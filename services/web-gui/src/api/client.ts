@@ -177,6 +177,8 @@ async function parseError(
   }
 }
 
+const NO_EXTERNAL_PROMPT = "Mục này không gọi AI nên không có prompt để copy.";
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -193,6 +195,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   // 202 (a job accepted) carries no body either.
   if (response.status === 204 || response.status === 202) {
     return undefined as T;
+  }
+  if ((init?.headers as Record<string, string> | undefined)?.[EXTERNAL_AI_HEADER] === "prompt") {
+    const { external_prompt: prompt } = (await response.json()) as { external_prompt?: string };
+    if (!prompt) throw new ApiError(NO_EXTERNAL_PROMPT);
+    throw new ExternalPromptReady(prompt);
   }
   return response.json() as Promise<T>;
 }
@@ -374,9 +381,43 @@ export function isRequestCancelled(err: unknown): boolean {
   return err instanceof RequestCancelledError;
 }
 
-/** Headers and signal of a request that carries an operation id; empty when it is not a followed call. */
-function operationInit(operation?: OperationCall): { headers: Record<string, string>; signal?: AbortSignal } {
-  return operation ? { headers: { [OPERATION_ID_HEADER]: operation.id }, signal: operation.signal } : { headers: {} };
+/** How a step's AI call runs through an AI outside the system: ask for the prompt to copy, or hand back the reply. */
+export type ExternalAi = { mode: "prompt" } | { mode: "paste"; reply: string };
+
+/** A step's AI call made through an AI outside the system instead of the model. */
+export interface ExternalAiCall {
+  external: ExternalAi;
+}
+
+/** How a step's AI call is made: followed and stoppable, or through an AI outside the system. */
+export type AiCall = OperationCall | ExternalAiCall;
+
+const EXTERNAL_AI_HEADER = "X-External-AI";
+
+/** The prompt of an external-AI run was built and no model was asked; it is what the Creator copies. */
+export class ExternalPromptReady extends Error {
+  constructor(readonly prompt: string) {
+    super("External prompt ready");
+    this.name = "ExternalPromptReady";
+  }
+}
+
+function externalOf(call?: AiCall): ExternalAi | undefined {
+  return call && "external" in call ? call.external : undefined;
+}
+
+/** Headers and signal of a request that carries an operation id or an external-AI mode; empty otherwise. */
+function operationInit(call?: AiCall): { headers: Record<string, string>; signal?: AbortSignal } {
+  if (!call) return { headers: {} };
+  if ("external" in call) return { headers: { [EXTERNAL_AI_HEADER]: call.external.mode } };
+  return { headers: { [OPERATION_ID_HEADER]: call.id }, signal: call.signal };
+}
+
+/** The JSON body of an AI call: the step's own fields, plus the pasted reply when the call is a paste. */
+function operationBody(body: object | undefined, call?: AiCall): string | undefined {
+  const external = externalOf(call);
+  if (external?.mode === "paste") return JSON.stringify({ ...body, external_reply: external.reply });
+  return body === undefined ? undefined : JSON.stringify(body);
 }
 
 export function suggestPublishMetadata(id: string, operation?: OperationCall): Promise<SuggestedMetadata> {
@@ -1517,13 +1558,13 @@ export async function redoUnit<C>(
   projectId: string,
   ref: UnitRef<C>,
   note: string,
-  operation?: OperationCall,
+  operation?: AiCall,
 ): Promise<ReviewUnit<C>> {
   const wire = await apiFetch<reviewUnitWire>(`${unitPath(projectId, ref)}/redo`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
     signal: operationInit(operation).signal,
-    body: JSON.stringify({ note }),
+    body: operationBody({ note }, operation),
   });
   return fromWireUnit(wire, ref.parse);
 }
@@ -1670,12 +1711,12 @@ export async function getIdeaScreen(projectId: string): Promise<IdeaScreen> {
  * Creator wrote (a model call: pass an operation id to follow it). 503 when no
  * language model is configured, 502 when the reply could not be read.
  */
-export async function generateProjectIdea(projectId: string, note: string, operation?: OperationCall): Promise<ProjectIdea> {
+export async function generateProjectIdea(projectId: string, note: string, operation?: AiCall): Promise<ProjectIdea> {
   const wire = await apiFetch<ideaWire>(`/v1/projects/${projectId}/idea/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
     signal: operationInit(operation).signal,
-    body: JSON.stringify({ note }),
+    body: operationBody({ note }, operation),
   });
   return fromWireIdea(wire);
 }
@@ -1712,10 +1753,12 @@ export async function unapproveProjectIdea(projectId: string): Promise<ProjectId
 }
 
 /** Has the AI read the idea for clarity, researchability and scope (a model call). */
-export async function reviewProjectIdea(projectId: string, operation?: OperationCall): Promise<IdeaReview> {
+export async function reviewProjectIdea(projectId: string, operation?: AiCall): Promise<IdeaReview> {
   const wire = await apiFetch<ideaReviewWire>(`/v1/projects/${projectId}/idea/review`, {
     method: "POST",
-    ...operationInit(operation),
+    headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
+    body: operationBody(undefined, operation),
   });
   return fromWireIdeaReview(wire);
 }
@@ -1867,12 +1910,12 @@ export async function getBriefScreen(projectId: string): Promise<BriefScreen> {
  * the idea is not approved, 503 when no language model is configured, 502 when
  * the reply could not be read.
  */
-export async function generateProjectBrief(projectId: string, note: string, operation?: OperationCall): Promise<ProjectBrief> {
+export async function generateProjectBrief(projectId: string, note: string, operation?: AiCall): Promise<ProjectBrief> {
   const wire = await apiFetch<projectBriefWire>(`/v1/projects/${projectId}/creative-brief/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
     signal: operationInit(operation).signal,
-    body: JSON.stringify({ note }),
+    body: operationBody({ note }, operation),
   });
   return fromWireProjectBrief(wire);
 }
@@ -1913,10 +1956,12 @@ export async function unapproveProjectBrief(projectId: string): Promise<ProjectB
 }
 
 /** Has the AI read the brief for audience, length, objectives and the avoid list (a model call). */
-export async function reviewProjectBrief(projectId: string, operation?: OperationCall): Promise<BriefReview> {
+export async function reviewProjectBrief(projectId: string, operation?: AiCall): Promise<BriefReview> {
   const wire = await apiFetch<briefReviewWire>(`/v1/projects/${projectId}/creative-brief/review`, {
     method: "POST",
-    ...operationInit(operation),
+    headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
+    body: operationBody(undefined, operation),
   });
   return fromWireBriefReview(wire);
 }
@@ -2214,13 +2259,13 @@ export async function getResearch(projectId: string): Promise<ResearchState> {
 export async function generateResearchQuestions(
   projectId: string,
   options: { replaceEdited: boolean; note?: string },
-  operation?: OperationCall,
+  operation?: AiCall,
 ): Promise<ResearchQuestion[]> {
   const res = await apiFetch<{ questions: ResearchQuestion[] | null }>(`/v1/projects/${projectId}/research/questions/generate`, {
     method: "POST",
     headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
     signal: operationInit(operation).signal,
-    body: JSON.stringify({ replace_edited: options.replaceEdited, note: options.note ?? "" }),
+    body: operationBody({ replace_edited: options.replaceEdited, note: options.note ?? "" }, operation),
   });
   return res.questions ?? [];
 }
@@ -2506,13 +2551,13 @@ export async function getStory(projectId: string): Promise<StoryState> {
  * step is not done, 503 without a language model, 502 when the reply could
  * not be read.
  */
-export async function generateStory(projectId: string, note: string, operation?: OperationCall): Promise<Story> {
+export async function generateStory(projectId: string, note: string, operation?: AiCall): Promise<Story> {
   return fromWireStoryBody(
     await apiFetch<storyWire>(`/v1/projects/${projectId}/story/generate`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
       signal: operationInit(operation).signal,
-      body: JSON.stringify({ note }),
+      body: operationBody({ note }, operation),
     }),
   );
 }
@@ -2692,13 +2737,13 @@ export async function getBeats(projectId: string): Promise<BeatState> {
  * an operation id to follow it). Beats the Creator wrote any part of keep that
  * part; the others are replaced and every beat goes to review.
  */
-export async function generateBeats(projectId: string, note: string, operation?: OperationCall, onlyUnwritten = false): Promise<BeatState> {
+export async function generateBeats(projectId: string, note: string, operation?: AiCall, onlyUnwritten = false): Promise<BeatState> {
   return fromWireBeats(
     await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/generate`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
       signal: operationInit(operation).signal,
-      body: JSON.stringify({ note, only_unwritten: onlyUnwritten }),
+      body: operationBody({ note, only_unwritten: onlyUnwritten }, operation),
     }),
   );
 }
@@ -2713,13 +2758,13 @@ export async function editBeat(projectId: string, key: string, fields: Record<st
 }
 
 /** Has the AI write one beat again with the Creator's note (a model call: pass an operation id to follow it). */
-export async function redoBeat(projectId: string, key: string, note: string, operation?: OperationCall): Promise<BeatState> {
+export async function redoBeat(projectId: string, key: string, note: string, operation?: AiCall): Promise<BeatState> {
   return fromWireBeats(
     await apiFetch<beatStateWire>(`${beatPath(projectId, key)}/redo`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
       signal: operationInit(operation).signal,
-      body: JSON.stringify({ note }),
+      body: operationBody({ note }, operation),
     }),
   );
 }
@@ -2750,14 +2795,14 @@ export async function addBeat(
   after: string,
   blank: boolean,
   note: string,
-  operation?: OperationCall,
+  operation?: AiCall,
 ): Promise<BeatState> {
   return fromWireBeats(
     await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
       signal: operationInit(operation).signal,
-      body: JSON.stringify({ after, blank, note }),
+      body: operationBody({ after, blank, note }, operation),
     }),
   );
 }
@@ -2965,13 +3010,13 @@ export async function getScript(projectId: string): Promise<ScriptState> {
  * another (a model call: pass an operation id to follow it). With `beat` only
  * that beat, which must have no dialogue yet.
  */
-export async function generateScript(projectId: string, beat: string, note: string, operation?: OperationCall): Promise<ScriptState> {
+export async function generateScript(projectId: string, beat: string, note: string, operation?: AiCall): Promise<ScriptState> {
   return fromWireScript(
     await apiFetch<scriptStateWire>(`/v1/projects/${projectId}/script/generate`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
       signal: operationInit(operation).signal,
-      body: JSON.stringify({ beat, note }),
+      body: operationBody({ beat, note }, operation),
     }),
   );
 }
@@ -2981,12 +3026,12 @@ export async function generateScript(projectId: string, beat: string, note: stri
  * the first line of a beat that joins badly with the one before it (`join`).
  * Nothing is stored: the Creator applies the text with an edit of the line.
  */
-export async function suggestScriptLine(projectId: string, kind: "line" | "join", lineId: string, operation?: OperationCall): Promise<string> {
+export async function suggestScriptLine(projectId: string, kind: "line" | "join", lineId: string, operation?: AiCall): Promise<string> {
   const reply = await apiFetch<{ text: string }>(`/v1/projects/${projectId}/script/suggest`, {
     method: "POST",
     headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
     signal: operationInit(operation).signal,
-    body: JSON.stringify({ kind, line_id: lineId }),
+    body: operationBody({ kind, line_id: lineId }, operation),
   });
   return reply.text;
 }
@@ -3249,14 +3294,14 @@ function fromWireLock(w: lockStateWire): ScriptLockState {
   };
 }
 
-async function lockCall(projectId: string, path: string, body?: unknown, operation?: OperationCall): Promise<ScriptLockState> {
+async function lockCall(projectId: string, path: string, body?: unknown, operation?: AiCall): Promise<ScriptLockState> {
   const init = operationInit(operation);
   return fromWireLock(
     await apiFetch<lockStateWire>(`/v1/projects/${projectId}/script-lock${path}`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...init.headers },
       signal: init.signal,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: operationBody(body as object | undefined, operation),
     }),
   );
 }
@@ -3267,7 +3312,7 @@ export async function getScriptLock(projectId: string): Promise<ScriptLockState>
 }
 
 /** Has the AI read the whole script and report what to deal with (a model call: pass an operation to follow it). */
-export function reviewScript(projectId: string, operation?: OperationCall): Promise<ScriptLockState> {
+export function reviewScript(projectId: string, operation?: AiCall): Promise<ScriptLockState> {
   return lockCall(projectId, "/review", undefined, operation);
 }
 
@@ -3295,7 +3340,7 @@ export function addGlossaryTerm(projectId: string, term: { term: string; say: st
 }
 
 /** Has the AI write the handoff note of every beat that has none, or only of `beat` (a model call). */
-export function generateHandoff(projectId: string, beat: string, operation?: OperationCall): Promise<ScriptLockState> {
+export function generateHandoff(projectId: string, beat: string, operation?: AiCall): Promise<ScriptLockState> {
   return lockCall(projectId, "/handoff/generate", { beat }, operation);
 }
 

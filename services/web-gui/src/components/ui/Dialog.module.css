@@ -82,6 +82,12 @@
   align-content: start;
 }
 
+/* What the Creator types is blue; the text around it to read stays in the ink colour. */
+.body textarea,
+.body input:not([type="checkbox"]):not([type="radio"]) {
+  color: var(--info);
+}
+
 .footer {
   display: flex;
   flex-wrap: wrap;

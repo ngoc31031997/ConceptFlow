@@ -36,3 +36,6 @@ if (!("ResizeObserver" in window)) {
   (window as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
   (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
 }
+
+// jsdom has no layout, so window.scrollTo only logs "not implemented"; a no-op keeps the log clean.
+window.scrollTo = () => {};

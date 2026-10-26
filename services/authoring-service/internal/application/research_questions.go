@@ -36,11 +36,8 @@ func (uc *ResearchDeskUseCase) questions(ctx context.Context, projectID string) 
 // the Creator's instruction for this run. A reply that cannot be read stores
 // nothing and leaves the questions as they were.
 func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID string, replaceEdited bool, note string) ([]QuestionView, error) {
-	if uc.provider == nil {
-		return nil, ErrLLMNotConfigured
-	}
-	if r, ok := uc.provider.(interface{ Ready() bool }); ok && !r.Ready() {
-		return nil, ErrLLMNotConfigured
+	if err := requireProvider(ctx, uc.provider); err != nil {
+		return nil, err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return nil, err

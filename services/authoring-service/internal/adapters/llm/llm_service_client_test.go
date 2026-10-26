@@ -218,3 +218,38 @@ func TestReadyReflectsTheServicesHiveKeyAndIsCached(t *testing.T) {
 }
 
 func asLLMError(err error, target **application.LLMError) bool { return errors.As(err, target) }
+
+func TestChatExternalSendsThePromptAndThePastedReply(t *testing.T) {
+	var got map[string]any
+	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/external" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_, _ = w.Write([]byte(`{"content":"{\"a\":1}","json":{"a":1},"usage":{"model":"external","usage_reported":false},"provider":"external","call_id":"c1"}`))
+	})
+	res, err := c.ChatExternal(context.Background(), application.ChatRequest{
+		System: "SYS", User: "USR", ExpectJSON: true, ProjectID: "p1", Role: "story_frame", Step: "story",
+	}, `{"a":1}`)
+	if err != nil {
+		t.Fatalf("ChatExternal: %v", err)
+	}
+	if string(res.JSON) != `{"a":1}` || res.CallID != "c1" || !res.Usage.UsageMissing {
+		t.Errorf("result = %+v, want the JSON, the call id and usage marked not reported", res)
+	}
+	if got["system"] != "SYS" || got["user"] != "USR" || got["reply"] != `{"a":1}` || got["expect_json"] != true || got["role"] != "story_frame" {
+		t.Errorf("body = %v, want the prompt, the reply and where the call comes from", got)
+	}
+}
+
+func TestChatExternalReportsAReplyWithoutJSONAsMalformed(t *testing.T) {
+	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"error":{"kind":"malformed","provider":"external","message":"khối JSON không đọc được","call_id":"c2"}}`))
+	})
+	_, err := c.ChatExternal(context.Background(), application.ChatRequest{ExpectJSON: true}, "xin chào")
+	var llmErr *application.LLMError
+	if !errors.As(err, &llmErr) || llmErr.Kind != application.ErrKindMalformed || llmErr.CallID != "c2" {
+		t.Errorf("error = %v, want a malformed LLMError carrying the call id", err)
+	}
+}

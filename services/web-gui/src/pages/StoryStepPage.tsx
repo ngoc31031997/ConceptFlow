@@ -1,6 +1,6 @@
 import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import type { StoryState } from "../api/client";
+import { generateStory, type StoryState } from "../api/client";
 import { AiModelSelect } from "../components/AiModelSelect";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
@@ -79,7 +79,7 @@ export function StoryStepPage() {
     return (
       <>
         <StoryInputCard state={s} onReload={story.reload} />
-        <StoryCard story={story} state={s} aiAvailable={aiAvailable} locked={locked} />
+        <StoryCard projectId={projectId} story={story} state={s} aiAvailable={aiAvailable} locked={locked} />
         <Card data-testid="story-approve-card">
           <div className={researchStyles.body}>
             <div className={researchStyles.head}>
@@ -93,7 +93,7 @@ export function StoryStepPage() {
                 </Button>
               ) : (
                 <>
-                  {aiAvailable && hasStory && (
+                  {hasStory && (
                     <Button variant="ghost" onClick={() => setRedoOpen(true)} disabled={busy} data-testid="story-redo-all">
                       Làm lại kèm ghi chú
                     </Button>
@@ -166,7 +166,11 @@ export function StoryStepPage() {
         impact={{ items: [], failed: false }}
         initialNote={story.failedNote}
         modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="story_frame" label="Model AI cho bước Câu chuyện" testId="story-redo-all-model" /> : undefined}
-        onSend={(note) => void story.generate(note)}
+        onSend={aiAvailable ? (note) => void story.generate(note) : undefined}
+        external={{
+          run: (note, external) => generateStory(projectId, note, { external }),
+          onDone: story.reload,
+        }}
         testId="story-redo-all-dialog"
       />
     </div>

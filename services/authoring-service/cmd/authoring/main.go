@@ -63,7 +63,7 @@ func main() {
 
 	// The one path to a language model.
 	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
-	var llmProvider application.LLMProviderPort = llmClient
+	var llmProvider application.LLMProviderPort = application.NewExternalAIProvider(llmClient, llmClient)
 	logger.Info("llm-service configured", "url", cfg.LLMServiceURL, "model", cfg.HiveModel)
 
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient).WithModels(authoringRepo)

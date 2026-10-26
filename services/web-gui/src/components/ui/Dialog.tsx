@@ -99,11 +99,15 @@ export function Dialog({
       }
     };
     document.addEventListener("keydown", handleKeyDown);
+    // Locking the page's scroll drops its offset when the page behind changes while the dialog is open
+    // (the control that opened it can disappear), so the offset is put back on close.
+    const scrollY = window.scrollY;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      window.scrollTo?.(0, scrollY);
       if (opener && document.contains(opener)) opener.focus();
     };
   }, [open, initialFocusRef]);

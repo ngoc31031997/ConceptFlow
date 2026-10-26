@@ -1,7 +1,8 @@
 import { useState } from "react";
-import type { StoryFieldKey, StoryPatch, StoryState } from "../../api/client";
+import { generateStory, type StoryFieldKey, type StoryPatch, type StoryState } from "../../api/client";
 import type { StoryControls } from "../../hooks/useStory";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiButton } from "../ExternalAiButton";
 import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
 import unitStyles from "../units/units.module.css";
@@ -12,6 +13,7 @@ import { StoryTextEditModal } from "./StoryTextEditModal";
 import styles from "./story.module.css";
 
 interface StoryCardProps {
+  projectId: string;
   story: StoryControls;
   state: StoryState;
   /** A language model is configured, so the AI can write the story. */
@@ -41,7 +43,7 @@ function Mine({ field, owned }: { field: StoryFieldKey; owned: boolean }) {
  * rule 4); one the Creator wrote is tagged and kept by the AI. The AI writes
  * the whole story, and "Làm lại kèm ghi chú" sits with the approval below.
  */
-export function StoryCard({ story, state, aiAvailable, locked }: StoryCardProps) {
+export function StoryCard({ projectId, story, state, aiAvailable, locked }: StoryCardProps) {
   const [editing, setEditing] = useState<"central_question" | "core_answer" | "narrative_arc" | null>(null);
   const s = state.story;
   const open = state.briefApproved && state.researchResolved;
@@ -93,13 +95,20 @@ export function StoryCard({ story, state, aiAvailable, locked }: StoryCardProps)
                 ? "Chưa có câu chuyện. AI chọn góc kể và xây mạch từ brief và dữ kiện, hoặc bạn tự viết từng ô."
                 : "Chưa có câu chuyện. Chưa cấu hình AI nên bạn tự viết từng ô rồi duyệt."}
             </p>
-            {aiAvailable && (
-              <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
+            <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
+              <ExternalAiButton
+                title="Câu chuyện · AI ngoài"
+                run={(external) => generateStory(projectId, "", { external })}
+                onDone={story.reload}
+                disabled={busy}
+                testId="story-generate-external"
+              />
+              {aiAvailable && (
                 <Button variant="run" onClick={() => void story.generate("")} disabled={busy} data-testid="story-generate">
                   AI viết câu chuyện
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
         {s && (state.briefStale || state.researchStale) && (

@@ -299,6 +299,26 @@ func (c *Client) Chat(ctx context.Context, req application.ChatRequest) (applica
 	return application.ChatResult{Content: res.Content, JSON: res.JSON, Usage: res.Usage.usage(), CallID: res.CallID}, nil
 }
 
+// ChatExternal has llm-service take reply, pasted from an AI outside the system,
+// as the answer to req's prompt. llm-service logs it and, with req.ExpectJSON,
+// reads its JSON object; a reply with none is an LLMError of kind malformed.
+func (c *Client) ChatExternal(ctx context.Context, req application.ChatRequest, reply string) (application.ChatResult, error) {
+	body := map[string]any{
+		"system": req.System, "user": req.User, "reply": reply, "expect_json": req.ExpectJSON,
+		"project_id": req.ProjectID, "role": req.Role, "step": req.Step, "phase": req.Phase,
+	}
+	var res struct {
+		Content string          `json:"content"`
+		JSON    json.RawMessage `json:"json"`
+		Usage   wireUsage       `json:"usage"`
+		CallID  string          `json:"call_id"`
+	}
+	if err := c.post(ctx, "/v1/chat/external", body, &res); err != nil {
+		return application.ChatResult{}, err
+	}
+	return application.ChatResult{Content: res.Content, JSON: res.JSON, Usage: res.Usage.usage(), CallID: res.CallID}, nil
+}
+
 // --- MetadataSuggesterPort ----------------------------------------------------
 
 // suggestCall posts a suggestion request. When ctx carries a progress callback

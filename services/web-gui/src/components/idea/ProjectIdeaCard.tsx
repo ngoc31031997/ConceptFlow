@@ -1,8 +1,9 @@
 import { useState } from "react";
-import type { IdeaAspect, IdeaRating, ProjectIdeaField } from "../../api/client";
+import { generateProjectIdea, reviewProjectIdea, type IdeaAspect, type IdeaRating, type ProjectIdeaField } from "../../api/client";
 import type { ProjectIdeaControls } from "../../hooks/useProjectIdea";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiButton } from "../ExternalAiButton";
 import { Button, Card } from "../ui";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import { UnitStatusChip } from "../units/UnitStatusChip";
@@ -107,11 +108,20 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
       <div className={styles.review} data-testid="idea-review-panel">
         <div className={styles.reviewHead}>
           <h4>Đánh giá của AI</h4>
-          {aiAvailable && (
-            <Button variant="run" onClick={() => void idea.review()} disabled={working || idea.busy || missing.length > 0} data-testid="idea-review-run">
-              {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
-            </Button>
-          )}
+          <div className={cardStyles.actions}>
+            <ExternalAiButton
+              title="Đánh giá ý tưởng · AI ngoài"
+              run={(external) => reviewProjectIdea(projectId, { external })}
+              onDone={idea.reload}
+              disabled={working || idea.busy || missing.length > 0}
+              testId="idea-review-external"
+            />
+            {aiAvailable && (
+              <Button variant="run" onClick={() => void idea.review()} disabled={working || idea.busy || missing.length > 0} data-testid="idea-review-run">
+                {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
+              </Button>
+            )}
+          </div>
         </div>
         {!review && (
           <p className={cardStyles.hint} data-testid="idea-review-none">
@@ -204,6 +214,12 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
             <Button variant="ghost" onClick={() => setEditOpen(true)} data-testid="idea-write-own">
               Tự viết ý tưởng
             </Button>
+            <ExternalAiButton
+              title="Ý tưởng · AI ngoài"
+              run={(external) => generateProjectIdea(projectId, "", { external })}
+              onDone={idea.reload}
+              testId="idea-generate-external"
+            />
             {aiAvailable && (
               <Button variant="run" onClick={() => void idea.generate()} data-testid="idea-generate">
                 AI viết ý tưởng
@@ -253,7 +269,7 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
           approveLabel="Duyệt ý tưởng"
           approveDisabled={missing.length > 0}
           busy={idea.busy || working}
-          canRedo={aiAvailable}
+          canRedo
           onEdit={() => setEditOpen(true)}
           onRedo={() => setRedoOpen(true)}
           onApprove={() => void idea.approve()}
@@ -287,7 +303,11 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
         approved={stored?.status === "approved"}
         initialNote={idea.failedNote}
         modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="brief" label="Model AI viết ý tưởng" testId="idea-redo-model" /> : undefined}
-        onSend={(note) => void idea.generate(note)}
+        onSend={aiAvailable ? (note) => void idea.generate(note) : undefined}
+        external={{
+          run: (note, external) => generateProjectIdea(projectId, note, { external }),
+          onDone: idea.reload,
+        }}
       />
     </Card>
   );

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { BEAT_DURATION_STEP, BEAT_FNS, BEAT_MIN_SECONDS, getBeatImpact, type Beat, type BeatFn, type BeatState } from "../../api/client";
+import { BEAT_DURATION_STEP, BEAT_FNS, BEAT_MIN_SECONDS, addBeat, getBeatImpact, redoBeat, type Beat, type BeatFn, type BeatState } from "../../api/client";
 import type { BeatsControls } from "../../hooks/useBeats";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiButton } from "../ExternalAiButton";
 import { FactTags } from "../story/FactTags";
 import { ImpactConfirm } from "../research/ImpactConfirm";
 import researchStyles from "../research/research.module.css";
@@ -14,6 +15,9 @@ import { UnitReviewBar } from "../units/UnitReviewBar";
 import unitStyles from "../units/units.module.css";
 import { UnitStatusChip } from "../units/UnitStatusChip";
 import styles from "./beats.module.css";
+
+/** How long a closing dialog takes to leave, so the page is scrolled after it has gone. */
+const SETTLE_MS = 300;
 
 interface BeatCardProps {
   projectId: string;
@@ -46,6 +50,11 @@ function Block({ label, text, testId }: { label: string; text: string; testId: s
       <span className={text.trim() ? undefined : researchStyles.hint}>{text.trim() || "(trống)"}</span>
     </div>
   );
+}
+
+/** Brings a beat card to the middle of the screen once the page behind a closed dialog has settled. */
+function showBeat(key: string) {
+  window.setTimeout(() => document.getElementById(`beat-${key}`)?.scrollIntoView?.({ block: "center" }), SETTLE_MS);
 }
 
 /**
@@ -86,7 +95,7 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
   ];
 
   return (
-    <Card data-testid={`beat-${beat.key}`}>
+    <Card id={`beat-${beat.key}`} data-testid={`beat-${beat.key}`}>
       <div className={researchStyles.body}>
         <div className={researchStyles.head}>
           <h3>
@@ -205,7 +214,7 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
               approveLabel="Duyệt beat"
               approveDisabled={beat.goal.trim() === ""}
               busy={busy}
-              canRedo={aiAvailable}
+              canRedo
               onEdit={() => setEditing(true)}
               onRedo={() => setRedoing(true)}
               onApprove={() => void beats.approve(beat.key)}
@@ -225,10 +234,38 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
           <Button variant="ghost" className={researchStyles.sm} onClick={() => (state.scriptApproved > 0 ? setMoving(1) : void beats.move(beat.key, 1))} disabled={busy || last} data-testid={`beat-down-${beat.key}`}>
             ↓ Xuống
           </Button>
+          {!skeleton && !beat.goal.trim() && !beat.content.trim() && (
+            <ExternalAiButton
+              title={`B${no} ${beat.title} · AI ngoài`}
+              label="Viết beat này bằng AI ngoài"
+              run={(external) => redoBeat(projectId, beat.key, "", { external })}
+              onDone={async () => {
+                await beats.reload();
+                showBeat(beat.key);
+              }}
+              disabled={busy}
+              testId={`beat-write-external-${beat.key}`}
+            />
+          )}
           {!skeleton && aiAvailable && !beat.goal.trim() && !beat.content.trim() && (
             <Button variant="run" className={researchStyles.sm} onClick={() => void beats.redo(beat.key, "")} disabled={busy} data-testid={`beat-write-${beat.key}`}>
               AI viết beat này
             </Button>
+          )}
+          {!skeleton && (
+            <ExternalAiButton
+              title={`Thêm beat sau B${no} · AI ngoài`}
+              label="+ Thêm beat sau bằng AI ngoài"
+              run={(external) => addBeat(projectId, beat.key, false, "", { external })}
+              onDone={async (sheet) => {
+                await beats.reload();
+                // The new beat is the one that now follows this one.
+                const at = sheet.beats.findIndex((b) => b.key === beat.key);
+                showBeat(sheet.beats[at + 1]?.key ?? beat.key);
+              }}
+              disabled={busy}
+              testId={`beat-add-external-${beat.key}`}
+            />
           )}
           <Button
             variant="run"
@@ -263,7 +300,14 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
         impact={redoImpact}
         initialNote={beats.failedNote}
         modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId={`beat-redo-model-${beat.key}`} /> : undefined}
-        onSend={(note) => void beats.redo(beat.key, note)}
+        onSend={aiAvailable ? (note) => void beats.redo(beat.key, note) : undefined}
+        external={{
+          run: (note, external) => redoBeat(projectId, beat.key, note, { external }),
+          onDone: async () => {
+            await beats.reload();
+            showBeat(beat.key);
+          },
+        }}
         testId={`beat-redo-${beat.key}`}
       />
       <ImpactConfirm

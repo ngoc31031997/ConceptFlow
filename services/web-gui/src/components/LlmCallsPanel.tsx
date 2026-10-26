@@ -30,6 +30,14 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleString("vi-VN", { hour12: false });
 }
 
+/** The provider label of the reply a Creator pasted from an AI outside the system. */
+const EXTERNAL_PROVIDER = "external";
+
+/** The model column: calls made through an outside AI have no model of the system's own. */
+function modelLabel(call: { provider: string; model: string }): string {
+  return call.provider === EXTERNAL_PROVIDER ? "AI ngoài" : call.model;
+}
+
 function formatMs(ms: number): string {
   if (ms <= 0) return "—";
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -237,7 +245,7 @@ export function LlmCallsPanel() {
                   <td className={styles.mono}>{r.project_id ? r.project_id.slice(0, 8) : "—"}</td>
                   <td>{r.role || "—"}</td>
                   <td>{[r.step, r.phase].filter(Boolean).join(" · ") || "—"}</td>
-                  <td>{r.model}</td>
+                  <td>{modelLabel(r)}</td>
                   <td className={r.ok ? styles.ok : styles.fail}>{r.ok ? "OK" : r.error_kind || "lỗi"}</td>
                   <td>
                     {r.usage_reported ? `${r.prompt_tokens} / ${r.completion_tokens}` : "không rõ"}
@@ -312,7 +320,7 @@ export function LlmCallsPanel() {
         {shown && (
           <>
             <p className={styles.detailMeta}>
-              Mã cuộc gọi <span className={styles.mono}>{shown.call_id}</span> · {shown.provider} · {shown.model}
+              Mã cuộc gọi <span className={styles.mono}>{shown.call_id}</span> · {shown.provider} · {modelLabel(shown)}
               {shown.num_ctx > 0 ? ` · num_ctx ${shown.num_ctx}` : ""}
               {shown.prompt_chars > 0 ? ` · prompt ${shown.prompt_chars.toLocaleString("vi-VN")} ký tự` : ""}
               {shown.ok ? "" : ` · lỗi ${shown.error_kind}: ${shown.error_message}`}

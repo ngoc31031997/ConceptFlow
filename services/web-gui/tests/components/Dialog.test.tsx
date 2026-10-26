@@ -109,4 +109,21 @@ describe("Dialog", () => {
     fireEvent.click(screen.getByTestId("dlg-cancel"));
     await waitFor(() => expect(document.body.style.overflow).toBe(""));
   });
+
+  it("puts the page back where it was scrolled when it closes", () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    Object.defineProperty(window, "scrollY", { value: 480, configurable: true });
+    const { rerender } = render(
+      <Dialog open onClose={() => {}} title="T" footer={<button>ok</button>}>
+        <p>x</p>
+      </Dialog>,
+    );
+    rerender(
+      <Dialog open={false} onClose={() => {}} title="T" footer={<button>ok</button>}>
+        <p>x</p>
+      </Dialog>,
+    );
+    expect(scrollTo).toHaveBeenCalledWith(0, 480);
+    scrollTo.mockRestore();
+  });
 });

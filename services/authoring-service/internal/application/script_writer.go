@@ -45,14 +45,8 @@ func (uc *ScriptDeskUseCase) context(ctx context.Context, projectID string) (scr
 }
 
 // requireAI fails unless a language model is configured.
-func (uc *ScriptDeskUseCase) requireAI() error {
-	if uc.provider == nil {
-		return ErrLLMNotConfigured
-	}
-	if r, ok := uc.provider.(interface{ Ready() bool }); ok && !r.Ready() {
-		return ErrLLMNotConfigured
-	}
-	return nil
+func (uc *ScriptDeskUseCase) requireAI(ctx context.Context) error {
+	return requireProvider(ctx, uc.provider)
 }
 
 // chat sends one system prompt and records the usage.
@@ -183,7 +177,7 @@ func (uc *ScriptDeskUseCase) writeBeat(ctx context.Context, projectID string, sc
 // only that beat, which must have no dialogue yet. A beat whose reply cannot
 // be read stores nothing and stops the run; beats already written stay.
 func (uc *ScriptDeskUseCase) Generate(ctx context.Context, projectID, beatKey, note string) error {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
@@ -224,7 +218,7 @@ func (uc *ScriptDeskUseCase) Generate(ctx context.Context, projectID, beatKey, n
 // before it (kind "join"). It stores nothing: the Creator applies the text
 // with an ordinary edit of the line.
 func (uc *ScriptDeskUseCase) Suggest(ctx context.Context, projectID, kind, lineID string) (string, error) {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return "", err
 	}
 	beatKey, ok := domain.ScriptLineBeat(lineID)

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { scriptBeatUnit, type ScriptBeat, type ScriptLine } from "../../api/client";
+import { generateScript, redoUnit, scriptBeatUnit, suggestScriptLine, type ScriptBeat, type ScriptLine } from "../../api/client";
 import type { ScriptControls } from "../../hooks/useScript";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiButton } from "../ExternalAiButton";
 import researchStyles from "../research/research.module.css";
 import { FactTags } from "../story/FactTags";
 import { Button, Card } from "../ui";
@@ -111,12 +112,23 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
       </div>
     ) : null;
 
-  const askButton = (kind: "line" | "join", lineId: string) =>
-    aiAvailable ? (
-      <Button variant="view" className={researchStyles.sm} onClick={() => void ask(kind, lineId)} disabled={busy} data-testid={`script-ask-${kind}-${lineId}`}>
-        {asking === lineId ? "AI đang gợi ý…" : suggestion?.lineId === lineId && suggestion.kind === kind ? "Ẩn gợi ý" : "Xem gợi ý"}
-      </Button>
-    ) : null;
+  const askButton = (kind: "line" | "join", lineId: string) => (
+    <>
+      <ExternalAiButton
+        title={`Gợi ý cho câu ${lineId} · AI ngoài`}
+        label="Gợi ý bằng AI ngoài"
+        run={(external) => suggestScriptLine(projectId, kind, lineId, { external })}
+        onDone={(text) => setSuggestion({ kind, lineId, text })}
+        disabled={busy}
+        testId={`script-ask-external-${kind}-${lineId}`}
+      />
+      {aiAvailable && (
+        <Button variant="view" className={researchStyles.sm} onClick={() => void ask(kind, lineId)} disabled={busy} data-testid={`script-ask-${kind}-${lineId}`}>
+          {asking === lineId ? "AI đang gợi ý…" : suggestion?.lineId === lineId && suggestion.kind === kind ? "Ẩn gợi ý" : "Xem gợi ý"}
+        </Button>
+      )}
+    </>
+  );
 
   return (
     <Card data-testid={`script-beat-${beat.key}`}>
@@ -166,6 +178,14 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
               Chưa có lời thoại.{aiAvailable ? " AI viết từ mục tiêu và nội dung của beat, hoặc bạn tự viết." : " Chưa cấu hình AI nên bạn tự viết."}
             </p>
             <div className={styles.actions}>
+              <ExternalAiButton
+                title={`Lời thoại B${beat.number} ${beat.title} · AI ngoài`}
+                label="Viết lời thoại bằng AI ngoài"
+                run={(external) => generateScript(projectId, beat.key, "", { external })}
+                onDone={script.reload}
+                disabled={busy}
+                testId={`script-write-external-${beat.key}`}
+              />
               {aiAvailable && (
                 <Button variant="run" className={researchStyles.sm} onClick={() => void script.generate(beat.key, "")} disabled={busy} data-testid={`script-write-${beat.key}`}>
                   AI viết lời thoại beat này
@@ -251,7 +271,7 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
               status={beat.status}
               approveLabel="Duyệt beat"
               busy={busy}
-              canRedo={aiAvailable}
+              canRedo
               onEdit={() => setEditing(true)}
               onRedo={() => setRedoing(true)}
               onApprove={() => void script.approve(beat.key)}
@@ -286,7 +306,11 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         impact={redoImpact}
         initialNote={script.failedNote}
         modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="story" label="Model AI cho bước Viết kịch bản" testId={`script-redo-model-${beat.key}`} /> : undefined}
-        onSend={(note) => void script.redo(beat.key, note)}
+        onSend={aiAvailable ? (note) => void script.redo(beat.key, note) : undefined}
+        external={{
+          run: (note, external) => redoUnit(projectId, scriptBeatUnit(beat.key), note, { external }),
+          onDone: script.reload,
+        }}
         testId={`script-redo-${beat.key}`}
       />
     </Card>

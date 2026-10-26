@@ -47,3 +47,4 @@
 | [ADR-0043](ADR-0043-pasted-research-with-source-verification.md) | Nghiên cứu có nguồn bằng prompt chép ra công cụ ngoài; backend kiểm đoạn trích và chặn địa chỉ nội bộ | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |
 | [ADR-0044](ADR-0044-locked-script-versions-and-handoff.md) | Chốt phiên bản kịch bản; bước sau chỉ đọc bản đã chốt và bộ bàn giao trong DB | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |
 | [ADR-0045](ADR-0045-llm-service-owns-call-log.md) | llm-service giữ DB riêng và là nơi duy nhất ghi và trả JSON của cuộc gọi AI | Proposed | Application Design (CR-100) | 2026-10-25 |
+| [ADR-0047](ADR-0047-external-ai-through-the-chat-gate.md) | Chạy bước AI bằng AI ngoài qua cổng `Chat`; mỗi lượt đúng một prompt | Proposed | Construction (CR-102) | 2026-10-26 |

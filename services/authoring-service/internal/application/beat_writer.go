@@ -352,6 +352,9 @@ func (uc *BeatDeskUseCase) writeOne(ctx context.Context, projectID string, bc be
 		if !errors.Is(err, domain.ErrBeatReplyUnusable) {
 			return domain.Beat{}, err
 		}
+		if UsingExternalAI(ctx) {
+			return domain.Beat{}, err
+		}
 		if attempt == beatWriteAttempts {
 			return domain.Beat{}, fmt.Errorf("beat %s (B%d) viết %d lần vẫn sai: %w", old.unit.Key, at+1, attempt, err)
 		}
@@ -415,7 +418,7 @@ func (uc *BeatDeskUseCase) saveContent(ctx context.Context, projectID string, bc
 // target. Nothing is stored unless all of it succeeds. Every beat written goes
 // to review.
 func (uc *BeatDeskUseCase) Generate(ctx context.Context, projectID, note string, onlyUnwritten bool) error {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
@@ -489,7 +492,7 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 	if blank {
 		beat = domain.Beat{Fn: domain.BeatFns[2], Title: "Beat mới", Facts: []string{}, Dur: 15}
 	} else {
-		if err := uc.requireAI(); err != nil {
+		if err := uc.requireAI(ctx); err != nil {
 			return "", err
 		}
 		if !gate.SkeletonApproved {

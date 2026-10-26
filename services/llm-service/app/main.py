@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app import errors, tasks
 from app import storyboard as sbm
-from app.calllog import CallFilter, CallLogPort, PgCallLog
+from app.calllog import CallFilter, CallLogPort, CallRecord, PgCallLog, new_call_id
 from app.config import Config
 from app.errors import LLMError, Usage
 from app.frame import LANDSCAPE, MAX_HEIGHT, Frame, frame_of
@@ -62,6 +62,22 @@ class ChatBody(BaseModel):
     role: str = ""
     step: str = ""
     phase: str = ""
+
+
+class ExternalChatBody(BaseModel):
+    """A reply the Creator pasted from an AI outside the system, for the prompt of one chat turn."""
+
+    system: str = ""
+    user: str
+    reply: str
+    expect_json: bool = False
+    project_id: str = ""
+    role: str = ""
+    step: str = ""
+    phase: str = ""
+
+
+EXTERNAL_PROVIDER = "external"
 
 
 class MetadataBody(BaseModel):
@@ -335,6 +351,31 @@ def create_app(
             return {**out, "json": obj}
 
         return _stream(work)
+
+    @app.post("/v1/chat/external")
+    async def chat_external(body: ExternalChatBody):
+        """Take a pasted reply as the answer of one chat turn and log it like a model call.
+
+        Same result shape as a finished `/v1/chat` (not streamed). With `expect_json`, a reply with no
+        readable JSON object is a `malformed` error and no repair turn is made: the Creator pastes again.
+        """
+        call_id = new_call_id()
+        obj, problem = first_json_object(body.reply) if body.expect_json else (None, "")
+        failed = body.expect_json and obj is None
+        await call_log.record(CallRecord(
+            call_id=call_id, provider=EXTERNAL_PROVIDER, model=EXTERNAL_PROVIDER, ok=not failed,
+            role=body.role, step=body.step, phase=body.phase, project_id=body.project_id,
+            response=body.reply, error_kind=errors.MALFORMED if failed else "",
+            error_message=f"khối JSON không đọc được ({problem})" if failed else "",
+            usage_reported=False, system_prompt=body.system, user_prompt=body.user,
+            prompt_chars=len(body.system) + len(body.user)))
+        if failed:
+            return _error_response(
+                f"khối JSON không đọc được ({problem})", status=422, kind=errors.MALFORMED,
+                provider=EXTERNAL_PROVIDER, call_id=call_id)
+        out = {"content": body.reply, "usage": Usage(model=EXTERNAL_PROVIDER, usage_reported=False).to_dict(),
+               "provider": EXTERNAL_PROVIDER, "call_id": call_id}
+        return {**out, "json": obj} if body.expect_json else out
 
     @app.get("/v1/llm/stats")
     async def llm_stats(step: str, phase: str, days: int = 30):

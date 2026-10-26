@@ -117,14 +117,8 @@ func (uc *ProjectIdeaUseCase) ApprovedIdea(ctx context.Context, projectID string
 }
 
 // requireAI refuses when no language model is ready.
-func (uc *ProjectIdeaUseCase) requireAI() error {
-	if uc.provider == nil {
-		return ErrLLMNotConfigured
-	}
-	if r, ok := uc.provider.(interface{ Ready() bool }); ok && !r.Ready() {
-		return ErrLLMNotConfigured
-	}
-	return nil
+func (uc *ProjectIdeaUseCase) requireAI(ctx context.Context) error {
+	return requireProvider(ctx, uc.provider)
 }
 
 // Generate has the AI write the idea from what the Creator typed, keeping every
@@ -132,7 +126,7 @@ func (uc *ProjectIdeaUseCase) requireAI() error {
 // the first run). The idea goes back to waiting for approval. A reply that
 // cannot be read, or that misses a field, is an error and nothing is stored.
 func (uc *ProjectIdeaUseCase) Generate(ctx context.Context, projectID, note string) (domain.StoredIdea, error) {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return domain.StoredIdea{}, err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
@@ -380,7 +374,7 @@ func (uc *ProjectIdeaUseCase) Unapprove(ctx context.Context, projectID string) (
 // stores what it found. The review is advice: it never changes the idea or its
 // approval.
 func (uc *ProjectIdeaUseCase) Review(ctx context.Context, projectID string) (domain.IdeaReview, error) {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return domain.IdeaReview{}, err
 	}
 	stored, err := uc.store.GetProjectIdea(ctx, projectID)

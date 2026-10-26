@@ -203,14 +203,8 @@ func (uc *StoryDeskUseCase) FactDependents() FactDependentsFinder {
 }
 
 // requireAI fails unless a language model is configured.
-func (uc *StoryDeskUseCase) requireAI() error {
-	if uc.provider == nil {
-		return ErrLLMNotConfigured
-	}
-	if r, ok := uc.provider.(interface{ Ready() bool }); ok && !r.Ready() {
-		return ErrLLMNotConfigured
-	}
-	return nil
+func (uc *StoryDeskUseCase) requireAI(ctx context.Context) error {
+	return requireProvider(ctx, uc.provider)
 }
 
 // current loads the stored story, or a new empty one when there is none yet.
@@ -304,7 +298,7 @@ func keptStoryFieldsText(stored domain.StoredStory) string {
 // waiting for approval. A reply that cannot be read, that misses a field or
 // that cites a fact the table does not hold is an error and nothing is stored.
 func (uc *StoryDeskUseCase) Generate(ctx context.Context, projectID, note string) (domain.StoredStory, error) {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return domain.StoredStory{}, err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {

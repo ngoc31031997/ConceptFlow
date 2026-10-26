@@ -15,14 +15,8 @@ import (
 const lockModelStep = "story"
 
 // requireAI fails unless a language model is configured.
-func (uc *ScriptLockDeskUseCase) requireAI() error {
-	if uc.provider == nil {
-		return ErrLLMNotConfigured
-	}
-	if r, ok := uc.provider.(interface{ Ready() bool }); ok && !r.Ready() {
-		return ErrLLMNotConfigured
-	}
-	return nil
+func (uc *ScriptLockDeskUseCase) requireAI(ctx context.Context) error {
+	return requireProvider(ctx, uc.provider)
 }
 
 // chat sends one system prompt and records the usage under role.
@@ -136,7 +130,7 @@ func previousFindingsText(r domain.ScriptReview) string {
 // stands with the findings it made before. A reply that cannot be read stores
 // nothing.
 func (uc *ScriptLockDeskUseCase) Review(ctx context.Context, projectID string) error {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
@@ -267,7 +261,7 @@ func (uc *ScriptLockDeskUseCase) writeHandoff(ctx context.Context, projectID str
 // which must have no note yet. A beat whose reply cannot be read stores
 // nothing and stops the run; notes already written stay.
 func (uc *ScriptLockDeskUseCase) GenerateHandoff(ctx context.Context, projectID, beatKey string) error {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
@@ -321,10 +315,11 @@ const maxReplyAttempts = 3
 
 // askUntilUsable runs ask until it succeeds, asking again only when the reply
 // could not be read (unusable); any other error, or the last attempt's, is returned.
+// Under an external AI there is one pasted reply, so it asks once.
 func askUntilUsable(ctx context.Context, what, projectID string, unusable error, ask func() error) error {
 	var err error
 	for attempt := 1; attempt <= maxReplyAttempts; attempt++ {
-		if err = ask(); err == nil || !errors.Is(err, unusable) || ctx.Err() != nil {
+		if err = ask(); err == nil || !errors.Is(err, unusable) || ctx.Err() != nil || UsingExternalAI(ctx) {
 			return err
 		}
 		slog.Warn("asking the model again", "what", what, "project_id", projectID, "attempt", attempt)

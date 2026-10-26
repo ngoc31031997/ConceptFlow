@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { IdeaAspect, IdeaRating, ProjectBriefField } from "../../api/client";
+import { generateProjectBrief, reviewProjectBrief, type IdeaAspect, type IdeaRating, type ProjectBriefField } from "../../api/client";
 import type { ProjectBriefControls } from "../../hooks/useProjectBrief";
 import { formatClock } from "../../utils/clockDuration";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiButton } from "../ExternalAiButton";
 import { Button, Card } from "../ui";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import { UnitStatusChip } from "../units/UnitStatusChip";
@@ -179,16 +180,25 @@ export function ProjectBriefCard({
       <div className={styles.review} data-testid="brief-review-panel">
         <div className={styles.reviewHead}>
           <h4>Đánh giá của AI</h4>
-          {aiAvailable && (
-            <Button
-              variant="run"
-              onClick={() => void brief.review()}
+          <div className={cardStyles.actions}>
+            <ExternalAiButton
+              title="Đánh giá brief · AI ngoài"
+              run={(external) => reviewProjectBrief(projectId, { external })}
+              onDone={brief.reload}
               disabled={working || brief.busy || cannotApprove}
-              data-testid="brief-review-run"
-            >
-              {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
-            </Button>
-          )}
+              testId="brief-review-external"
+            />
+            {aiAvailable && (
+              <Button
+                variant="run"
+                onClick={() => void brief.review()}
+                disabled={working || brief.busy || cannotApprove}
+                data-testid="brief-review-run"
+              >
+                {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
+              </Button>
+            )}
+          </div>
         </div>
         {!review && (
           <p className={cardStyles.hint} data-testid="brief-review-none">
@@ -289,6 +299,13 @@ export function ProjectBriefCard({
             <Button variant="ghost" onClick={() => setEditOpen(true)} data-testid="brief-write-own">
               Tự viết brief
             </Button>
+            <ExternalAiButton
+              title="Creative brief · AI ngoài"
+              run={(external) => generateProjectBrief(projectId, "", { external })}
+              onDone={brief.reload}
+              disabled={!ideaApproved}
+              testId="brief-generate-external"
+            />
             {aiAvailable && (
               <Button
                 variant="run"
@@ -338,7 +355,7 @@ export function ProjectBriefCard({
           approveLabel="Duyệt brief"
           approveDisabled={cannotApprove}
           busy={brief.busy || working}
-          canRedo={aiAvailable && ideaApproved}
+          canRedo={ideaApproved}
           onEdit={() => setEditOpen(true)}
           onRedo={() => setRedoOpen(true)}
           onApprove={() => void brief.approve()}
@@ -405,7 +422,11 @@ export function ProjectBriefCard({
             />
           ) : undefined
         }
-        onSend={(note) => void brief.generate(note)}
+        onSend={aiAvailable ? (note) => void brief.generate(note) : undefined}
+        external={{
+          run: (note, external) => generateProjectBrief(projectId, note, { external }),
+          onDone: brief.reload,
+        }}
       />
     </Card>
   );

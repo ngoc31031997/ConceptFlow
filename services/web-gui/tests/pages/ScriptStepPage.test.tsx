@@ -142,6 +142,22 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
   });
 
+  it("tạo project rồi mở hộp thoại AI ngoài để viết ý tưởng, không gọi AI của hệ thống", async () => {
+    generate.mockImplementation(async (_id, _note, call) => {
+      if (call && "external" in call && call.external.mode === "prompt") throw new apiClient.ExternalPromptReady("PROMPT Ý TƯỞNG");
+      return ideaOf() as never;
+    });
+    renderPage();
+    await screen.findByText("Tạo project và viết ý tưởng →");
+    typeText(SUBJECT);
+    fireEvent.click(screen.getByTestId("script-step-create-external"));
+
+    expect(await screen.findByTestId("idea-create-external-dialog-prompt")).toHaveTextContent("PROMPT Ý TƯỞNG");
+    expect(createDraft).toHaveBeenCalledWith(expect.any(String), SUBJECT, "vi");
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(generate).toHaveBeenCalledWith(expect.any(String), "", { external: { mode: "prompt" } });
+  });
+
   it("tạo project với giá trị mặc định, AI viết ba trường rồi đánh giá", async () => {
     renderPage();
     await screen.findByText("Tạo project và viết ý tưởng →");

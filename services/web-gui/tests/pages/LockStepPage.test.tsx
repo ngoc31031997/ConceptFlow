@@ -189,13 +189,13 @@ describe("LockStepPage", () => {
     await waitFor(() => expect(screen.getByTestId("finding-r1")).toHaveAttribute("data-state", "fixed"));
   });
 
-  it("accepts a finding with the reason typed in the dialog", async () => {
+  it("accepts a finding in one click, with no dialog and no reason", async () => {
     const accept = vi.spyOn(apiClient, "acceptFinding").mockImplementation(async () => state);
     await ready();
+    expect(screen.getByTestId("finding-accept-r2")).toHaveTextContent("Chấp nhận");
     fireEvent.click(screen.getByTestId("finding-accept-r2"));
-    fireEvent.change(await screen.findByTestId("lock-accept-why"), { target: { value: "đã kiểm ở nguồn khác" } });
-    fireEvent.click(screen.getByTestId("lock-accept-save"));
-    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "r2", "đã kiểm ở nguồn khác"));
+    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "r2", ""));
+    expect(screen.queryByTestId("lock-accept")).not.toBeInTheDocument();
   });
 
   it("starts the AI review, then calls it a re-review once the script was reviewed", async () => {

@@ -54,6 +54,14 @@ function renderPanel() {
 describe("LlmCallsPanel", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it("labels a reply pasted from an outside AI instead of showing a model", async () => {
+    serve({ calls: [call({ call_id: "c9", provider: "external", model: "external", usage_reported: false })] });
+    renderPanel();
+    const row = await screen.findByTestId("llm-call-c9");
+    expect(within(row).getByText("AI ngoài")).toBeInTheDocument();
+    expect(within(row).queryByText("external")).not.toBeInTheDocument();
+  });
+
   it("loads the raw rows and shows how each call ended", async () => {
     serve({ calls: rows });
     renderPanel();

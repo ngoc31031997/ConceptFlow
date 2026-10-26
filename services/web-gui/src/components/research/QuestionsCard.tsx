@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { QuestionCoverage, ResearchBrief, ResearchIdea, ResearchQuestion } from "../../api/client";
+import { generateResearchQuestions, type QuestionCoverage, type ResearchBrief, type ResearchIdea, type ResearchQuestion } from "../../api/client";
 import type { OperationRun } from "../../hooks/useOperationRun";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiDialog } from "../ExternalAiDialog";
 import { Button, Card, TextInput } from "../ui";
 import unitStyles from "../units/units.module.css";
 import { CoverageChip } from "./CoverageChip";
@@ -125,7 +126,10 @@ export function QuestionsCard({
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<ResearchQuestion | null>(null);
-  const [regenerating, setRegenerating] = useState(false);
+  // Regenerating while the Creator has questions of their own asks first, for the system's AI or an AI outside.
+  const [regenerating, setRegenerating] = useState<"system" | "outside" | null>(null);
+  // The dialog of the AI outside the system; the value is whether it replaces the Creator's own questions.
+  const [outside, setOutside] = useState<boolean | null>(null);
   // The dialog that shows what the AI reads.
   const [inputOpen, setInputOpen] = useState(false);
   const [inputLoading, setInputLoading] = useState(false);
@@ -152,9 +156,15 @@ export function QuestionsCard({
     void onReloadInput().finally(() => setInputLoading(false));
   }
 
-  function startGenerate() {
-    if (mine.length > 0) setRegenerating(true);
-    else void onGenerate(false);
+  function startGenerate(via: "system" | "outside") {
+    if (mine.length > 0) setRegenerating(via);
+    else if (via === "system") void onGenerate(false);
+    else setOutside(false);
+  }
+
+  function chooseGenerate(replaceEdited: boolean) {
+    if (regenerating === "outside") setOutside(replaceEdited);
+    else void onGenerate(replaceEdited);
   }
 
   const generateLabel = questions.length === 0 ? "Sinh câu hỏi từ brief" : "Sinh lại từ brief";
@@ -224,9 +234,18 @@ export function QuestionsCard({
             + Thêm câu hỏi
           </Button>
           <Button
+            variant="ghost"
+            className={styles.sm}
+            onClick={() => startGenerate("outside")}
+            disabled={locked || running}
+            data-testid="question-generate-external"
+          >
+            Dùng AI ngoài
+          </Button>
+          <Button
             variant={mine.length > 0 && questions.length > 0 ? "impact" : "run"}
             className={styles.sm}
-            onClick={startGenerate}
+            onClick={() => startGenerate("system")}
             disabled={locked || running || !aiAvailable}
             title={aiAvailable ? undefined : "Chưa cấu hình AI"}
             data-testid="question-generate"
@@ -269,8 +288,8 @@ export function QuestionsCard({
         testId="question-delete-dialog"
       />
       <ImpactConfirm
-        open={regenerating}
-        onClose={() => setRegenerating(false)}
+        open={regenerating !== null}
+        onClose={() => setRegenerating(null)}
         title="Sinh lại câu hỏi từ brief?"
         lead={`Câu hỏi bạn đã viết hoặc sửa: ${mine.map((q) => q.id).join(", ")}.`}
         list={[
@@ -280,10 +299,18 @@ export function QuestionsCard({
         ]}
         undo="Chữ bạn đã sửa không lấy lại được nếu chọn thay."
         choices={[
-          { label: "Giữ câu của tôi", variant: "run", onChoose: () => void onGenerate(false), testId: "question-generate-keep" },
-          { label: "Thay cả câu tôi đã sửa", variant: "impact", onChoose: () => void onGenerate(true), testId: "question-generate-replace" },
+          { label: "Giữ câu của tôi", variant: "run", onChoose: () => chooseGenerate(false), testId: "question-generate-keep" },
+          { label: "Thay cả câu tôi đã sửa", variant: "impact", onChoose: () => chooseGenerate(true), testId: "question-generate-replace" },
         ]}
         testId="question-generate-dialog"
+      />
+      <ExternalAiDialog
+        open={outside !== null}
+        onClose={() => setOutside(null)}
+        title="Câu hỏi nghiên cứu · AI ngoài"
+        run={(external) => generateResearchQuestions(projectId, { replaceEdited: outside === true }, { external })}
+        onDone={onReloadInput}
+        testId="question-generate-external-dialog"
       />
     </Card>
   );

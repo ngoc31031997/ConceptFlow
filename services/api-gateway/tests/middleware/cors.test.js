@@ -26,5 +26,6 @@ describe('middleware/cors', () => {
     expect(res.headers['access-control-allow-methods']).toContain('POST');
     expect(res.headers['access-control-allow-methods']).toContain('DELETE');
     expect(res.headers['access-control-allow-headers']).toContain('Content-Type');
+    expect(res.headers['access-control-allow-headers']).toContain('X-External-AI');
   });
 });

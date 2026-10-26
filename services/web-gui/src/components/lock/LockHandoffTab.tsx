@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { handoffBeatUnit, type LockBeat } from "../../api/client";
+import { generateHandoff, handoffBeatUnit, redoUnit, type LockBeat } from "../../api/client";
 import type { ScriptLockControls } from "../../hooks/useScriptLock";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiButton } from "../ExternalAiButton";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, FormField, TextInput } from "../ui";
 import { UnitEditModal } from "../units/UnitEditModal";
@@ -60,6 +61,14 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
 
         {!beat.written ? (
           <div className={styles.row}>
+            <ExternalAiButton
+              title={`Ghi chú bàn giao B${beat.number} ${beat.title} · AI ngoài`}
+              label="Viết ghi chú bằng AI ngoài"
+              run={(external) => generateHandoff(projectId, beat.key, { external })}
+              onDone={lock.reload}
+              disabled={busy}
+              testId={`handoff-write-external-${beat.key}`}
+            />
             {aiAvailable && (
               <Button variant="run" className={researchStyles.sm} onClick={() => void lock.generate(beat.key)} disabled={busy} data-testid={`handoff-write-${beat.key}`}>
                 AI viết ghi chú beat này
@@ -112,7 +121,7 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
                 status={beat.status}
                 approveLabel="Duyệt ghi chú"
                 busy={busy}
-                canRedo={aiAvailable}
+                canRedo
                 onEdit={() => setEditing(true)}
                 onRedo={() => setRedoing(true)}
                 onApprove={() => void lock.approve(beat.key)}
@@ -125,11 +134,9 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
                 <Button variant="ghost" className={researchStyles.sm} onClick={() => setEditing(true)} disabled={busy} data-testid={`handoff-stale-edit-${beat.key}`}>
                   Sửa tay
                 </Button>
-                {aiAvailable && (
-                  <Button variant="ghost" className={researchStyles.sm} onClick={() => setRedoing(true)} disabled={busy} data-testid={`handoff-stale-redo-${beat.key}`}>
-                    Làm lại kèm ghi chú
-                  </Button>
-                )}
+                <Button variant="ghost" className={researchStyles.sm} onClick={() => setRedoing(true)} disabled={busy} data-testid={`handoff-stale-redo-${beat.key}`}>
+                  Làm lại kèm ghi chú
+                </Button>
               </div>
             )}
           </>
@@ -159,7 +166,11 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
         impact={redoImpact}
         initialNote={lock.failedNote}
         modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="story" label="Model AI cho bước Rà soát và chốt" testId={`handoff-redo-model-${beat.key}`} /> : undefined}
-        onSend={(note) => void lock.redo(beat.key, note)}
+        onSend={aiAvailable ? (note) => void lock.redo(beat.key, note) : undefined}
+        external={{
+          run: (note, external) => redoUnit(projectId, handoffBeatUnit(beat.key), note, { external }),
+          onDone: lock.reload,
+        }}
         testId={`handoff-redo-${beat.key}`}
       />
     </Card>
@@ -267,15 +278,17 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
         </div>
       </Card>
 
-      <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
-        <Button variant="ghost" className={researchStyles.sm} onClick={() => void lock.approveAll()} disabled={busy || toApprove === 0} data-testid="handoff-approve-all">
-          Duyệt tất cả ghi chú còn lại
-        </Button>
-      </div>
-
       {state.beats.map((b) => (
         <HandoffBeatCard key={b.key} projectId={projectId} beat={b} lock={lock} aiAvailable={aiAvailable} locked={locked} />
       ))}
+
+      {state.beats.some((b) => b.written) && (
+        <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
+          <Button onClick={() => void lock.approveAll()} disabled={busy || toApprove === 0} data-testid="handoff-approve-all">
+            Duyệt tất cả ghi chú còn lại
+          </Button>
+        </div>
+      )}
 
       <Dialog
         open={adding}

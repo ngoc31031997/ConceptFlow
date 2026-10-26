@@ -222,3 +222,28 @@ def test_the_database_url_is_required(monkeypatch):
     monkeypatch.delenv("LLM_DATABASE_URL")
     with pytest.raises(ValueError, match="LLM_DATABASE_URL"):
         Config.from_env()
+
+
+async def test_a_pasted_reply_is_logged_as_an_external_call_and_its_json_is_read(call_log):
+    r = await app_client(call_log).post("/v1/chat/external", json={
+        "system": "S", "user": "U", "reply": 'Đây:\n```json\n{"a": 1}\n```', "expect_json": True,
+        "project_id": "p1", "role": "story_frame", "step": "story"})
+    body = r.json()
+    assert r.status_code == 200 and body["json"] == {"a": 1} and body["provider"] == "external"
+    [row] = call_log.rows
+    assert (row.call_id, row.provider, row.ok, row.system_prompt, row.user_prompt) == (
+        body["call_id"], "external", True, "S", "U")
+    assert row.role == "story_frame" and row.project_id == "p1" and not row.usage_reported
+
+
+async def test_a_pasted_reply_without_json_is_a_malformed_error_and_still_logged(call_log):
+    r = await app_client(call_log).post("/v1/chat/external", json={"user": "U", "reply": "xin chào", "expect_json": True})
+    err = r.json()["error"]
+    assert r.status_code == 422 and err["kind"] == "malformed" and err["call_id"]
+    [row] = call_log.rows
+    assert not row.ok and row.error_kind == "malformed" and row.response == "xin chào"
+
+
+async def test_a_pasted_reply_without_expect_json_comes_back_as_text(call_log):
+    body = (await app_client(call_log).post("/v1/chat/external", json={"user": "U", "reply": "văn bản"})).json()
+    assert body["content"] == "văn bản" and "json" not in body

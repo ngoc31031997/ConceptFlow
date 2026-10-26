@@ -132,14 +132,8 @@ func (uc *ProjectBriefUseCase) ApprovedBrief(ctx context.Context, projectID stri
 }
 
 // requireAI refuses when no language model is ready.
-func (uc *ProjectBriefUseCase) requireAI() error {
-	if uc.provider == nil {
-		return ErrLLMNotConfigured
-	}
-	if r, ok := uc.provider.(interface{ Ready() bool }); ok && !r.Ready() {
-		return ErrLLMNotConfigured
-	}
-	return nil
+func (uc *ProjectBriefUseCase) requireAI(ctx context.Context) error {
+	return requireProvider(ctx, uc.provider)
 }
 
 // videoFormText names the video's form for a prompt.
@@ -156,7 +150,7 @@ func videoFormText(mode domain.VideoOutputMode) string {
 // cannot be read, that misses a field or whose length is outside the video's
 // range is an error and nothing is stored.
 func (uc *ProjectBriefUseCase) Generate(ctx context.Context, projectID, note string) (domain.StoredBrief, error) {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return domain.StoredBrief{}, err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
@@ -435,7 +429,7 @@ func (uc *ProjectBriefUseCase) Unapprove(ctx context.Context, projectID string) 
 // avoid list, and stores what it found. The review is advice: it never changes
 // the brief or its approval.
 func (uc *ProjectBriefUseCase) Review(ctx context.Context, projectID string) (domain.BriefReview, error) {
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return domain.BriefReview{}, err
 	}
 	stored, err := uc.store.GetProjectBrief(ctx, projectID)

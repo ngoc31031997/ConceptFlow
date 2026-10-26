@@ -7,6 +7,7 @@ interface CardProps {
   headerAction?: ReactNode;
   children: ReactNode;
   className?: string;
+  id?: string;
   "data-testid"?: string;
 }
 

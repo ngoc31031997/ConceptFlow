@@ -70,7 +70,7 @@ func (k handoffKind) Redo(ctx context.Context, projectID, key, note string) (dom
 		return domain.ReviewUnit{}, domain.ErrUnitNotFound
 	}
 	uc := k.desk
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return domain.ReviewUnit{}, err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {

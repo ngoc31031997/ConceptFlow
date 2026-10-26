@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { FindingState, ReviewFinding } from "../../api/client";
+import { reviewScript, type FindingState, type ReviewFinding } from "../../api/client";
 import type { ScriptLockControls } from "../../hooks/useScriptLock";
 import { scriptRoute } from "../../utils/flow";
 import { AiOperationCard } from "../AiOperationCard";
+import { ExternalAiButton } from "../ExternalAiButton";
 import researchStyles from "../research/research.module.css";
-import { Button, Card, Dialog, FormField, TextArea, TextInput } from "../ui";
+import { Button, Card, FormField, TextArea } from "../ui";
 import styles from "./lock.module.css";
 
 interface LockReviewTabProps {
@@ -15,6 +16,9 @@ interface LockReviewTabProps {
   /** The step cannot be changed now (the project is past editing). */
   locked: boolean;
 }
+
+/** What the server keeps for a finding accepted without a reason. */
+const NO_REASON = "không ghi lý do";
 
 const CHIP: Record<FindingState, { label: string; className: string }> = {
   open: { label: "! cần xử lý", className: styles.chipOpen },
@@ -32,14 +36,12 @@ function lineLink(projectId: string, line: string): string {
 /**
  * The first tab: what the machine and the AI found over the whole script. A
  * finding offers what fits it: open the line, open research, apply the AI's
- * replacement line, add its note to a beat's handoff, or accept it with a
- * reason. "Rà soát lại" has the AI compare the script as it stands with the
+ * replacement line, add its note to a beat's handoff, or accept it as it
+ * stands in one click. "Rà soát lại" has the AI compare the script as it stands with the
  * findings it made before.
  */
 export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockReviewTabProps) {
   const state = lock.state;
-  const [accepting, setAccepting] = useState<ReviewFinding | null>(null);
-  const [why, setWhy] = useState("");
   const [note, setNote] = useState("");
   if (!state) return null;
   const busy = locked || lock.busy || lock.running !== null;
@@ -64,7 +66,7 @@ export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockRevi
             </>
           )}
           {open && f.fix && <div className={styles.quote}>Gợi ý: {f.fix}</div>}
-          {f.state === "accepted" && <div className={styles.detail}>Lý do: {f.why}</div>}
+          {f.state === "accepted" && f.why && f.why !== NO_REASON && <div className={styles.detail}>Lý do: {f.why}</div>}
         </div>
         {open && (
           <div className={styles.findingActions}>
@@ -92,17 +94,8 @@ export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockRevi
                 Thêm vào ghi chú bàn giao
               </Button>
             )}
-            <Button
-              variant="ghost"
-              className={researchStyles.sm}
-              onClick={() => {
-                setWhy("");
-                setAccepting(f);
-              }}
-              disabled={busy}
-              data-testid={`finding-accept-${f.id}`}
-            >
-              Chấp nhận, ghi lý do
+            <Button variant="ghost" className={researchStyles.sm} onClick={() => void lock.accept(f.id, "")} disabled={busy} data-testid={`finding-accept-${f.id}`}>
+              Chấp nhận
             </Button>
           </div>
         )}
@@ -119,12 +112,20 @@ export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockRevi
             <span className={researchStyles.hint}>máy kiểm và AI rà soát · {state.openCount} mục cần xử lý</span>
           </div>
           <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
+            <ExternalAiButton
+              title="Rà soát kịch bản · AI ngoài"
+              label="Rà soát bằng AI ngoài"
+              run={(external) => reviewScript(projectId, { external })}
+              onDone={lock.reload}
+              disabled={busy || !state.scriptReady}
+              testId="lock-review-external"
+            />
             {aiAvailable ? (
               <Button variant="run" onClick={() => void lock.review()} disabled={busy || !state.scriptReady} data-testid="lock-review-run">
                 {reviewed ? "Rà soát lại" : "AI rà soát"}
               </Button>
             ) : (
-              <span className={researchStyles.hint}>Chưa cấu hình AI: chỉ có phần máy kiểm. Mục “AI chưa rà soát” chấp nhận kèm lý do được.</span>
+              <span className={researchStyles.hint}>Chưa cấu hình AI: chỉ có phần máy kiểm. Mục “AI chưa rà soát” chấp nhận kèm lý do được, hoặc rà soát bằng AI ngoài.</span>
             )}
             {aiAvailable && (
               <span className={researchStyles.hint}>
@@ -169,45 +170,6 @@ export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockRevi
           </div>
         </div>
       </Card>
-
-      <Dialog
-        open={accepting !== null}
-        onClose={() => setAccepting(null)}
-        title="Chấp nhận mục rà soát"
-        hasInput
-        testId="lock-accept"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setAccepting(null)} data-testid="lock-accept-cancel">
-              Huỷ
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                const id = accepting?.id;
-                setAccepting(null);
-                if (id) void lock.accept(id, why);
-              }}
-              data-testid="lock-accept-save"
-            >
-              Chấp nhận
-            </Button>
-          </>
-        }
-      >
-        {accepting && (
-          <>
-            <p>
-              <b>{accepting.title}</b>
-            </p>
-            <p className={researchStyles.hint}>{accepting.detail}</p>
-          </>
-        )}
-        <FormField label="Lý do chấp nhận">
-          <TextInput value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Ví dụ: đã kiểm ở nguồn khác, sẽ bổ sung sau" data-testid="lock-accept-why" />
-        </FormField>
-        <p className={researchStyles.hint}>Lý do lưu cùng phiên bản kịch bản.</p>
-      </Dialog>
     </>
   );
 }

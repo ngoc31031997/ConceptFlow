@@ -353,14 +353,8 @@ func indexOf(list []string, key string) int {
 }
 
 // requireAI fails unless a language model is configured.
-func (uc *BeatDeskUseCase) requireAI() error {
-	if uc.provider == nil {
-		return ErrLLMNotConfigured
-	}
-	if r, ok := uc.provider.(interface{ Ready() bool }); ok && !r.Ready() {
-		return ErrLLMNotConfigured
-	}
-	return nil
+func (uc *BeatDeskUseCase) requireAI(ctx context.Context) error {
+	return requireProvider(ctx, uc.provider)
 }
 
 // chat sends one system prompt and records the usage.

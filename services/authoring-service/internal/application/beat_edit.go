@@ -135,7 +135,7 @@ func (uc *BeatDeskUseCase) Redo(ctx context.Context, projectID, key, note string
 	if err := requireBeatKey(key); err != nil {
 		return err
 	}
-	if err := uc.requireAI(); err != nil {
+	if err := uc.requireAI(ctx); err != nil {
 		return err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {

@@ -70,6 +70,7 @@ func NewRouter(suggestPublishMetadata suggestPublishMetadataUseCase, internal In
 // Handler builds the chi.Router with all routes (health + REST endpoints).
 func (rt *Router) Handler() http.Handler {
 	r := chi.NewRouter()
+	r.Use(externalAI)
 	r.Get("/health", rt.handleHealth)
 	r.Get("/v1/operations/{operation_id}", rt.handleGetOperation)
 	r.Post("/v1/operations/{operation_id}/cancel", rt.handleCancelOperation)

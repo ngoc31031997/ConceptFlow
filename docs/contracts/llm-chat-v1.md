@@ -32,6 +32,16 @@ Sự kiện `error`: `error` gồm `kind`, `provider`, `message`, `usage`, `part
 
 Phía authoring-service, các hàm `Parse…Reply` nhận `json` (chuỗi object sạch), không tự cắt `{`…`}`. Kiểm tra nghiệp vụ (dữ kiện, ô Creator đã điền, `Validate`) vẫn ở authoring-service.
 
+## `POST /v1/chat/external` (authoring-service → llm-service)
+
+Nhận một câu trả lời Creator dán từ AI bên ngoài hệ thống làm câu trả lời của một lượt hỏi, và ghi nó vào `llm_calls` như một cuộc gọi. Không gọi model. Trả JSON một lần (không phải luồng NDJSON). Quyết định: [ADR-0047](../../aidlc-docs/decisions/ADR-0047-external-ai-through-the-chat-gate.md).
+
+Thân yêu cầu: `system`, `user` (prompt của lượt hỏi, lưu vào nhật ký), `reply` (đoạn dán), `expect_json`, `project_id`, `role`, `step`, `phase` (như `/v1/chat`).
+
+- `200`: `content` (= `reply`), `usage` (`model = "external"`, `usage_reported = false`, token 0), `provider = "external"`, `call_id`; có `json` khi `expect_json`.
+- `422`: chỉ khi `expect_json` mà `reply` không có object JSON đọc được. Thân `{"error": {"kind": "malformed", "provider": "external", "message", "call_id"}}`. Không có lượt sửa: Creator dán lại. Dòng nhật ký vẫn được ghi (`ok = false`).
+- Dòng `llm_calls`: `provider = "external"`, `model = "external"`, `response = reply`, `usage_reported = false`.
+
 ## Prompt quá dài với Ollama
 
 Với Ollama, llm-service gửi `options.num_ctx = OLLAMA_NUM_CTX` kèm mọi cuộc gọi. Trước khi gọi, nó ước lượng số token của prompt (2 ký tự một token); nếu vượt 85% cửa sổ thì **cắt phần giữa** (giữ đầu và đuôi, chèn dòng `[... phần giữa bị cắt ...]`) rồi gọi bình thường, không báo lỗi, và ghi cảnh báo ra log của service. `system_prompt`/`user_prompt` trong `llm_calls` là bản đã cắt, đúng cái model nhận. Hive không bị cắt.

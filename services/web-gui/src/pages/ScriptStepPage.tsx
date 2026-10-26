@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { AiModelSelect } from "../components/AiModelSelect";
+import { ExternalAiDialog } from "../components/ExternalAiDialog";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { ProjectIdeaCard } from "../components/idea/ProjectIdeaCard";
 import type { StepStripProps } from "../components/StepStrip";
@@ -11,6 +12,7 @@ import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/Pro
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import {
   createProjectDraft,
+  generateProjectIdea,
   patchWizardSettings,
   saveAuthoringModels,
   updateProjectTopic,
@@ -48,6 +50,8 @@ export function ScriptStepPage() {
 
   const [createdFor, setCreatedFor] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // The project is made first, then the idea is written through an AI outside the system.
+  const [outsideOpen, setOutsideOpen] = useState(false);
   const [savingText, setSavingText] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [similarProjects, setSimilarProjects] = useState<SimilarProject[]>([]);
@@ -80,7 +84,7 @@ export function ScriptStepPage() {
   const savedText = idea.screen?.subject ?? "";
   const textEdited = created && idea.screen !== null && text.trim() !== savedText.trim() && text.trim().length > 0;
 
-  async function handleCreate() {
+  async function handleCreate(via: "system" | "outside") {
     const trimmed = text.trim();
     if (!trimmed) return;
     const projectId = draft.projectId;
@@ -105,7 +109,8 @@ export function ScriptStepPage() {
     } finally {
       setCreating(false);
     }
-    if (aiAvailable) void idea.generate();
+    if (via === "outside") setOutsideOpen(true);
+    else if (aiAvailable) void idea.generate();
   }
 
   async function handleSaveText() {
@@ -186,9 +191,12 @@ export function ScriptStepPage() {
                     {createError}
                   </p>
                 )}
+                <Button variant="ghost" onClick={() => void handleCreate("outside")} disabled={!canCreate} data-testid="script-step-create-external">
+                  Tạo project và viết bằng AI ngoài
+                </Button>
                 <Button
                   variant={aiAvailable ? "run" : "primary"}
-                  onClick={() => void handleCreate()}
+                  onClick={() => void handleCreate("system")}
                   disabled={!canCreate}
                   data-testid="script-step-create"
                 >
@@ -220,6 +228,15 @@ export function ScriptStepPage() {
 
         <ProjectIdeaCard projectId={draft.projectId} created={created} idea={idea} aiAvailable={aiAvailable} />
       </AppShell>
+
+      <ExternalAiDialog
+        open={outsideOpen}
+        onClose={() => setOutsideOpen(false)}
+        title="Ý tưởng · AI ngoài"
+        run={(external) => generateProjectIdea(draft.projectId, "", { external })}
+        onDone={idea.reload}
+        testId="idea-create-external-dialog"
+      />
 
       <WizardNav
         allowWhenLocked
