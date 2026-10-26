@@ -23,6 +23,8 @@
   const COPY_WAIT_MS = 3000;
   const TICK_MS = 1000;
   const HIGHLIGHT_MS = 4000;
+  /** How often the wait for the answer logs what it sees. */
+  const DIAGNOSE_EVERY_MS = 15 * 1000;
 
   /** Thrown inside the run to end it with an error code. */
   class RunError extends Error {
@@ -184,9 +186,20 @@
     throw new RunError("ui_changed", button ? "gửi prompt (đã bấm nút gửi và Enter)" : "nút gửi");
   }
 
+  /**
+   * The rendered markdown blocks that are answers, not DeepThink reasoning. A
+   * block counts as reasoning only when the thinking-panel ancestor it sits in
+   * is local to it: an ancestor that wraps every block (a whole message or the
+   * chat list whose class happens to contain "think") does not hide the answer.
+   */
   function answerBlocks(S) {
-    return queryAll(S.markdown, "markdown").filter(function (el) {
-      return !el.closest(S.thinking);
+    const all = queryAll(S.markdown, "markdown");
+    return all.filter(function (el) {
+      const panel = el.parentElement ? el.parentElement.closest(S.thinking) : null;
+      if (!panel) return true;
+      return all.every(function (other) {
+        return panel.contains(other);
+      });
     });
   }
 
@@ -248,6 +261,7 @@
   async function waitForAnswer(S, countBefore, deadline) {
     let lastText = "";
     let changedAt = Date.now();
+    let loggedAt = 0;
     for (;;) {
       checkStillRunning(deadline);
       const answer = findAnswer(S, countBefore);
@@ -256,7 +270,23 @@
         lastText = text;
         changedAt = Date.now();
       }
-      if (answer && A.isFinished(text, changedAt, Date.now(), findCopyButton(S, answer) !== null)) return answer;
+      const hasActions = answer ? findCopyButton(S, answer) !== null : false;
+      if (Date.now() - loggedAt >= DIAGNOSE_EVERY_MS) {
+        loggedAt = Date.now();
+        log(
+          "đang chờ:",
+          "markdown trên trang=" + queryAll(S.markdown, "markdown").length,
+          "khối trả lời=" + answerBlocks(S).length + " (trước khi gửi " + countBefore + ")",
+          "độ dài câu trả lời=" + text.length,
+          "đứng yên " + Math.round((Date.now() - changedAt) / 1000) + "s",
+          "nút Copy=" + (hasActions ? "có" : "chưa"),
+          "tab " + (document.hidden ? "nền" : "đang xem"),
+        );
+      }
+      if (answer && A.isFinished(text, changedAt, Date.now(), hasActions)) {
+        log("câu trả lời xong:", text.length, "ký tự, nút Copy", hasActions ? "có" : "không");
+        return answer;
+      }
       await wait(TICK_MS);
     }
   }
@@ -338,6 +368,22 @@
     one("markdown", function () {
       return answerBlocks(S);
     });
+    try {
+      const all = queryAll(S.markdown, "markdown");
+      result.markdown.total = all.length;
+      result.markdown.thinkingAncestors = all.map(function (el) {
+        const panel = el.parentElement ? el.parentElement.closest(S.thinking) : null;
+        return panel ? panel.getAttribute("class") || panel.tagName : "";
+      });
+      const last = answerBlocks(S).slice(-1)[0];
+      if (last) {
+        const copy = findCopyButton(S, last);
+        result.iconButton = { count: copy ? 1 : 0, sample: copy ? copy.outerHTML.slice(0, 160) : "" };
+        if (copy) highlight([copy], "#2563eb");
+      }
+    } catch (err) {
+      result.markdownDetail = { error: String(err && err.message ? err.message : err) };
+    }
     ["deepThinkButton", "searchButton"].forEach(function (key) {
       if (result[key] && result[key].count) {
         const el = key === "deepThinkButton" ? findToggle(S, S.deepThinkButton, S.deepThinkLabels, key) : findToggle(S, S.searchButton, S.searchLabels, key);

@@ -61,6 +61,7 @@
         return;
       }
       let text = r.count ? "Tìm thấy " + r.count : "Không tìm thấy";
+      if (r.total !== undefined) text += " (trên trang có " + r.total + " khối markdown, kể cả phần suy nghĩ)";
       if (r.on !== undefined) text += " · đang " + (r.on ? "bật" : "tắt") + " · class=\"" + r.className + "\"";
       el.textContent = text;
       el.className = r.count ? "found ok" : "found bad";
@@ -78,7 +79,7 @@
     try {
       const probe = await chrome.tabs.sendMessage(tabs[0].id, { kind: "probe", selectors: current() });
       showProbe(probe);
-      say("Đã kiểm tra trên tab DeepSeek; phần tìm thấy được viền đỏ vài giây. Ô khung câu trả lời chỉ tìm thấy khi tab đang có câu trả lời.", "ok");
+      say("Đã kiểm tra trên tab DeepSeek: phần tìm thấy được viền đỏ, nút Copy dưới câu trả lời cuối viền xanh, trong vài giây. Ô khối câu trả lời và nút dưới câu trả lời chỉ kiểm được khi tab đang có một câu trả lời đã xong.", "ok");
     } catch (err) {
       say("Tab DeepSeek chưa nạp extension. Tải lại tab DeepSeek (Cmd+R) rồi bấm Kiểm tra lại.", "bad");
     }
