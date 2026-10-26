@@ -10,16 +10,20 @@ interface PasteCardProps {
   message: PasteMessage | null;
   busy: boolean;
   locked: boolean;
-  onRead: (raw: string) => Promise<boolean>;
+  /** The text in the box; the page holds it so a run from section 2 can fill it. */
+  text: string;
+  onTextChange: (text: string) => void;
+  /** Reads `text`; resolves true when it was read, so the box can be emptied. */
+  onRead: () => Promise<boolean>;
 }
 
 /**
  * Section 3 of the research step: the Creator pastes the whole answer of the
  * outside tool, as many times as they like. The server finds the JSON block,
  * merges the facts by code and logs each paste with what it read and left out.
+ * A DeepSeek run from section 2 fills the same box and reads it by itself.
  */
-export function PasteCard({ pastes, message, busy, locked, onRead }: PasteCardProps) {
-  const [text, setText] = useState("");
+export function PasteCard({ pastes, message, busy, locked, text, onTextChange, onRead }: PasteCardProps) {
   const [empty, setEmpty] = useState(false);
 
   async function read() {
@@ -28,7 +32,7 @@ export function PasteCard({ pastes, message, busy, locked, onRead }: PasteCardPr
       return;
     }
     setEmpty(false);
-    if (await onRead(text)) setText("");
+    await onRead();
   }
 
   return (
@@ -68,7 +72,7 @@ export function PasteCard({ pastes, message, busy, locked, onRead }: PasteCardPr
           className={styles.paste}
           value={text}
           onChange={(e) => {
-            setText(e.target.value);
+            onTextChange(e.target.value);
             setEmpty(false);
           }}
           rows={5}

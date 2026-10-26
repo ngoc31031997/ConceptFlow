@@ -5,6 +5,8 @@ import {
   GENERIC_CONNECTION_ERROR,
   type ExternalAi,
 } from "../api/client";
+import { useAiBridge, type AiBridgeModes } from "../hooks/useAiBridge";
+import { AiBridgeRunStatus } from "./AiBridgeRunStatus";
 import { Button, CopyBox, Dialog, TextArea } from "./ui";
 import styles from "./ExternalAiDialog.module.css";
 
@@ -20,7 +22,60 @@ interface ExternalAiDialogProps<T> {
   run: (external: ExternalAi) => Promise<T>;
   /** The reply was read and the step ran on it; gets what the request returned. The screen loads what changed. */
   onDone: (result: T) => void | Promise<void>;
+  /** DeepSeek modes for "Chạy bằng DeepSeek"; reasoning only unless the step needs web sources. */
+  deepSeekModes?: AiBridgeModes;
   testId: string;
+}
+
+/** Most steps reason over what the project already holds, so DeepSeek does not search the web. */
+const DEFAULT_DEEPSEEK_MODES: AiBridgeModes = { deepThink: true, search: false };
+
+interface DeepSeekRunProps {
+  prompt: string;
+  modes: AiBridgeModes;
+  disabled: boolean;
+  /** DeepSeek's whole answer, to put in the reply box and read. */
+  onAnswer: (text: string) => void;
+  testId: string;
+}
+
+/**
+ * "Chạy bằng DeepSeek": the AI Bridge extension runs the prompt on DeepSeek in
+ * a background tab and hands the answer back. Rendered only while the dialog
+ * is open, so closing the dialog stops waiting for a run. Without the
+ * extension it shows nothing and the dialog stays copy-and-paste.
+ */
+function DeepSeekRun({ prompt, modes, disabled, onAnswer, testId }: DeepSeekRunProps) {
+  const bridge = useAiBridge();
+  const [error, setError] = useState<string | null>(null);
+  if (!bridge.providers.includes("deepseek")) return null;
+
+  async function start() {
+    setError(null);
+    const outcome = await bridge.run("deepseek", prompt, modes);
+    if (outcome.ok) onAnswer(outcome.text);
+    else if (!outcome.cancelled) setError(outcome.message);
+  }
+
+  return (
+    <div className={styles.section}>
+      {bridge.stage === null ? (
+        <div>
+          <Button variant="run" onClick={() => void start()} disabled={disabled} data-testid={`${testId}-deepseek`}>
+            Chạy bằng DeepSeek
+          </Button>
+          <p className={styles.hint}>Extension chạy prompt trên DeepSeek ở tab nền, dán câu trả lời vào ô bên dưới rồi tự đọc kết quả.</p>
+        </div>
+      ) : (
+        <AiBridgeRunStatus stage={bridge.stage} modes={modes} onCancel={bridge.cancel} testId={`${testId}-deepseek`} />
+      )}
+      {error && (
+        <p className={styles.error} role="alert" data-testid={`${testId}-deepseek-error`}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** How a redo form hands its note to an AI outside the system, when the step supports it. */
@@ -41,6 +96,8 @@ function messageOf(err: unknown): string {
  * to paste the other AI's answer into; "Đọc kết quả" then runs the step on that
  * answer exactly as it would on the model's own. A reply the step cannot use is
  * explained here and the pasted text stays, so the Creator fixes it or pastes again.
+ * With the AI Bridge extension installed, "Chạy bằng DeepSeek" does the copy,
+ * the run and the paste, then reads the answer the same way.
  */
 export function ExternalAiDialog<T>({
   open,
@@ -48,6 +105,7 @@ export function ExternalAiDialog<T>({
   title,
   run,
   onDone,
+  deepSeekModes = DEFAULT_DEEPSEEK_MODES,
   testId,
 }: ExternalAiDialogProps<T>) {
   const [prompt, setPrompt] = useState<string | null>(null);
@@ -81,12 +139,12 @@ export function ExternalAiDialog<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  async function read() {
+  async function read(text: string) {
     setReading(true);
     setReadError(null);
     let result: T;
     try {
-      result = await run({ mode: "paste", reply });
+      result = await run({ mode: "paste", reply: text });
     } catch (err) {
       setReadError(messageOf(err));
       setReading(false);
@@ -112,7 +170,7 @@ export function ExternalAiDialog<T>({
           </Button>
           <Button
             variant="primary"
-            onClick={() => void read()}
+            onClick={() => void read(reply)}
             disabled={reading || prompt === null || reply.trim() === ""}
             data-testid={`${testId}-read`}
           >
@@ -141,6 +199,18 @@ export function ExternalAiDialog<T>({
           </CopyBox>
         )}
       </div>
+      {open && prompt !== null && (
+        <DeepSeekRun
+          prompt={prompt}
+          modes={deepSeekModes}
+          disabled={reading}
+          onAnswer={(text) => {
+            setReply(text);
+            void read(text);
+          }}
+          testId={testId}
+        />
+      )}
       <div className={styles.section}>
         <p className={styles.label}>2. Dán kết quả AI ngoài trả về</p>
         <TextArea

@@ -8,6 +8,7 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { QuestionCoverage, ResearchFact, ResearchQuestion, ResearchState } from "../../src/api/client";
 import type { Project } from "../../src/types";
+import { installFakeAiBridge } from "../helpers/fakeAiBridge";
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -195,6 +196,84 @@ describe("ResearchStepPage", () => {
     fireEvent.click(screen.getByTestId("research-paste-read"));
     await waitFor(() => expect(screen.getByTestId("research-paste-message")).toHaveTextContent("không tìm thấy khối JSON"));
     expect(screen.getByTestId("research-paste-input")).toHaveValue("chỉ là văn bản");
+  });
+
+  it("without the AI Bridge extension shows how to install it instead of the DeepSeek button", async () => {
+    await ready();
+    await screen.findByTestId("research-prompt-preview");
+    expect(screen.getByTestId("research-bridge-missing")).toHaveTextContent("ConceptFlow AI Bridge");
+    expect(screen.queryByTestId("research-bridge-run")).not.toBeInTheDocument();
+  });
+
+  it("runs the prompt on DeepSeek, puts the answer in section 3 and reads it", async () => {
+    const fake = installFakeAiBridge();
+    const paste = vi.spyOn(apiClient, "pasteResearch").mockResolvedValue({
+      added: ["F13"],
+      updated: [],
+      rejected: [],
+      log: { n: 2, at: "", added: ["F13"], updated: [], rejected: [] },
+    });
+    try {
+      await ready();
+      fireEvent.click(await screen.findByTestId("research-bridge-run"));
+      await waitFor(() => expect(fake.runs).toHaveLength(1));
+      expect(fake.runs[0]).toMatchObject({ provider: "deepseek", prompt: "PROMPT NGHIÊN CỨU\nQ1. Quả sung có phải là hoa không?" });
+      fake.send({ type: "progress", request_id: fake.runs[0].requestId, stage: "answering" });
+      await waitFor(() => expect(screen.getByTestId("research-bridge-stage")).toHaveTextContent("DeepSeek đang suy nghĩ"));
+      fake.send({ type: "result", request_id: fake.runs[0].requestId, text: "```json\n{}\n```" });
+      await waitFor(() => expect(paste).toHaveBeenCalledWith("p1", "```json\n{}\n```"));
+      await waitFor(() => expect(screen.getByTestId("research-paste-input")).toHaveValue(""));
+      expect(screen.getByTestId("research-paste-message")).toHaveTextContent("Đã đọc 1 dữ kiện");
+      expect(screen.getByTestId("research-bridge-run")).toBeInTheDocument();
+    } finally {
+      fake.remove();
+    }
+  });
+
+  it("keeps DeepSeek's answer in section 3 when the server cannot read it", async () => {
+    const fake = installFakeAiBridge();
+    vi.spyOn(apiClient, "pasteResearch").mockRejectedValue(new apiClient.ApiError("không tìm thấy khối JSON", undefined, undefined, 400));
+    try {
+      await ready();
+      fireEvent.click(await screen.findByTestId("research-bridge-run"));
+      await waitFor(() => expect(fake.runs).toHaveLength(1));
+      fake.send({ type: "result", request_id: fake.runs[0].requestId, text: "chỉ là văn bản" });
+      await waitFor(() => expect(screen.getByTestId("research-paste-message")).toHaveTextContent("không tìm thấy khối JSON"));
+      expect(screen.getByTestId("research-paste-input")).toHaveValue("chỉ là văn bản");
+    } finally {
+      fake.remove();
+    }
+  });
+
+  it("shows the extension's error and fills nothing", async () => {
+    const fake = installFakeAiBridge();
+    const paste = vi.spyOn(apiClient, "pasteResearch");
+    try {
+      await ready();
+      fireEvent.click(await screen.findByTestId("research-bridge-run"));
+      await waitFor(() => expect(fake.runs).toHaveLength(1));
+      fake.send({ type: "error", request_id: fake.runs[0].requestId, code: "not_logged_in", message: "Chưa đăng nhập DeepSeek." });
+      await waitFor(() => expect(screen.getByTestId("research-bridge-error")).toHaveTextContent("Chưa đăng nhập DeepSeek."));
+      expect(screen.getByTestId("research-paste-input")).toHaveValue("");
+      expect(paste).not.toHaveBeenCalled();
+    } finally {
+      fake.remove();
+    }
+  });
+
+  it("cancels a DeepSeek run without an error", async () => {
+    const fake = installFakeAiBridge();
+    try {
+      await ready();
+      fireEvent.click(await screen.findByTestId("research-bridge-run"));
+      await waitFor(() => expect(fake.runs).toHaveLength(1));
+      fireEvent.click(screen.getByTestId("research-bridge-cancel"));
+      await waitFor(() => expect(fake.cancels).toEqual([fake.runs[0].requestId]));
+      expect(screen.getByTestId("research-bridge-run")).toBeInTheDocument();
+      expect(screen.queryByTestId("research-bridge-error")).not.toBeInTheDocument();
+    } finally {
+      fake.remove();
+    }
   });
 
   it("shows the whole prompt and copies it from the card", async () => {

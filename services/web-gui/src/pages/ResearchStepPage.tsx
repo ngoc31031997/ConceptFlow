@@ -17,12 +17,16 @@ import styles from "../components/research/research.module.css";
 import { UnitStatusChip } from "../components/units/UnitStatusChip";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
+import { useAiBridge, type AiBridgeModes } from "../hooks/useAiBridge";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useResearch } from "../hooks/useResearch";
 import { VIEW_RESEARCH, readOnlyReason, storyRoute } from "../utils/flow";
 
 const SUBTITLE =
   "Sinh câu hỏi cần tra, chép prompt ra công cụ nghiên cứu bên ngoài, rồi dán kết quả lại. Hệ thống tải từng link và kiểm đoạn trích có thật trong trang không.";
+
+/** Research needs sources, so DeepSeek reasons and searches the web. */
+const RESEARCH_MODES: AiBridgeModes = { deepThink: true, search: true };
 
 const ROLE =
   "Thu thập dữ kiện có nguồn; phân biệt sự thật, giả thuyết và điểm chưa biết. Bước tuỳ chọn: bỏ qua thì dữ kiện mang nhãn “chưa có nguồn” và không bước nào bị chặn.";
@@ -77,12 +81,33 @@ export function ResearchStepPage() {
   const [skipping, setSkipping] = useState(false);
   const [editing, setEditing] = useState<ResearchFact | null>(null);
   const [adding, setAdding] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const bridge = useAiBridge();
 
   if (!projectId) return <Navigate to="/" replace />;
 
   const state = research.state;
   const locked = !flow.editable;
   const aiAvailable = llm?.enabled === true;
+
+  async function readPaste(raw: string): Promise<boolean> {
+    const read = await research.pasteResults(raw);
+    if (read) setPasteText("");
+    return read;
+  }
+
+  /** Runs the prompt on DeepSeek, puts the answer in section 3 and reads it, as a paste by hand would be. */
+  async function runOnDeepSeek(prompt: string) {
+    setBridgeError(null);
+    const outcome = await bridge.run("deepseek", prompt, RESEARCH_MODES);
+    if (!outcome.ok) {
+      setBridgeError(outcome.cancelled ? null : outcome.message);
+      return;
+    }
+    setPasteText(outcome.text);
+    await readPaste(outcome.text);
+  }
 
   function content(s: ResearchState) {
     const checking = new Set(s.facts.filter((f) => f.link.state === "run" || research.holding.has(f.id)).map((f) => f.id));
@@ -135,8 +160,28 @@ export function ResearchStepPage() {
           onSave={research.saveQuestion}
           onDelete={research.deleteQuestion}
         />
-        <PromptCard projectId={projectId} questions={s.questions} />
-        <PasteCard pastes={s.pastes} message={research.pasteMessage} busy={research.busy} locked={locked} onRead={research.pasteResults} />
+        <PromptCard
+          projectId={projectId}
+          questions={s.questions}
+          bridge={{
+            available: bridge.providers.includes("deepseek"),
+            stage: bridge.stage,
+            modes: RESEARCH_MODES,
+            error: bridgeError,
+            enabled: !locked && !research.busy,
+            onRun: (prompt) => void runOnDeepSeek(prompt),
+            onCancel: bridge.cancel,
+          }}
+        />
+        <PasteCard
+          pastes={s.pastes}
+          message={research.pasteMessage}
+          busy={research.busy}
+          locked={locked}
+          text={pasteText}
+          onTextChange={setPasteText}
+          onRead={() => readPaste(pasteText)}
+        />
         <FactsCard
           projectId={projectId}
           facts={s.facts}

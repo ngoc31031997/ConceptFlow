@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "ConceptFlow AI Bridge",
+  "version": "1.0.0",
+  "description": "Gửi prompt từ ConceptFlow sang DeepSeek trên web, chờ câu trả lời rồi đưa về ConceptFlow.",
+  "minimum_chrome_version": "111",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["https://chat.deepseek.com/*"],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "js": ["src/protocol.js", "src/bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["src/deepseek/clipboard-hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["src/protocol.js", "src/deepseek/selectors.js", "src/deepseek/answer.js", "src/deepseek/adapter.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
