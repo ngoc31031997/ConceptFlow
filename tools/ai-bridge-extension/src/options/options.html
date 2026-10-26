@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ConceptFlow AI Bridge · Selector DeepSeek</title>
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <h1>Selector DeepSeek</h1>
+  <p class="hint">Khi DeepSeek đổi giao diện, mở tab DeepSeek, nhấn F12, chuột phải vào phần cần tìm → Inspect → chuột phải dòng HTML → Copy → Copy selector, rồi dán vào ô tương ứng. Ô để trống dùng giá trị mặc định (chữ mờ trong ô).</p>
+  <form id="form"></form>
+  <div class="actions">
+    <button type="button" id="check">Kiểm tra trên tab DeepSeek</button>
+    <button type="button" id="reset" class="ghost">Về mặc định</button>
+    <button type="button" id="save" class="primary">Lưu</button>
+  </div>
+  <p id="status" role="status"></p>
+  <pre id="result" hidden></pre>
+</main>
+<script src="../deepseek/selectors.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

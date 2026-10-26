@@ -68,7 +68,7 @@ Nếu ConceptFlow không đọc được câu trả lời (ví dụ DeepSeek kh�
 | Không có nút "Chạy bằng DeepSeek" (bước Nghiên cứu hiện dòng "Cài extension…") | Extension chưa cài, bị tắt, hoặc tab ConceptFlow mở trước khi cài | Kiểm tra `chrome://extensions`, rồi tải lại tab ConceptFlow |
 | "Extension không phản hồi" | Extension vừa được tải lại nhưng trang thì chưa | Tải lại tab ConceptFlow |
 | "Chưa đăng nhập DeepSeek" | Phiên DeepSeek hết hạn | Mở chat.deepseek.com, đăng nhập, chạy lại |
-| "Giao diện DeepSeek đã đổi… (nút Search)" hoặc tên phần khác | DeepSeek đổi giao diện | Dán tay như cũ; sửa selector (xem dưới) |
+| "Giao diện DeepSeek đã đổi… (nút Search)" hoặc tên phần khác | DeepSeek đổi giao diện | Dán selector mới ở trang Selector DeepSeek (xem dưới) |
 | "Đang có một lượt chạy DeepSeek khác" | Một lượt trước chưa xong | Chờ, hoặc bấm Huỷ ở tab đã chạy lượt đó |
 | Tiến độ đứng ở "DeepSeek đang suy nghĩ…" rất lâu | Chrome làm chậm tab nền | Bấm sang tab DeepSeek một lần rồi quay lại; câu trả lời sẽ được lấy khi xong |
 | "DeepSeek chưa trả lời xong sau 15 phút" | Câu hỏi quá dài, mạng chậm, DeepSeek quá tải | Xem tab DeepSeek; có câu trả lời thì chép và dán tay |
@@ -100,29 +100,41 @@ ConceptFlow (localhost:3000)                    Chrome extension                
 | `src/jobs.js` | Luật của lượt chạy đang lưu (còn chặn lượt mới không, message có thuộc lượt này không) |
 | `src/bridge.js` | Content script trên ConceptFlow: chuyển message trang ↔ service worker |
 | `src/background.js` | Service worker: mở tab, giao prompt, chuyển tiến độ và kết quả |
-| `src/deepseek/selectors.js` | **Mọi selector của giao diện DeepSeek** |
+| `src/deepseek/selectors.js` | **Selector mặc định của giao diện DeepSeek**, ghép với phần bạn dán ở trang cài đặt |
+| `src/options/` | Trang **Selector DeepSeek**: dán, kiểm tra, lưu selector |
 | `src/deepseek/answer.js` | Luật "đã trả lời xong", khớp nhãn nút, dựng lại khối code |
 | `src/deepseek/adapter.js` | Điều khiển trang DeepSeek |
 | `src/deepseek/clipboard-hook.js` | Chặn lần copy của nút Copy trong lượt chạy |
 
-## Khi DeepSeek đổi giao diện
+## Khi DeepSeek đổi giao diện: tự dán selector
 
-Lỗi "Giao diện DeepSeek đã đổi… (tên phần)" cho biết phần nào không tìm thấy. Chỉ cần sửa `src/deepseek/selectors.js`:
+Lỗi "Giao diện DeepSeek đã đổi… (tên phần)" cho biết phần nào không tìm thấy. Bạn sửa được mà không cần sửa code:
 
-| Phần trong lỗi | Khoá trong `selectors.js` | Cách tìm selector mới |
-|---|---|---|
-| ô chat | `input` | Chuột phải vào ô chat → Inspect, lấy id hoặc tag |
-| nút DeepThink, nút Search | `deepThinkLabels`, `searchLabels`, `clickable`, `selectedClass` | Xem chữ trên nút; xem class nào thêm vào khi nút bật |
-| gửi prompt | `input` (ô chat không tự xoá sau Enter) | Kiểm tra DeepSeek còn gửi bằng Enter không |
-| nội dung câu trả lời | `markdown`, `thinking` | Inspect câu trả lời: class bao khối markdown, và class bao phần suy nghĩ |
+1. Bấm **icon ConceptFlow AI Bridge** trên thanh công cụ Chrome. Nếu chưa ghim icon thì vào `chrome://extensions` → **Chi tiết** → **Tuỳ chọn tiện ích**. Trang **Selector DeepSeek** mở ra.
+2. Mở một tab `chat.deepseek.com` (đã đăng nhập), rồi bấm **Kiểm tra trên tab DeepSeek**. Mỗi ô hiện "Tìm thấy" hoặc "Không tìm thấy". Phần tìm thấy được viền đỏ vài giây trên tab DeepSeek. Với nút DeepThink và Search, trang cũng cho biết nút đang bật hay tắt và class của nút.
+3. Ô nào "Không tìm thấy", hoặc tìm thấy sai phần tử:
+   - Sang tab DeepSeek, nhấn **F12**.
+   - Bấm biểu tượng mũi tên chọn phần tử (Cmd + Shift + C), rồi bấm vào phần cần tìm (ô chat, nút DeepThink, nút Search, nút gửi ↑).
+   - Trong tab Elements, chuột phải dòng HTML đang chọn → **Copy** → **Copy selector**.
+   - Dán vào ô tương ứng.
+4. Bấm **Kiểm tra** lại cho đến khi mọi ô đúng, rồi bấm **Lưu**. Lượt chạy sau dùng selector mới. **Về mặc định** xoá hết phần bạn dán.
 
-Không có hàng nút Copy thì vẫn chạy được, chỉ chậm hơn (đợi 60 giây). Muốn sửa thì xem khoá `iconButton`.
+Mẹo:
 
-Dùng id, `role`, class `ds-…` hoặc chữ hiện trên nút. Đừng dùng class dạng mã băm (ví dụ `_7a8b9c`) vì chúng đổi mỗi lần DeepSeek cập nhật. Sửa xong, tải lại extension và tab DeepSeek.
+- Selector do "Copy selector" sinh ra thường chứa class mã băm (ví dụ `._7a8b9c`), nên sẽ hỏng khi DeepSeek cập nhật. Nếu được, rút gọn lại còn id, `role` hoặc class `ds-…`.
+- Ô **Class khi nút đang bật**: bật nút Search bằng tay, bấm Kiểm tra, xem class của nút. Phần chỉ xuất hiện khi nút bật (ví dụ `ds-toggle-button--selected`) là thứ cần điền. Ô này là biểu thức chính quy, nhiều giá trị thì ngăn cách bằng `|`.
+- **Nút gửi** để trống thì extension bấm nút cuối cùng trong khung chat; nếu không gửi được thì thử Enter.
+- Ô **Khối câu trả lời** chỉ kiểm tra được khi tab DeepSeek đang có một câu trả lời.
+
+Selector mặc định nằm trong `src/deepseek/selectors.js`. Nếu một selector bạn dán chạy ổn, hãy báo để cập nhật mặc định cho mọi người.
+
+### Xem log một lượt chạy
+
+Mở tab DeepSeek mà extension đã tạo, nhấn F12, chọn tab **Console** và lọc theo `ai-bridge`. Mỗi bước đều có một dòng log: ô chat tìm thấy, trạng thái DeepThink/Search trước và sau khi bấm (kèm class), nút gửi đã bấm, cách lấy câu trả lời, và lỗi nếu có. Gửi các dòng này khi cần hỗ trợ.
 
 ## Phát triển và test
 
-Phần logic thuần (giao thức, lượt chạy, luật đọc câu trả lời) có test chạy bằng Node 18+, không cần cài gì:
+Phần logic thuần (giao thức, lượt chạy, luật đọc câu trả lời, ghép selector) có test chạy bằng Node 18+, không cần cài gì:
 
 ```bash
 cd tools/ai-bridge-extension

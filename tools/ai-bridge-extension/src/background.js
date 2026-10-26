@@ -115,3 +115,8 @@ chrome.tabs.onRemoved.addListener(function (tabId) {
     console.error("ai-bridge: could not settle the run of closed tab " + tabId + ":", err);
   });
 });
+
+// The toolbar icon opens the selector settings page.
+chrome.action.onClicked.addListener(function () {
+  chrome.runtime.openOptionsPage();
+});

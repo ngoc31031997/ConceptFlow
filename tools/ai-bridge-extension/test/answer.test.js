@@ -21,6 +21,8 @@ test("toggle labels match with or without the model name after them", () => {
   assert.equal(A.hasLabel("search", ["Search"]), true);
   assert.equal(A.hasLabel("联网搜索", ["Search", "联网搜索"]), true);
   assert.equal(A.hasLabel("Research notes", ["Search"]), false);
+  assert.equal(A.hasLabel("DeepThink\nSearch", ["DeepThink"]), false, "a toolbar holding both toggles");
+  assert.equal(A.hasLabel("Search more", ["Search"]), false);
 });
 
 test("code blocks are fenced again so the JSON block can be found", () => {

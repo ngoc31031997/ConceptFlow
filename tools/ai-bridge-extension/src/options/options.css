@@ -1,0 +1,16 @@
+:root { color-scheme: light dark; --fg: #1a1a1a; --muted: #666; --bg: #fffdf6; --card: #fff; --line: #1a1a1a; --accent: #f5c518; --bad: #c62828; --ok: #2e7d32; }
+@media (prefers-color-scheme: dark) { :root { --fg: #eee; --muted: #aaa; --bg: #17150f; --card: #22201a; --line: #ddd; --bad: #ef9a9a; --ok: #a5d6a7; } }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 8px; }
+.hint { color: var(--muted); margin: 4px 0 16px; }
+label { display: block; font-weight: 600; margin-top: 14px; }
+small { display: block; color: var(--muted); font-weight: 400; }
+input { box-sizing: border-box; width: 100%; margin-top: 4px; padding: 8px 10px; border: 2px solid var(--line); border-radius: 4px; background: var(--card); color: var(--fg); font: 13px ui-monospace, monospace; }
+.found { font-size: 12px; margin-top: 2px; }
+.found.ok { color: var(--ok); } .found.bad { color: var(--bad); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+button { padding: 8px 14px; border: 2px solid var(--line); border-radius: 4px; background: var(--card); color: var(--fg); font-weight: 600; cursor: pointer; }
+button.primary { background: var(--accent); color: #1a1a1a; }
+#status { min-height: 1.5em; }
+pre { white-space: pre-wrap; word-break: break-all; background: var(--card); border: 2px solid var(--line); border-radius: 4px; padding: 10px; font-size: 12px; }

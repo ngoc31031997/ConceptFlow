@@ -21,11 +21,16 @@
     return hasActions ? quiet >= STABLE_MS : quiet >= STABLE_WITHOUT_ACTIONS_MS;
   }
 
-  /** True when a control's visible text is one of the labels, ignoring case and spacing. */
+  /**
+   * True when a control's visible text is one of the labels, ignoring case and
+   * spacing; a model name in brackets may follow ("DeepThink (R1)"). A wrapper
+   * holding several controls ("DeepThink Search") does not match.
+   */
   function hasLabel(text, labels) {
     const t = String(text || "").replace(/\s+/g, " ").trim().toLowerCase();
     return labels.some(function (label) {
-      return t === label.toLowerCase() || t.startsWith(label.toLowerCase() + " ") || t.startsWith(label.toLowerCase() + "(");
+      const l = label.toLowerCase();
+      return t === l || /^\s?\([^)]*\)$/.test(t.slice(l.length)) && t.startsWith(l);
     });
   }
 
