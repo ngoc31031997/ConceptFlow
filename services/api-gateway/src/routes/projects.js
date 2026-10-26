@@ -169,6 +169,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/script/generate', proxyHandler(authoringAi, 'authoring-service'));
   router.post('/v1/projects/:id/script/suggest', proxyHandler(authoringAi, 'authoring-service'));
   router.post('/v1/projects/:id/script/speak', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script/replace', proxyHandler(authoring, 'authoring-service'));
   // Bước Rà soát và chốt: ghi chú bàn giao từng beat đi qua /units/handoff_beat/*; ở đây
   // là cả màn, lượt AI rà soát và viết ghi chú bàn giao, xử lý từng mục, thuật ngữ và chốt.
   router.get('/v1/projects/:id/script-lock', proxyHandler(authoring, 'authoring-service'));

@@ -472,3 +472,107 @@ func TestSpokenWordingIsWhatTheVoiceReadsAndKeepsTheShownText(t *testing.T) {
 		t.Errorf("line = %+v, want an empty spoken wording to read the text again", got)
 	}
 }
+
+// writeLines stores hand-written lines for a beat with the given review status.
+func (f *scriptFixture) writeLines(t *testing.T, key string, status domain.UnitStatus, lines ...domain.ScriptLine) {
+	t.Helper()
+	s := domain.ScriptBeat{Lines: lines, NextSeq: len(lines) + 1}
+	unit := domain.ReviewUnit{Status: status, CreatorFields: []string{}, InputRef: domain.UnitKindBeat + ":" + key}
+	if _, err := f.uc.saveScript(context.Background(), "p1", key, s, unit); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func replaceTestLine(id, text, spoken string) domain.ScriptLine {
+	return domain.ScriptLine{ID: id, Text: text, Spoken: spoken, Facts: []string{}}
+}
+
+func TestReplacePreviewListsLinesAndStoresNothing(t *testing.T) {
+	f := newScriptFixture(t)
+	f.writeLines(t, "b1", domain.UnitPending, replaceTestLine("b1.1", "TRNG chậm.", ""), replaceTestLine("b1.2", "Không liên quan.", ""))
+	res, err := f.uc.Replace(context.Background(), "p1", ScriptReplaceRequest{Find: "TRNG", Replace: "TI A EN GI", Field: ScriptReplaceSpoken, MatchCase: true})
+	if err != nil {
+		t.Fatalf("Replace: %v", err)
+	}
+	if res.Applied || len(res.Matches) != 1 || res.Matches[0].Line != "b1.1" || res.Matches[0].After != "TI A EN GI chậm." {
+		t.Errorf("result = %+v, want one previewed line b1.1 and nothing applied", res)
+	}
+	if s := f.script(t, "b1"); s.Lines[0].Spoken != "" || s.Lines[0].Text != "TRNG chậm." {
+		t.Errorf("a preview stored a change: %+v", s.Lines[0])
+	}
+}
+
+func TestReplaceSpokenKeepsTheTextOnScreenAndReadsTheNewWording(t *testing.T) {
+	f := newScriptFixture(t)
+	f.writeLines(t, "b1", domain.UnitPending, replaceTestLine("b1.1", "TRNG chậm.", ""), replaceTestLine("b1.2", "Dùng TRNG ở đây.", "Dùng TRNG ở đây nhé."))
+	f.writeLines(t, "b2", domain.UnitPending, replaceTestLine("b2.1", "Lại TRNG.", ""))
+	res, err := f.uc.Replace(context.Background(), "p1", ScriptReplaceRequest{Find: "TRNG", Replace: "TI A EN GI", Field: ScriptReplaceSpoken, MatchCase: true, Apply: true})
+	if err != nil || !res.Applied || len(res.Matches) != 3 {
+		t.Fatalf("Replace = %+v, %v; want 3 lines changed", res, err)
+	}
+	b1 := f.script(t, "b1")
+	if b1.Lines[0].Text != "TRNG chậm." || b1.Lines[0].Spoken != "TI A EN GI chậm." {
+		t.Errorf("b1.1 = %+v, want the text kept and the spoken wording set", b1.Lines[0])
+	}
+	if b1.Lines[1].Spoken != "Dùng TI A EN GI ở đây nhé." {
+		t.Errorf("b1.2 spoken = %q, want its own spoken wording replaced", b1.Lines[1].Spoken)
+	}
+	if got := f.script(t, "b2").Lines[0].Spoken; got != "Lại TI A EN GI." {
+		t.Errorf("b2.1 spoken = %q, want the other beat changed too", got)
+	}
+}
+
+func TestReplaceTextChangesTheWrittenWording(t *testing.T) {
+	f := newScriptFixture(t)
+	f.writeLines(t, "b1", domain.UnitPending, replaceTestLine("b1.1", "TRNG chậm.", "TRNG chậm."))
+	if _, err := f.uc.Replace(context.Background(), "p1", ScriptReplaceRequest{Find: "TRNG", Replace: "máy sinh số thật", Field: ScriptReplaceText, MatchCase: true, Apply: true}); err != nil {
+		t.Fatal(err)
+	}
+	if l := f.script(t, "b1").Lines[0]; l.Text != "máy sinh số thật chậm." || l.Spoken != "TRNG chậm." {
+		t.Errorf("line = %+v, want only the text on screen replaced", l)
+	}
+}
+
+func TestReplaceLeavesApprovedBeatsAndCountsThem(t *testing.T) {
+	f := newScriptFixture(t)
+	f.writeLines(t, "b1", domain.UnitApproved, replaceTestLine("b1.1", "TRNG.", ""), replaceTestLine("b1.2", "TRNG nữa.", ""))
+	f.writeLines(t, "b2", domain.UnitPending, replaceTestLine("b2.1", "TRNG.", ""))
+	res, err := f.uc.Replace(context.Background(), "p1", ScriptReplaceRequest{Find: "TRNG", Replace: "X", Field: ScriptReplaceText, MatchCase: true, Apply: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Matches) != 1 || len(res.SkippedApproved) != 1 || res.SkippedApproved[0].Beat != "b1" || res.SkippedApproved[0].Lines != 2 {
+		t.Errorf("result = %+v, want b2 changed and b1's 2 lines counted as skipped", res)
+	}
+	if got := f.script(t, "b1").Lines[0].Text; got != "TRNG." {
+		t.Errorf("approved beat changed to %q", got)
+	}
+	if u, _ := f.beat.units.GetUnit(context.Background(), "p1", domain.UnitKindScriptBeat, "b2"); u.Status != domain.UnitPending || !u.HasCreatorField("lines") {
+		t.Errorf("a replaced beat must wait for review as the Creator's edit: %+v", u)
+	}
+}
+
+func TestReplaceStoresNothingWhenALineWouldBeEmpty(t *testing.T) {
+	f := newScriptFixture(t)
+	f.writeLines(t, "b1", domain.UnitPending, replaceTestLine("b1.1", "TRNG chậm.", ""))
+	f.writeLines(t, "b2", domain.UnitPending, replaceTestLine("b2.1", "TRNG", ""))
+	_, err := f.uc.Replace(context.Background(), "p1", ScriptReplaceRequest{Find: "TRNG", Replace: "", Field: ScriptReplaceText, MatchCase: true, Apply: true})
+	if !errors.Is(err, domain.ErrInvalidUnitEdit) {
+		t.Fatalf("error = %v, want an invalid edit for the line that would be empty", err)
+	}
+	if got := f.script(t, "b1").Lines[0].Text; got != "TRNG chậm." {
+		t.Errorf("b1 changed to %q although the run was refused", got)
+	}
+}
+
+func TestReplaceRefusesAnEmptyWordAndAnUnknownField(t *testing.T) {
+	f := newScriptFixture(t)
+	for _, req := range []ScriptReplaceRequest{
+		{Find: "  ", Replace: "x", Field: ScriptReplaceText},
+		{Find: "a", Replace: "x", Field: "facts"},
+	} {
+		if _, err := f.uc.Replace(context.Background(), "p1", req); !errors.Is(err, domain.ErrInvalidUnitEdit) {
+			t.Errorf("Replace(%+v) error = %v, want an invalid edit", req, err)
+		}
+	}
+}

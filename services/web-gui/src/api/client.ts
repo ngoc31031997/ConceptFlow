@@ -3047,6 +3047,47 @@ export async function speakScriptLines(projectId: string, lineIds: string[]): Pr
   );
 }
 
+/** Where a find-and-replace over the dialogue writes: the wording the voice reads, or the text on screen. */
+export type ScriptReplaceField = "spoken" | "text";
+
+/** One line a find-and-replace changes, as it reads before and after. */
+export interface ScriptReplaceMatch {
+  beat: string;
+  line: string;
+  before: string;
+  after: string;
+}
+
+/** What a find-and-replace changes, or would change: approved beats are never touched and only counted. */
+export interface ScriptReplaceResult {
+  matches: ScriptReplaceMatch[];
+  skippedApproved: { beat: string; lines: number }[];
+  applied: boolean;
+}
+
+/** Previews (`apply` false) or applies a whole-word replace over the dialogue of the beats not yet approved. */
+export async function replaceInScript(
+  projectId: string,
+  options: { find: string; replace: string; field: ScriptReplaceField; matchCase: boolean; apply: boolean },
+): Promise<ScriptReplaceResult> {
+  const wire = await apiFetch<{
+    matches: ScriptReplaceMatch[] | null;
+    skipped_approved: { beat: string; lines: number }[] | null;
+    applied: boolean;
+  }>(`/v1/projects/${projectId}/script/replace`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({
+      find: options.find,
+      replace: options.replace,
+      field: options.field,
+      match_case: options.matchCase,
+      apply: options.apply,
+    }),
+  });
+  return { matches: wire.matches ?? [], skippedApproved: wire.skipped_approved ?? [], applied: wire.applied };
+}
+
 /** Where the browser plays a line's voice file from. */
 export function scriptAudioUrl(projectId: string, file: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/audio/${encodeURIComponent(file)}`;

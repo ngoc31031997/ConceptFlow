@@ -1,7 +1,9 @@
+import { useState } from "react";
 import type { ScriptState } from "../../api/client";
 import type { LinePlayer } from "../../hooks/useLinePlayer";
 import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
+import { ScriptReplaceDialog } from "./ScriptReplaceDialog";
 import styles from "./script.module.css";
 
 /** "4:28" for a length in seconds. */
@@ -11,10 +13,13 @@ export function formatSeconds(seconds: number): string {
 }
 
 interface ScriptOverviewCardProps {
+  projectId: string;
   state: ScriptState;
   player: LinePlayer;
   /** The step cannot be changed or listened to now. */
   disabled: boolean;
+  /** The lines were changed by a find-and-replace; the screen loads them again. */
+  onReload: () => void | Promise<void>;
 }
 
 /**
@@ -23,7 +28,8 @@ interface ScriptOverviewCardProps {
  * checks over the opening, the closing, the flags and the joins, and the
  * button that plays the script from the top. A check that fails is a warning.
  */
-export function ScriptOverviewCard({ state, player, disabled }: ScriptOverviewCardProps) {
+export function ScriptOverviewCard({ projectId, state, player, disabled, onReload }: ScriptOverviewCardProps) {
+  const [replacing, setReplacing] = useState(false);
   const { stats } = state;
   const ids = state.beats.flatMap((b) => b.lines.map((l) => l.id));
   const playingAny = player.playingId !== null || player.waitingId !== null;
@@ -32,6 +38,9 @@ export function ScriptOverviewCard({ state, player, disabled }: ScriptOverviewCa
       <div className={researchStyles.body}>
         <div className={researchStyles.head}>
           <h3>Toàn bộ kịch bản</h3>
+          <Button variant="ghost" className={researchStyles.sm} onClick={() => setReplacing(true)} disabled={disabled || ids.length === 0} data-testid="script-replace-open">
+            Tìm và thay
+          </Button>
           <Button
             variant="ghost"
             className={researchStyles.sm}
@@ -67,6 +76,7 @@ export function ScriptOverviewCard({ state, player, disabled }: ScriptOverviewCa
           </p>
         )}
       </div>
+      <ScriptReplaceDialog open={replacing} onClose={() => setReplacing(false)} projectId={projectId} onApplied={onReload} />
     </Card>
   );
 }

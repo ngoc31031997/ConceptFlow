@@ -82,6 +82,7 @@ describe('routing between orchestrator and authoring-service', () => {
     ['post', '/v1/projects/p1/script/generate', 'authoringAi'],
     ['post', '/v1/projects/p1/script/suggest', 'authoringAi'],
     ['post', '/v1/projects/p1/script/speak', 'authoring'],
+    ['post', '/v1/projects/p1/script/replace', 'authoring'],
     ['get', '/v1/projects/p1/script-lock', 'authoring'],
     ['post', '/v1/projects/p1/script-lock/review', 'authoringAi'],
     ['post', '/v1/projects/p1/script-lock/findings/r1/apply', 'authoring'],

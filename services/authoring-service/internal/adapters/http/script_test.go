@@ -20,6 +20,7 @@ type fakeScript struct {
 	lineID  string
 	lineIDs []string
 	runs    int
+	replace application.ScriptReplaceRequest
 }
 
 func (f *fakeScript) State(context.Context, string) (application.ScriptState, error) {
@@ -37,6 +38,11 @@ func (f *fakeScript) Suggest(_ context.Context, _, kind, lineID string) (string,
 func (f *fakeScript) Speak(_ context.Context, _ string, ids []string) error {
 	f.lineIDs = ids
 	return f.err
+}
+
+func (f *fakeScript) Replace(_ context.Context, _ string, req application.ScriptReplaceRequest) (application.ScriptReplaceResult, error) {
+	f.replace = req
+	return application.ScriptReplaceResult{Matches: []application.ScriptReplaceMatch{{Beat: "b1", Line: "b1.1", Before: "TRNG", After: "X"}}, Applied: req.Apply}, f.err
 }
 
 type fakeVoiceLines struct {
@@ -133,5 +139,32 @@ func TestVoiceLinesAreClaimedAndAnsweredThroughTheInternalRoutes(t *testing.T) {
 	}
 	if rec = serveScript(&fakeScript{}, v, http.MethodPost, "/internal/v1/authoring/p1/voice-lines/fail", `{}`); rec.Code != http.StatusBadRequest {
 		t.Errorf("a failure without a reason is refused, got %d", rec.Code)
+	}
+}
+
+func TestReplaceRouteHandsTheRequestToTheStepAndReturnsTheChanges(t *testing.T) {
+	f := &fakeScript{}
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithScript(f, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects/p1/script/replace",
+		strings.NewReader(`{"find":"TRNG","replace":"TI A EN GI","field":"spoken","match_case":true,"apply":true}`))
+	rec := httptest.NewRecorder()
+	rt.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"applied":true`) || !strings.Contains(rec.Body.String(), `"line":"b1.1"`) {
+		t.Fatalf("status = %d, body %s", rec.Code, rec.Body)
+	}
+	want := application.ScriptReplaceRequest{Find: "TRNG", Replace: "TI A EN GI", Field: "spoken", MatchCase: true, Apply: true}
+	if f.replace != want {
+		t.Errorf("request = %+v, want %+v", f.replace, want)
+	}
+}
+
+func TestReplaceRouteRefusesABadRequestWith400(t *testing.T) {
+	f := &fakeScript{err: domain.ErrInvalidUnitEdit}
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithScript(f, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects/p1/script/replace", strings.NewReader(`{"find":""}`))
+	rec := httptest.NewRecorder()
+	rt.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
 	}
 }

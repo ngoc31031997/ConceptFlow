@@ -21,6 +21,7 @@ type scriptUseCase interface {
 	Generate(ctx context.Context, projectID, beatKey, note string) error
 	Suggest(ctx context.Context, projectID, kind, lineID string) (string, error)
 	Speak(ctx context.Context, projectID string, lineIDs []string) error
+	Replace(ctx context.Context, projectID string, req application.ScriptReplaceRequest) (application.ScriptReplaceResult, error)
 }
 
 // voiceLinesUseCase is what the orchestrator calls to read lines.
@@ -42,6 +43,7 @@ func (rt *Router) scriptRoutes(r chi.Router) {
 	r.Post(base+"/generate", rt.handleGenerateScript)
 	r.Post(base+"/suggest", rt.handleSuggestScript)
 	r.Post(base+"/speak", rt.handleSpeakScript)
+	r.Post(base+"/replace", rt.handleReplaceScript)
 }
 
 func (rt *Router) scriptEnabled(w http.ResponseWriter) bool {
@@ -203,4 +205,30 @@ func (rt *Router) handleFailVoiceLines(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleReplaceScript previews or applies a find-and-replace over the dialogue.
+func (rt *Router) handleReplaceScript(w http.ResponseWriter, r *http.Request) {
+	if !rt.scriptEnabled(w) {
+		return
+	}
+	var body struct {
+		Find      string `json:"find"`
+		Replace   string `json:"replace"`
+		Field     string `json:"field"`
+		MatchCase bool   `json:"match_case"`
+		Apply     bool   `json:"apply"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	result, err := rt.script.Replace(r.Context(), chi.URLParam(r, "project_id"), application.ScriptReplaceRequest{
+		Find: body.Find, Replace: body.Replace, Field: body.Field, MatchCase: body.MatchCase, Apply: body.Apply,
+	})
+	if err != nil {
+		writeUnitError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }

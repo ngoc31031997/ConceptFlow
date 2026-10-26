@@ -84,3 +84,13 @@ describe("AI calls through an AI outside the system", () => {
     expect(req.signal).toBe(controller.signal);
   });
 });
+
+describe("replaceInScript", () => {
+  it("posts the word, the replacement, where to write it and whether to apply", async () => {
+    const fetchFn = mockFetch(200, { matches: null, skipped_approved: [{ beat: "b3", lines: 2 }], applied: false });
+    const result = await client.replaceInScript("p1", { find: "TRNG", replace: "TI A EN GI", field: "spoken", matchCase: true, apply: false });
+    const req = lastRequest(fetchFn);
+    expect(req.body).toEqual({ find: "TRNG", replace: "TI A EN GI", field: "spoken", match_case: true, apply: false });
+    expect(result).toEqual({ matches: [], skippedApproved: [{ beat: "b3", lines: 2 }], applied: false });
+  });
+});

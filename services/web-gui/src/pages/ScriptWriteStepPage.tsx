@@ -98,7 +98,7 @@ export function ScriptWriteStepPage() {
             </div>
           </Card>
         )}
-        {s.beatsApproved && s.stats.written > 0 && <ScriptOverviewCard state={s} player={script.player} disabled={locked} />}
+        {s.beatsApproved && s.stats.written > 0 && <ScriptOverviewCard projectId={projectId} state={s} player={script.player} disabled={locked} onReload={script.reload} />}
         {s.beatsApproved &&
           s.beats.map((beat) => <ScriptBeatCard key={beat.key} projectId={projectId} beat={beat} script={script} aiAvailable={aiAvailable} locked={locked} highlight={highlight} />)}
         {s.beatsApproved && s.stats.written > 0 && (
