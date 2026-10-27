@@ -23,6 +23,19 @@ function lastRequest(fn: ReturnType<typeof vi.fn>) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("AI calls through an AI outside the system", () => {
+  it("describes the request without sending it", async () => {
+    const fetchFn = mockFetch(200, {});
+    const error = await client
+      .generateBeats("p1", "ngắn gọn", { external: { mode: "describe" } }, true)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(client.ExternalRequestDescribed);
+    const { request } = error as client.ExternalRequestDescribed;
+    expect(request.method).toBe("POST");
+    expect(request.path).toBe("/v1/projects/p1/beats/generate");
+    expect(JSON.parse(request.body ?? "")).toEqual({ note: "ngắn gọn", only_unwritten: true });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it("asks for the prompt with the mode header and rejects with it", async () => {
     const fetchFn = mockFetch(200, { external_prompt: "Viết câu chuyện\n\nLàm đi" });
     const error = await client

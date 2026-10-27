@@ -180,6 +180,14 @@ async function parseError(
 const NO_EXTERNAL_PROMPT = "Mục này không gọi AI nên không có prompt để copy.";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  if ((init?.headers as Record<string, string> | undefined)?.[EXTERNAL_AI_HEADER] === "describe") {
+    throw new ExternalRequestDescribed({
+      gateway: GATEWAY_URL,
+      method: init?.method ?? "GET",
+      path,
+      body: typeof init?.body === "string" ? init.body : undefined,
+    });
+  }
   let response: Response;
   try {
     response = await fetch(`${GATEWAY_URL}${path}`, init);
@@ -381,8 +389,30 @@ export function isRequestCancelled(err: unknown): boolean {
   return err instanceof RequestCancelledError;
 }
 
-/** How a step's AI call runs through an AI outside the system: ask for the prompt to copy, or hand back the reply. */
-export type ExternalAi = { mode: "prompt" } | { mode: "paste"; reply: string };
+/**
+ * How a step's AI call runs through an AI outside the system: ask for the prompt to copy, hand back
+ * the reply, or only describe the request so it can be made later (nothing is sent).
+ */
+export type ExternalAi = { mode: "prompt" } | { mode: "paste"; reply: string } | { mode: "describe" };
+
+/** The plain HTTP request of a step's AI call, enough to make it again later with an external-AI mode. */
+export interface ExternalRequest {
+  /** Base URL of the gateway the request goes to. */
+  gateway: string;
+  method: string;
+  /** Path after the gateway, e.g. `/v1/projects/p1/beats/generate`. */
+  path: string;
+  /** The step's own JSON fields as a string; absent when the call has none. */
+  body?: string;
+}
+
+/** The request of an external-AI call was described and not sent; carries what was described. */
+export class ExternalRequestDescribed extends Error {
+  constructor(readonly request: ExternalRequest) {
+    super("External request described");
+    this.name = "ExternalRequestDescribed";
+  }
+}
 
 /** A step's AI call made through an AI outside the system instead of the model. */
 export interface ExternalAiCall {
