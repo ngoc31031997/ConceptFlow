@@ -38,7 +38,7 @@ Mọi lượt AI ở bước 1–7 (viết ý tưởng, đánh giá, brief, câu
 3. Khi xong, câu trả lời được dán vào ô "Dán kết quả" và hộp thoại tự bấm **Đọc kết quả**. Bước chạy tiếp như khi gọi AI của hệ thống, rồi hộp thoại đóng.
 4. Nếu bước không dùng được câu trả lời, hộp thoại báo lý do và câu trả lời vẫn nằm trong ô. Bạn sửa rồi bấm **Đọc kết quả**, hoặc chạy lại.
 
-Ở các hộp thoại này DeepSeek chỉ bật **DeepThink**, không tra web. Đóng hộp thoại thì ConceptFlow ngừng chờ; tab DeepSeek vẫn mở.
+Ở các hộp thoại này DeepSeek chỉ bật **DeepThink**, không tra web. Đóng hộp thoại thì ConceptFlow ngừng chờ và cửa sổ DeepSeek tự đóng.
 
 Ví dụ bước 1 · Ý tưởng: tạo project, rồi ở thẻ ② bấm **Dùng AI ngoài** để viết ý tưởng; làm lại thì chọn AI ngoài trong modal **Làm lại kèm ghi chú**.
 
@@ -46,16 +46,16 @@ Ví dụ bước 1 · Ý tưởng: tạo project, rồi ở thẻ ② bấm **D�
 
 1. Mở project, vào bước **3 · Nghiên cứu**, tạo câu hỏi ở ô ①.
 2. Ở ô ② **Prompt nghiên cứu**, bấm **Chạy bằng DeepSeek**. Nếu không thấy nút này mà thấy dòng "Cài extension…", xem phần Xử lý lỗi.
-3. Extension mở một tab DeepSeek **ở nền** (bạn vẫn ở lại ConceptFlow), bật DeepThink + Search, dán prompt và gửi.
+3. Extension mở một **cửa sổ DeepSeek riêng**, không chiếm focus (bạn vẫn ở lại ConceptFlow); xong là cửa sổ tự đóng, bật DeepThink + Search, dán prompt và gửi.
 4. Ô ② hiện tiến độ:
-   - "Đang mở DeepSeek trong một tab nền…"
+   - "Đang mở DeepSeek trong một cửa sổ riêng…"
    - "Đang bật DeepThink + Search và gửi prompt…"
    - "DeepSeek đang suy nghĩ và tra web…": thường mất vài phút, tối đa 15 phút.
    - "Đang lấy câu trả lời…"
 5. Khi xong, câu trả lời được điền vào ô ③ và ConceptFlow tự bấm **Đọc kết quả**. Dữ kiện hiện ở bảng dữ kiện và hệ thống bắt đầu kiểm link như khi bạn dán tay.
 6. Tab DeepSeek được giữ lại để bạn xem lại hoặc hỏi tiếp. Đóng nó khi không cần nữa.
 
-Muốn dừng: bấm **Huỷ** cạnh dòng tiến độ. ConceptFlow ngừng chờ; tab DeepSeek vẫn mở và DeepSeek có thể vẫn trả lời tiếp trong tab đó. Nếu muốn, bạn chép và dán tay câu trả lời đó.
+Muốn dừng: bấm **Huỷ** cạnh dòng tiến độ. ConceptFlow ngừng chờ và cửa sổ DeepSeek bị đóng, câu trả lời đang dở sẽ mất.
 
 Mỗi lần chỉ chạy được một lượt. Mỗi lượt là một cú bấm của bạn; extension không tự chạy lại hay chạy hàng loạt.
 
@@ -70,7 +70,7 @@ Nếu ConceptFlow không đọc được câu trả lời (ví dụ DeepSeek kh�
 | "Chưa đăng nhập DeepSeek" | Phiên DeepSeek hết hạn | Mở chat.deepseek.com, đăng nhập, chạy lại |
 | "Giao diện DeepSeek đã đổi… (nút Search)" hoặc tên phần khác | DeepSeek đổi giao diện | Dán selector mới ở trang Selector DeepSeek (xem dưới) |
 | "Đang có một lượt chạy DeepSeek khác" | Một lượt trước chưa xong | Chờ, hoặc bấm Huỷ ở tab đã chạy lượt đó |
-| Tiến độ đứng ở "DeepSeek đang suy nghĩ…" rất lâu | Chrome làm chậm tab nền | Bấm sang tab DeepSeek một lần rồi quay lại; câu trả lời sẽ được lấy khi xong |
+| Tiến độ đứng ở "DeepSeek đang suy nghĩ…" rất lâu | Chrome làm chậm cửa sổ bị che | Mở cửa sổ DeepSeek lên một lần rồi quay lại; câu trả lời sẽ được lấy khi xong |
 | "DeepSeek chưa trả lời xong sau 15 phút" | Câu hỏi quá dài, mạng chậm, DeepSeek quá tải | Xem tab DeepSeek; có câu trả lời thì chép và dán tay |
 
 Xem log chi tiết:
@@ -81,13 +81,13 @@ Xem log chi tiết:
 ## Cách hoạt động
 
 ```
-ConceptFlow (localhost:3000)                    Chrome extension                       chat.deepseek.com (tab nền)
-  useAiBridge ──postMessage──▶ bridge.js ──runtime──▶ background.js ──tabs.create──▶ adapter.js
+ConceptFlow (localhost:3000)                    Chrome extension                       chat.deepseek.com (cửa sổ riêng)
+  useAiBridge ──postMessage──▶ bridge.js ──runtime──▶ background.js ─windows.create▶ adapter.js
              ◀──postMessage── bridge.js ◀──tabs.sendMessage── background.js ◀──runtime── adapter.js
 ```
 
 1. Trang gửi `run` (có `request_id`) qua `window.postMessage`. Giao thức đầy đủ ở `docs/contracts/ai-bridge-v1.md`.
-2. `background.js` (service worker) lưu lượt chạy vào `chrome.storage.session` và mở tab DeepSeek ở nền. Lưu vào storage vì Chrome có thể tắt service worker trong lúc DeepSeek đang trả lời.
+2. `background.js` (service worker) lưu lượt chạy vào `chrome.storage.session` và mở cửa sổ DeepSeek riêng và đóng nó khi xong. Lưu vào storage vì Chrome có thể tắt service worker trong lúc DeepSeek đang trả lời.
 3. `deepseek/adapter.js` nạp xong thì xin việc (`ready`). Nó chờ ô chat, đặt DeepThink và Search đúng chế độ lượt chạy yêu cầu (`modes`), ghi prompt vào ô chat rồi nhấn Enter.
 4. Câu trả lời được coi là xong khi hàng nút dưới câu trả lời (Copy, Regenerate…) đã hiện và nội dung đứng yên 5 giây. Nếu không tìm thấy hàng nút thì cần nội dung đứng yên 60 giây.
 5. Lấy câu trả lời bằng nút **Copy** của DeepSeek để giữ nguyên markdown và khối ```` ```json ````. `deepseek/clipboard-hook.js` chạy trong trang DeepSeek và chặn đúng lần copy đó, nên **clipboard thật của bạn không bị ghi đè**. Các lần bạn tự copy vẫn đi qua bình thường. Nếu không lấy được qua nút Copy, adapter đọc chữ trên trang, bỏ phần suy nghĩ của DeepThink và dựng lại các khối code.
@@ -99,7 +99,7 @@ ConceptFlow (localhost:3000)                    Chrome extension                
 | `src/protocol.js` | Định dạng message, mã lỗi và câu báo lỗi tiếng Việt, giới hạn thời gian |
 | `src/jobs.js` | Luật của lượt chạy đang lưu (còn chặn lượt mới không, message có thuộc lượt này không) |
 | `src/bridge.js` | Content script trên ConceptFlow: chuyển message trang ↔ service worker |
-| `src/background.js` | Service worker: mở tab, giao prompt, chuyển tiến độ và kết quả |
+| `src/background.js` | Service worker: mở và đóng cửa sổ, giao prompt, chuyển tiến độ và kết quả |
 | `src/deepseek/selectors.js` | **Selector mặc định của giao diện DeepSeek**, ghép với phần bạn dán ở trang cài đặt |
 | `src/options/` | Trang **Selector DeepSeek**: dán, kiểm tra, lưu selector |
 | `src/deepseek/answer.js` | Luật "đã trả lời xong", khớp nhãn nút, dựng lại khối code |

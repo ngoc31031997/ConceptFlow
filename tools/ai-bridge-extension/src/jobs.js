@@ -10,9 +10,9 @@
   /** Extra time past MAX_RUN_MS after which a job left behind (a crashed adapter) no longer blocks a new run. */
   const STALE_GRACE_MS = 60 * 1000;
 
-  /** A new job for a run the page asked for; `providerTabId` is filled once the tab exists. */
+  /** A new job for a run the page asked for; `providerTabId` and `providerWindowId` are filled once the window exists. */
   function newJob(requestId, prompt, modes, replyTabId, now) {
-    return { requestId: requestId, prompt: prompt, modes: modes, replyTabId: replyTabId, providerTabId: null, started: false, startedAt: now };
+    return { requestId: requestId, prompt: prompt, modes: modes, replyTabId: replyTabId, providerTabId: null, providerWindowId: null, started: false, startedAt: now };
   }
 
   /** True when a stored job still blocks a new run. */

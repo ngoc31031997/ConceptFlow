@@ -1,7 +1,8 @@
 /**
- * Service worker: opens a DeepSeek tab in the background for a run, hands the
- * prompt to the DeepSeek adapter once that tab is ready, and forwards the
- * adapter's progress, answer or error to the ConceptFlow tab that asked.
+ * Service worker: opens a DeepSeek window of its own (unfocused) for a run, hands
+ * the prompt to the DeepSeek adapter once its tab is ready, forwards the
+ * adapter's progress, answer or error to the ConceptFlow tab that asked, and
+ * closes that window when the run ends or is cancelled.
  * One run at a time; the run is kept in chrome.storage.session (see jobs.js).
  */
 importScripts("protocol.js", "jobs.js");
@@ -40,9 +41,18 @@ async function startRun(message, replyTabId) {
   const job = J.newJob(message.requestId, message.prompt, message.modes || P.readModes(null), replyTabId, now);
   await writeJob(job);
   await toPage(replyTabId, P.toPage("progress", { request_id: job.requestId, stage: "opening" }));
-  const tab = await chrome.tabs.create({ url: DEEPSEEK_URL, active: false });
-  job.providerTabId = tab.id;
+  const win = await chrome.windows.create({ url: DEEPSEEK_URL, focused: false });
+  job.providerWindowId = win.id;
+  job.providerTabId = win.tabs[0].id;
   await writeJob(job);
+}
+
+/** Closes the run's DeepSeek window; it may already be gone (closed by hand). */
+function closeProviderWindow(job) {
+  if (!job || job.providerWindowId === null || job.providerWindowId === undefined) return;
+  chrome.windows.remove(job.providerWindowId).catch(function (err) {
+    console.warn("ai-bridge: DeepSeek window " + job.providerWindowId + " was not closed:", err);
+  });
 }
 
 /** The adapter asks for its work when its page has loaded; it gets the prompt once. */
@@ -62,6 +72,7 @@ async function forwardFromAdapter(message, tabId) {
     return;
   }
   await clearJob();
+  closeProviderWindow(job);
   if (message.kind === "result") {
     await toPage(job.replyTabId, P.toPage("result", { request_id: job.requestId, text: message.text }));
   } else {
@@ -73,11 +84,7 @@ async function cancelRun(requestId) {
   const job = await readJob();
   if (!job || job.requestId !== requestId) return;
   await clearJob();
-  if (job.providerTabId !== null) {
-    chrome.tabs.sendMessage(job.providerTabId, { kind: "cancel", requestId: requestId }).catch(function (err) {
-      console.warn("ai-bridge: DeepSeek tab did not take the cancel:", err);
-    });
-  }
+  closeProviderWindow(job);
 }
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
@@ -110,6 +117,7 @@ chrome.tabs.onRemoved.addListener(function (tabId) {
       await toPage(job.replyTabId, P.errorToPage(job.requestId, "tab_closed"));
     } else if (job.replyTabId === tabId) {
       await clearJob();
+      closeProviderWindow(job);
     }
   }).catch(function (err) {
     console.error("ai-bridge: could not settle the run of closed tab " + tabId + ":", err);
