@@ -4,11 +4,12 @@ import type { OperationRun } from "../../hooks/useOperationRun";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
 import { useDeepSeekRun } from "../../hooks/useDeepSeekRun";
-import { DeepSeekRunButton } from "../DeepSeekRunButton";
+import { AiBridgeRunStatus } from "../AiBridgeRunStatus";
 import { ExternalAiDialog } from "../ExternalAiDialog";
 import { Button, Card, TextInput } from "../ui";
 import unitStyles from "../units/units.module.css";
 import { CoverageChip } from "./CoverageChip";
+import { FollowUpPrompt } from "./FollowUpPrompt";
 import { ImpactConfirm } from "./ImpactConfirm";
 import { ResearchInputModal } from "./ResearchInputModal";
 import styles from "./research.module.css";
@@ -16,13 +17,15 @@ import styles from "./research.module.css";
 interface QuestionRowProps {
   question: ResearchQuestion;
   coverage: QuestionCoverage | undefined;
+  /** A link of one of the question's facts is still being checked. */
+  checking: boolean;
   disabled: boolean;
   onSave: (id: string, text: string) => void;
   onDelete: (question: ResearchQuestion) => void;
 }
 
 /** One question as a field: it is saved when the Creator leaves it with a changed, non-empty text. */
-function QuestionRow({ question, coverage, disabled, onSave, onDelete }: QuestionRowProps) {
+function QuestionRow({ question, coverage, checking, disabled, onSave, onDelete }: QuestionRowProps) {
   const [value, setValue] = useState(question.text);
   useEffect(() => setValue(question.text), [question.text]);
 
@@ -63,7 +66,12 @@ function QuestionRow({ question, coverage, disabled, onSave, onDelete }: Questio
             ↻ cần sinh lại
           </span>
         )}
-        <CoverageChip coverage={coverage} testId={`question-coverage-${question.id}`} />
+        <CoverageChip coverage={coverage} checking={checking} testId={`coverage-chip-${question.id}`} />
+        {coverage && !checking && coverage.badFacts.length > 0 && (
+          <span className={styles.warn} data-testid={`coverage-bad-${question.id}`}>
+            {coverage.badFacts.join(", ")} không khớp
+          </span>
+        )}
       </span>
       <Button
         variant="danger"
@@ -79,10 +87,20 @@ function QuestionRow({ question, coverage, disabled, onSave, onDelete }: Questio
   );
 }
 
+type Engine = "system" | "deepseek" | "outside";
+
+const ENGINES: { id: Engine; label: string }[] = [
+  { id: "system", label: "AI hệ thống" },
+  { id: "deepseek", label: "DeepSeek" },
+  { id: "outside", label: "AI ngoài" },
+];
+
 interface QuestionsCardProps {
   projectId: string;
   questions: ResearchQuestion[];
   coverage: QuestionCoverage[];
+  /** Ids of the questions that have a fact whose link is still being checked. */
+  checking: ReadonlySet<string>;
   /** The brief the questions come from changed since the AI wrote them. */
   stale: boolean;
   /** A language model is configured, so the AI can write the questions. */
@@ -103,15 +121,18 @@ interface QuestionsCardProps {
 }
 
 /**
- * Section 1 of the research step: the questions to look up. The AI writes
- * them from the brief and nobody approves them; every question is a field the
- * Creator edits, deletes (after a confirmation) or adds to. Regenerating keeps
- * the questions the Creator wrote, unless they agree to replace those too.
+ * Section 1 of the research step: the questions to look up, each with how well
+ * it is sourced. The AI writes them from the brief and nobody approves them;
+ * every question is a field the Creator edits, deletes (after a confirmation)
+ * or adds to. One button generates them on the engine picked beside it: the
+ * system's AI, DeepSeek or an AI outside. Regenerating keeps the questions the
+ * Creator wrote, unless they agree to replace those too.
  */
 export function QuestionsCard({
   projectId,
   questions,
   coverage,
+  checking,
   stale,
   aiAvailable,
   running,
@@ -144,6 +165,10 @@ export function QuestionsCard({
       setOutside(deepSeekReplace.current);
     },
   });
+  const [pickedEngine, setPickedEngine] = useState<Engine | null>(null);
+  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, deepseek: deepSeek.available, outside: true };
+  // The Creator's pick, or the first engine that can run when that one cannot.
+  const engine: Engine = pickedEngine && engineAvailable[pickedEngine] ? pickedEngine : (ENGINES.find((e) => engineAvailable[e.id])?.id ?? "outside");
   // The dialog that shows what the AI reads.
   const [inputOpen, setInputOpen] = useState(false);
   const [inputLoading, setInputLoading] = useState(false);
@@ -211,7 +236,6 @@ export function QuestionsCard({
               Xem đầu vào của AI
             </Button>
           </div>
-          <span className={styles.hint}>AI tự sinh từ brief · không cần duyệt · sửa, xoá, thêm tuỳ ý</span>
         </div>
         {stale && (
           <p className={styles.banner} role="status" data-testid="research-questions-stale">
@@ -229,6 +253,7 @@ export function QuestionsCard({
               key={q.id}
               question={q}
               coverage={coverageOf(q.id)}
+              checking={checking.has(q.id)}
               disabled={locked}
               onSave={(id, text) => void onSave(id, text)}
               onDelete={setDeleting}
@@ -252,39 +277,57 @@ export function QuestionsCard({
             </div>
           )}
         </div>
-        {aiAvailable && !locked && (
-          <AiModelSelect projectId={projectId} step="research" label="Model AI sinh câu hỏi" testId="research-model" />
-        )}
         <div className={styles.actions}>
           <Button variant="ghost" className={styles.sm} onClick={() => setAdding(true)} disabled={locked || adding} data-testid="question-add">
             + Thêm câu hỏi
           </Button>
-          <Button
-            variant="ghost"
-            className={styles.sm}
-            onClick={() => startGenerate("outside")}
-            disabled={locked || running || deepSeek.busy}
-            data-testid="question-generate-external"
-          >
-            Dùng AI ngoài
-          </Button>
-          <DeepSeekRunButton
-            run={deepSeek}
-            disabled={locked || running}
-            onStart={() => startGenerate("deepseek")}
-            testId="question-generate-deepseek"
-          />
-          <Button
-            variant={mine.length > 0 && questions.length > 0 ? "impact" : "run"}
-            className={styles.sm}
-            onClick={() => startGenerate("system")}
-            disabled={locked || running || !aiAvailable}
-            title={aiAvailable ? undefined : "Chưa cấu hình AI"}
-            data-testid="question-generate"
-          >
-            {generateLabel}
-          </Button>
+          <span className={styles.grow} />
+          <FollowUpPrompt projectId={projectId} questions={questions} coverage={coverage} checking={checking} />
         </div>
+        <div className={styles.engineBar}>
+          <span className={styles.hint} id="question-engine-label">
+            Sinh bằng
+          </span>
+          <div className={styles.seg} role="radiogroup" aria-labelledby="question-engine-label">
+            {ENGINES.filter((e) => e.id !== "deepseek" || deepSeek.available).map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                role="radio"
+                aria-checked={engine === e.id}
+                className={engine === e.id ? `${styles.segItem} ${styles.segOn}` : styles.segItem}
+                onClick={() => setPickedEngine(e.id)}
+                disabled={locked || running || deepSeek.busy || !engineAvailable[e.id]}
+                title={engineAvailable[e.id] ? undefined : "Chưa cấu hình AI"}
+                data-testid={`question-engine-${e.id}`}
+              >
+                {e.label}
+              </button>
+            ))}
+          </div>
+          {engine === "system" && !locked && (
+            <AiModelSelect projectId={projectId} step="research" label="Model AI sinh câu hỏi" testId="research-model" />
+          )}
+          <span className={styles.grow} />
+          {deepSeek.stage !== null ? (
+            <AiBridgeRunStatus stage={deepSeek.stage} modes={deepSeek.modes} onCancel={deepSeek.cancel} testId="question-generate-deepseek" />
+          ) : (
+            <Button
+              variant={mine.length > 0 && questions.length > 0 ? "impact" : "run"}
+              className={styles.sm}
+              onClick={() => startGenerate(engine)}
+              disabled={locked || running || deepSeek.busy}
+              data-testid="question-generate"
+            >
+              {deepSeek.busy ? "Đang chạy…" : generateLabel}
+            </Button>
+          )}
+        </div>
+        {deepSeek.error && (
+          <p className={styles.error} role="alert" data-testid="question-generate-deepseek-error">
+            {deepSeek.error}
+          </p>
+        )}
         <AiOperationCard run={run} active={running} testId="research-progress" title="AI đang sinh câu hỏi" />
       </div>
 

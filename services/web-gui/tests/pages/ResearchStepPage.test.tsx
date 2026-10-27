@@ -127,13 +127,18 @@ async function ready() {
 }
 
 describe("ResearchStepPage", () => {
-  it("shows the five sections with the questions, the prompt, the paste log, the facts and the coverage", async () => {
+  it("shows the three sections with the questions and their coverage, the prompt and paste log, and the facts", async () => {
     await ready();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Nghiên cứu và kiểm chứng");
     expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 3/21");
     expect(screen.getByTestId("rail-step-3")).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("question-input-Q1")).toHaveValue("Quả sung có phải là hoa không?");
-    await waitFor(() => expect(screen.getByTestId("research-prompt-preview")).toHaveTextContent("PROMPT NGHIÊN CỨU"));
+    await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("research-prompt-open"));
+    expect(await screen.findByTestId("research-prompt-modal-text")).toHaveTextContent("PROMPT NGHIÊN CỨU");
+    fireEvent.click(screen.getByTestId("research-prompt-modal-close-button"));
+    expect(screen.queryByTestId("research-paste-log")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("research-paste-log-toggle"));
     expect(screen.getByTestId("research-paste-log-1")).toHaveTextContent("Đọc được 2 dữ kiện: thêm F01, F02. Bỏ 1 dòng: dòng 13 (dữ kiện F13 thiếu trường type).");
     for (let i = 1; i <= 12; i += 1) expect(screen.getByTestId(`fact-row-F${String(i).padStart(2, "0")}`)).toBeInTheDocument();
     expect(screen.getByTestId("coverage-chip-Q1")).toHaveTextContent("✓ 2 nguồn khớp");
@@ -200,7 +205,7 @@ describe("ResearchStepPage", () => {
 
   it("without the AI Bridge extension shows how to install it instead of the DeepSeek button", async () => {
     await ready();
-    await screen.findByTestId("research-prompt-preview");
+    await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());
     expect(screen.getByTestId("research-bridge-missing")).toHaveTextContent("ConceptFlow AI Bridge");
     expect(screen.queryByTestId("research-bridge-run")).not.toBeInTheDocument();
   });
@@ -276,18 +281,19 @@ describe("ResearchStepPage", () => {
     }
   });
 
-  it("shows the whole prompt and copies it from the card", async () => {
+  it("copies the prompt from the card in one click", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     await ready();
-    await waitFor(() => expect(screen.getByTestId("research-prompt-preview")).toHaveTextContent("PROMPT NGHIÊN CỨU"));
+    await waitFor(() => expect(screen.getByTestId("research-prompt-quick-copy")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("research-prompt-quick-copy"));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("PROMPT NGHIÊN CỨU\nQ1. Quả sung có phải là hoa không?"));
   });
 
   it("opens the follow-up prompt for the questions still short of sources", async () => {
     await ready();
-    expect(screen.getByTestId("coverage-follow-up")).toHaveTextContent("Xem prompt bổ sung cho 1 câu hỏi");
+    expect(screen.getByTestId("coverage-weak")).toHaveTextContent("1 câu hỏi thiếu nguồn");
+    expect(screen.getByTestId("coverage-follow-up")).toHaveTextContent("Prompt bổ sung");
     fireEvent.click(screen.getByTestId("coverage-follow-up"));
     expect(await screen.findByTestId("research-follow-up-modal-text")).toHaveTextContent("PROMPT BỔ SUNG");
   });
@@ -373,6 +379,16 @@ describe("ResearchStepPage", () => {
       await waitFor(() => expect(generate).toHaveBeenLastCalledWith("p1", { replaceEdited: false, note: undefined }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })));
     });
 
+    it("picks where the questions are generated and keeps the model choice for the system AI only", async () => {
+      await ready();
+      expect(screen.getByTestId("question-engine-system")).toHaveAttribute("aria-checked", "true");
+      expect(screen.queryByTestId("question-engine-deepseek")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("question-engine-outside"));
+      expect(screen.getByTestId("question-engine-outside")).toHaveAttribute("aria-checked", "true");
+      expect(screen.getByTestId("question-engine-system")).toHaveAttribute("aria-checked", "false");
+      expect(screen.queryByTestId("research-model-field")).not.toBeInTheDocument();
+    });
+
     it("offers to generate when there are no questions, and has no prompt to show yet", async () => {
       state = baseState({ questions: [], coverage: [], facts: [] });
       await ready();
@@ -383,12 +399,13 @@ describe("ResearchStepPage", () => {
       expect(screen.getByTestId("step-strip")).toHaveTextContent("Chưa có dữ kiện");
     });
 
-    it("turns the generate button off without an AI and tells the Creator to add questions by hand", async () => {
+    it("turns the system AI off without an AI, falls back to the AI outside and tells the Creator to add questions by hand", async () => {
       vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: false, provider: "", reason: "Chưa cấu hình" });
       state = baseState({ questions: [], coverage: [], facts: [] });
       await ready();
       await waitFor(() => expect(screen.getByTestId("research-questions-empty")).toHaveTextContent("Chưa cấu hình AI nên bạn tự thêm câu hỏi"));
-      expect(screen.getByTestId("question-generate")).toBeDisabled();
+      expect(screen.getByTestId("question-engine-system")).toBeDisabled();
+      expect(screen.getByTestId("question-engine-outside")).toHaveAttribute("aria-checked", "true");
       expect(screen.getByTestId("question-add")).not.toBeDisabled();
       expect(screen.queryByTestId("research-model-field")).not.toBeInTheDocument();
     });
@@ -633,7 +650,7 @@ describe("ResearchStepPage", () => {
         return state.gate;
       });
       await ready();
-      expect(screen.getByTestId("research-optional")).toHaveTextContent("Tuỳ chọn");
+      expect(screen.getByTestId("research-optional")).toHaveTextContent("Bước tuỳ chọn");
       fireEvent.click(screen.getByTestId("research-skip"));
       const dialog = await screen.findByTestId("research-skip-dialog");
       expect(dialog).toHaveTextContent("Bỏ qua bước Nghiên cứu?");

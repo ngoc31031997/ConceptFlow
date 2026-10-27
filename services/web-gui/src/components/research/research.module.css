@@ -71,35 +71,59 @@
   color: var(--ink);
 }
 
-.optional {
+/* Pushes the controls after it to the end of a flex row. */
+.grow {
+  flex: 1 1 0;
+}
+
+/* The line at the foot of the step that offers to skip it. */
+.skipLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+/* ① engine bar: where the questions are generated, and the button that runs it. */
+.engineBar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding-top: 12px;
+  border-top: 1.5px dashed var(--muted);
+}
+.seg {
+  display: inline-flex;
   border: var(--border-w) solid var(--border-color);
   border-radius: var(--radius);
+  overflow: hidden;
+}
+.segItem {
+  padding: 4px 12px;
+  border: 0;
+  border-right: var(--border-w) solid var(--border-color);
   background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  cursor: pointer;
 }
-.optional span:nth-child(2) {
-  flex: 1 1 260px;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--ink-soft);
+.segItem:last-child {
+  border-right: 0;
 }
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border: 1.5px solid var(--border-color);
-  border-radius: 3px;
-  background: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
+.segItem:disabled {
   color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.segOn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
 }
 
 /* ① questions */
@@ -159,7 +183,27 @@
   background: var(--info-soft);
 }
 
-/* ② prompt */
+/* ② fetch facts: the two ways to get an answer, side by side */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.option {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.or {
+  align-self: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
 .promptBox {
   margin: 0;
   padding: 10px 12px;
@@ -181,7 +225,6 @@
   user-select: all;
 }
 
-/* ③ paste */
 .paste {
   width: 100%;
   font-family: var(--font-mono);
@@ -218,7 +261,7 @@
   white-space: nowrap;
 }
 
-/* ④ facts */
+/* ③ facts */
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -330,8 +373,12 @@
     justify-content: flex-start;
   }
   .grid3,
-  .grid2 {
+  .grid2,
+  .split {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .or {
+    justify-self: center;
   }
 }
 

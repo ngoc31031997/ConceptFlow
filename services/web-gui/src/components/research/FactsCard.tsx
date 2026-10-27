@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { FACT_TYPES, getFactImpact, type FactType, type LinkState, type ResearchFact } from "../../api/client";
+import { FACT_TYPES, getFactImpact, type FactType, type LinkState, type ResearchFact, type UnitStatus } from "../../api/client";
 import { Button, Card, Select } from "../ui";
+import { UnitStatusChip } from "../units/UnitStatusChip";
 import { FACT_TYPE_NAMES } from "./factTypes";
 import { ImpactConfirm } from "./ImpactConfirm";
 import styles from "./research.module.css";
@@ -91,15 +92,22 @@ interface FactsCardProps {
   onEdit: (fact: ResearchFact) => void;
   onFlags: (id: string, flags: { type?: FactType; must?: boolean; keep?: boolean }) => Promise<boolean>;
   onRecheck: (id: string) => Promise<boolean>;
+  /** Whether the table is approved, for the status chip and the button at its foot. */
+  status: UnitStatus;
+  /** An approval or other request of the step is running. */
+  busy: boolean;
+  onApprove: () => void;
+  onUnapprove: () => void;
 }
 
 /**
- * Section 4 of the research step: the fact table. Type and "bắt buộc nói" change
- * straight in the table; wording, link and quote open "Sửa". A change that
- * later work already uses asks first and lists what it sends back
- * (docs/ux-ui-design-rules.md, rule 5), taking the list from the server.
+ * Section 3 of the research step: the fact table, approved from the button at
+ * its foot. Type and "bắt buộc nói" change straight in the table; wording, link
+ * and quote open "Sửa". A change that later work already uses asks first and
+ * lists what it sends back (docs/ux-ui-design-rules.md, rule 5), taking the
+ * list from the server.
  */
-export function FactsCard({ projectId, facts, checking, locked, onAdd, onEdit, onFlags, onRecheck }: FactsCardProps) {
+export function FactsCard({ projectId, facts, checking, locked, onAdd, onEdit, onFlags, onRecheck, status, busy, onApprove, onUnapprove }: FactsCardProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [pending, setPending] = useState<PendingChange | null>(null);
   const shown = facts.filter((f) => matches(f, filter));
@@ -123,14 +131,14 @@ export function FactsCard({ projectId, facts, checking, locked, onAdd, onEdit, o
     <Card data-testid="research-facts-card">
       <div className={styles.body}>
         <div className={styles.head}>
-          <h3>④ Bảng dữ kiện</h3>
+          <h3>③ Bảng dữ kiện</h3>
+          <UnitStatusChip state={status} testId="research-status" />
+          <span className={styles.grow} />
           <Button variant="ghost" className={styles.sm} onClick={onAdd} disabled={locked} data-testid="fact-add-open">
             + Thêm dữ kiện tay
           </Button>
         </div>
-        <span className={styles.hint}>
-          Mã, câu hỏi, loại, nguồn và đoạn trích. Loại và “bắt buộc nói” sửa ngay trong bảng; chữ, link và đoạn trích sửa ở nút Sửa.
-        </span>
+        <span className={styles.hint}>Loại và “bắt buộc nói” sửa ngay trong bảng; chữ, link và đoạn trích sửa ở nút Sửa.</span>
         {checking.size > 0 && (
           <p className={styles.checking} role="status" data-testid="facts-checking">
             <span className={styles.spinner} aria-hidden="true" />
@@ -168,7 +176,7 @@ export function FactsCard({ projectId, facts, checking, locked, onAdd, onEdit, o
               {shown.length === 0 && (
                 <tr>
                   <td colSpan={7} className={styles.hint} data-testid="research-facts-empty">
-                    {facts.length === 0 ? "Chưa có dữ kiện. Dán kết quả ở ③ hoặc thêm tay." : "Không có dữ kiện ở bộ lọc này."}
+                    {facts.length === 0 ? "Chưa có dữ kiện. Lấy dữ kiện ở ② hoặc thêm tay." : "Không có dữ kiện ở bộ lọc này."}
                   </td>
                 </tr>
               )}
@@ -262,6 +270,18 @@ export function FactsCard({ projectId, facts, checking, locked, onAdd, onEdit, o
               ))}
             </tbody>
           </table>
+        </div>
+        <div className={`${styles.actions} ${styles.actionsEnd}`}>
+          <span className={styles.hint}>Duyệt được dù còn link chưa khớp; bước Rà soát nhắc lại các câu thoại dùng dữ kiện đó.</span>
+          {status === "approved" ? (
+            <Button variant="ghost" onClick={onUnapprove} disabled={locked || busy} data-testid="research-unapprove">
+              Bỏ duyệt
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={onApprove} disabled={locked || busy} data-testid="research-approve">
+              Duyệt bảng dữ kiện
+            </Button>
+          )}
         </div>
       </div>
 

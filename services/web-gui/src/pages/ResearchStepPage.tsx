@@ -5,16 +5,13 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import type { StepStripProps } from "../components/StepStrip";
 import { Button, Card } from "../components/ui";
-import { CoverageCard } from "../components/research/CoverageCard";
 import { FactAddModal } from "../components/research/FactAddModal";
 import { FactEditModal } from "../components/research/FactEditModal";
 import { FactsCard } from "../components/research/FactsCard";
+import { FetchFactsCard } from "../components/research/FetchFactsCard";
 import { ImpactConfirm } from "../components/research/ImpactConfirm";
-import { PasteCard } from "../components/research/PasteCard";
-import { PromptCard } from "../components/research/PromptCard";
 import { QuestionsCard } from "../components/research/QuestionsCard";
 import styles from "../components/research/research.module.css";
-import { UnitStatusChip } from "../components/units/UnitStatusChip";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useAiBridge, type AiBridgeModes } from "../hooks/useAiBridge";
@@ -49,7 +46,7 @@ function stripOf(state: ResearchState): StepStripProps {
     return {
       tone: "todo",
       label: "Chưa có dữ kiện",
-      message: "Sinh hoặc tự thêm câu hỏi, chép prompt sang công cụ nghiên cứu, rồi dán kết quả vào ③.",
+      message: "Sinh hoặc tự thêm câu hỏi, chép prompt sang công cụ nghiên cứu, rồi dán kết quả vào ②.",
     };
   }
   const running = count("run");
@@ -97,7 +94,7 @@ export function ResearchStepPage() {
     return read;
   }
 
-  /** Runs the prompt on DeepSeek, puts the answer in section 3 and reads it, as a paste by hand would be. */
+  /** Runs the prompt on DeepSeek, puts the answer in the box of section 2 and reads it, as a paste by hand would be. */
   async function runOnDeepSeek(prompt: string) {
     setBridgeError(null);
     const outcome = await bridge.run("deepseek", prompt, RESEARCH_MODES);
@@ -136,17 +133,11 @@ export function ResearchStepPage() {
     }
     return (
       <>
-        <div className={styles.optional} data-testid="research-optional">
-          <span className={styles.tag}>Tuỳ chọn</span>
-          <span>Bỏ qua thì dữ kiện mang nhãn “chưa có nguồn”; bước Rà soát hiện cảnh báo nhưng không chặn.</span>
-          <Button variant="impact" className={styles.sm} onClick={() => setSkipping(true)} disabled={locked} data-testid="research-skip">
-            Bỏ qua bước này
-          </Button>
-        </div>
         <QuestionsCard
           projectId={projectId}
           questions={s.questions}
           coverage={s.coverage}
+          checking={checkingQuestions}
           stale={s.questionsStale}
           aiAvailable={aiAvailable}
           running={research.running}
@@ -160,9 +151,16 @@ export function ResearchStepPage() {
           onSave={research.saveQuestion}
           onDelete={research.deleteQuestion}
         />
-        <PromptCard
+        <FetchFactsCard
           projectId={projectId}
           questions={s.questions}
+          pastes={s.pastes}
+          message={research.pasteMessage}
+          busy={research.busy}
+          locked={locked}
+          text={pasteText}
+          onTextChange={setPasteText}
+          onRead={() => readPaste(pasteText)}
           bridge={{
             available: bridge.providers.includes("deepseek"),
             stage: bridge.stage,
@@ -173,15 +171,6 @@ export function ResearchStepPage() {
             onCancel: bridge.cancel,
           }}
         />
-        <PasteCard
-          pastes={s.pastes}
-          message={research.pasteMessage}
-          busy={research.busy}
-          locked={locked}
-          text={pasteText}
-          onTextChange={setPasteText}
-          onRead={() => readPaste(pasteText)}
-        />
         <FactsCard
           projectId={projectId}
           facts={s.facts}
@@ -191,36 +180,17 @@ export function ResearchStepPage() {
           onEdit={setEditing}
           onFlags={research.setFlags}
           onRecheck={(id) => research.recheck([id])}
+          status={s.gate.status}
+          busy={research.busy}
+          onApprove={() => void research.approve()}
+          onUnapprove={() => void research.unapprove()}
         />
-        <CoverageCard
-          projectId={projectId}
-          questions={s.questions}
-          coverage={s.coverage}
-          checking={checkingQuestions}
-        />
-        <Card data-testid="research-approve-card">
-          <div className={styles.body}>
-            <div className={styles.head}>
-              <h3>Duyệt bảng dữ kiện</h3>
-              <UnitStatusChip state={s.gate.status} testId="research-status" />
-            </div>
-            <p className={styles.hint}>
-              Duyệt không cần mọi link khớp. Dữ kiện chưa khớp mang nhãn tương ứng ở các bước sau, và bước Rà soát nhắc lại những
-              câu thoại dùng chúng.
-            </p>
-            <div className={`${styles.actions} ${styles.actionsEnd}`}>
-              {s.gate.status === "approved" ? (
-                <Button variant="ghost" onClick={() => void research.unapprove()} disabled={locked || research.busy} data-testid="research-unapprove">
-                  Bỏ duyệt
-                </Button>
-              ) : (
-                <Button variant="primary" onClick={() => void research.approve()} disabled={locked || research.busy} data-testid="research-approve">
-                  Duyệt bảng dữ kiện
-                </Button>
-              )}
-            </div>
-          </div>
-        </Card>
+        <p className={styles.skipLine} data-testid="research-optional">
+          Bước tuỳ chọn. Không cần nghiên cứu cho video này?
+          <Button variant="impact" className={styles.sm} onClick={() => setSkipping(true)} disabled={locked} data-testid="research-skip">
+            Bỏ qua bước này
+          </Button>
+        </p>
       </>
     );
   }
