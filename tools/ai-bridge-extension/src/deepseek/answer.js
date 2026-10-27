@@ -8,7 +8,7 @@
   /** The answer must not change for this long, with its icon row shown, to count as finished. */
   const STABLE_MS = 5 * 1000;
   /** Without an icon row (DeepSeek changed it) the answer must not change for this long instead. */
-  const STABLE_WITHOUT_ACTIONS_MS = 60 * 1000;
+  const STABLE_WITHOUT_ACTIONS_MS = 20 * 1000;
 
   /**
    * Whether the answer is finished. `text` is the answer read so far,

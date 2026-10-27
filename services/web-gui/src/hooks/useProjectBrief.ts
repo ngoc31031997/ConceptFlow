@@ -34,7 +34,7 @@ export interface ProjectBriefControls {
   busy: boolean;
   /** The note of the redo that failed, so the redo dialog starts from it. */
   failedNote: string;
-  /** Has the AI write the brief, then review it; resolves false when the writing failed. */
+  /** Has the AI write the brief; the review is asked for separately. Resolves false when the writing failed. */
   generate: (note?: string) => Promise<boolean>;
   /** Has the AI read the brief again. */
   review: () => Promise<boolean>;
@@ -134,11 +134,9 @@ export function useProjectBrief(projectId: string, enabled: boolean): ProjectBri
       } finally {
         setWriting(false);
       }
-      // The review is advice for the Creator's decision; a failed review leaves the brief as written.
-      await review();
       return true;
     },
-    [projectId, writeRun, reload, review],
+    [projectId, writeRun, reload],
   );
 
   const edit = useCallback(

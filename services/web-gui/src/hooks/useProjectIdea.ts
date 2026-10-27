@@ -34,7 +34,7 @@ export interface ProjectIdeaControls {
   busy: boolean;
   /** The note of the redo that failed, so the redo dialog starts from it. */
   failedNote: string;
-  /** Has the AI write the idea, then review it; resolves false when the writing failed. */
+  /** Has the AI write the idea; the review is asked for separately. Resolves false when the writing failed. */
   generate: (note?: string) => Promise<boolean>;
   /** Has the AI read the idea again. */
   review: () => Promise<boolean>;
@@ -128,11 +128,9 @@ export function useProjectIdea(projectId: string, enabled: boolean): ProjectIdea
       } finally {
         setWriting(false);
       }
-      // The review is advice for the Creator's decision; a failed review leaves the idea as written.
-      await review();
       return true;
     },
-    [projectId, writeRun, reload, review],
+    [projectId, writeRun, reload],
   );
 
   const edit = useCallback(

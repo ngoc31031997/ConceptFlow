@@ -136,11 +136,14 @@ describe("CreativeBriefStepPage (Bước 2 — Creative brief)", () => {
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Duyệt ý tưởng ở bước 1 trước");
   });
 
-  it("AI viết brief rồi tự đọc lại; brief chờ duyệt, có đủ năm ô và đánh giá", async () => {
+  it("AI viết brief; brief chờ duyệt, có đủ năm ô, đánh giá chỉ chạy khi Creator nhờ", async () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("brief-generate"));
     await screen.findByTestId("brief-field-audience");
     expect(generate).toHaveBeenCalledTimes(1);
+    expect(review).not.toHaveBeenCalled();
+    expect(screen.getByTestId("brief-review-none")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("brief-review-run"));
     await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId("brief-field-audience")).toHaveTextContent("Khán giả phổ thông");
     expect(screen.getByTestId("brief-field-duration_seconds")).toHaveTextContent("4:30");

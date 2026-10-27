@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  ApiError,
-  ExternalPromptReady,
-  GENERIC_CONNECTION_ERROR,
-  type ExternalAi,
-} from "../api/client";
+import { ExternalPromptReady, type ExternalAi } from "../api/client";
 import { useAiBridge, type AiBridgeModes } from "../hooks/useAiBridge";
+import { DEFAULT_DEEPSEEK_MODES, messageOf } from "../hooks/useDeepSeekRun";
 import { AiBridgeRunStatus } from "./AiBridgeRunStatus";
 import { Button, CopyBox, Dialog, TextArea } from "./ui";
 import styles from "./ExternalAiDialog.module.css";
@@ -24,11 +20,12 @@ interface ExternalAiDialogProps<T> {
   onDone: (result: T) => void | Promise<void>;
   /** DeepSeek modes for "Chạy bằng DeepSeek"; reasoning only unless the step needs web sources. */
   deepSeekModes?: AiBridgeModes;
+  /** A reply to show in the reply box on opening, e.g. DeepSeek's answer the step could not read. */
+  initialReply?: string;
+  /** Why `initialReply` could not be read, shown under the reply box on opening. */
+  initialError?: string;
   testId: string;
 }
-
-/** Most steps reason over what the project already holds, so DeepSeek does not search the web. */
-const DEFAULT_DEEPSEEK_MODES: AiBridgeModes = { deepThink: true, search: false };
 
 interface DeepSeekRunProps {
   prompt: string;
@@ -41,14 +38,20 @@ interface DeepSeekRunProps {
 
 /**
  * "Chạy bằng DeepSeek": the AI Bridge extension runs the prompt on DeepSeek in
- * a background tab and hands the answer back. Rendered only while the dialog
+ * a new tab and hands the answer back. Rendered only while the dialog
  * is open, so closing the dialog stops waiting for a run. Without the
  * extension it shows nothing and the dialog stays copy-and-paste.
  */
 function DeepSeekRun({ prompt, modes, disabled, onAnswer, testId }: DeepSeekRunProps) {
   const bridge = useAiBridge();
   const [error, setError] = useState<string | null>(null);
-  if (!bridge.providers.includes("deepseek")) return null;
+  if (!bridge.providers.includes("deepseek")) {
+    return (
+      <p className={styles.hint} data-testid={`${testId}-deepseek-missing`}>
+        Cài extension ConceptFlow AI Bridge (tools/ai-bridge-extension) để chạy prompt bằng DeepSeek và tự dán kết quả.
+      </p>
+    );
+  }
 
   async function start() {
     setError(null);
@@ -64,7 +67,7 @@ function DeepSeekRun({ prompt, modes, disabled, onAnswer, testId }: DeepSeekRunP
           <Button variant="run" onClick={() => void start()} disabled={disabled} data-testid={`${testId}-deepseek`}>
             Chạy bằng DeepSeek
           </Button>
-          <p className={styles.hint}>Extension chạy prompt trên DeepSeek ở tab nền, dán câu trả lời vào ô bên dưới rồi tự đọc kết quả.</p>
+          <p className={styles.hint}>Extension chạy prompt trên DeepSeek ở một tab mới, dán câu trả lời vào ô bên dưới rồi tự đọc kết quả.</p>
         </div>
       ) : (
         <AiBridgeRunStatus stage={bridge.stage} modes={modes} onCancel={bridge.cancel} testId={`${testId}-deepseek`} />
@@ -86,10 +89,6 @@ export interface ExternalRedo {
   onDone: () => void | Promise<void>;
 }
 
-function messageOf(err: unknown): string {
-  return err instanceof ApiError && err.message ? err.message : GENERIC_CONNECTION_ERROR;
-}
-
 /**
  * Runs one AI step through an AI outside the system (docs/ux-ui-design-rules.md,
  * rules 4 and 8): the prompt the step would send, in a box to copy; below it a box
@@ -106,6 +105,8 @@ export function ExternalAiDialog<T>({
   run,
   onDone,
   deepSeekModes = DEFAULT_DEEPSEEK_MODES,
+  initialReply = "",
+  initialError,
   testId,
 }: ExternalAiDialogProps<T>) {
   const [prompt, setPrompt] = useState<string | null>(null);
@@ -120,8 +121,8 @@ export function ExternalAiDialog<T>({
     let stale = false;
     setPrompt(null);
     setPromptError(null);
-    setReadError(null);
-    setReply("");
+    setReadError(initialError ?? null);
+    setReply(initialReply);
     run({ mode: "prompt" }).then(
       () => {
         if (!stale) setPromptError("Mục này không trả prompt để copy.");

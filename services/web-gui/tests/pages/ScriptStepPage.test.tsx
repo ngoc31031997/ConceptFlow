@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useContext, useEffect, type ReactNode } from "react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
@@ -9,6 +9,7 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { IdeaReview, IdeaScreen, ProjectIdea } from "../../src/api/client";
 import type { Project } from "../../src/types";
+import { installFakeAiBridge } from "../helpers/fakeAiBridge";
 
 const SUBJECT = "Chuyện gì xảy ra nếu ta rơi vào hố đen?";
 
@@ -158,7 +159,35 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(generate).toHaveBeenCalledWith(expect.any(String), "", { external: { mode: "prompt" } });
   });
 
-  it("tạo project với giá trị mặc định, AI viết ba trường rồi đánh giá", async () => {
+  it("tạo project rồi chạy ý tưởng trên DeepSeek; câu trả lời được đọc như dán tay, không tự đánh giá", async () => {
+    const bridge = installFakeAiBridge();
+    try {
+      generate.mockImplementation(async (_id, _note, call) => {
+        if (call && "external" in call) {
+          if (call.external.mode === "prompt") throw new apiClient.ExternalPromptReady("PROMPT Ý TƯỞNG");
+          server = { ...server, idea: ideaOf() };
+        }
+        return ideaOf() as never;
+      });
+      renderPage();
+      await screen.findByText("Tạo project và viết ý tưởng →");
+      typeText(SUBJECT);
+      fireEvent.click(await screen.findByTestId("script-step-create-deepseek"));
+
+      await waitFor(() => expect(bridge.runs).toHaveLength(1));
+      expect(createDraft).toHaveBeenCalledWith(expect.any(String), SUBJECT, "vi");
+      expect(bridge.runs[0]).toMatchObject({ provider: "deepseek", prompt: "PROMPT Ý TƯỞNG" });
+      act(() => bridge.send({ type: "result", request_id: bridge.runs[0].requestId, text: "ý tưởng của DeepSeek" }));
+
+      expect(await screen.findByTestId("idea-field-central_question")).toHaveTextContent("Người rơi thấy gì");
+      expect(generate).toHaveBeenLastCalledWith(expect.any(String), "", { external: { mode: "paste", reply: "ý tưởng của DeepSeek" } });
+      expect(review).not.toHaveBeenCalled();
+    } finally {
+      bridge.remove();
+    }
+  });
+
+  it("tạo project với giá trị mặc định, AI viết ba trường; đánh giá chỉ chạy khi Creator nhờ", async () => {
     renderPage();
     await screen.findByText("Tạo project và viết ý tưởng →");
     typeText("  " + SUBJECT + "  ");
@@ -177,7 +206,10 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(screen.getByTestId("idea-status")).toHaveTextContent("Chờ duyệt");
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chờ bạn duyệt ý tưởng");
 
-    // The AI reads the idea right after writing it.
+    // Writing the idea does not start a review; the Creator asks for one.
+    expect(review).not.toHaveBeenCalled();
+    expect(screen.getByTestId("idea-review-none")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("idea-review-run"));
     await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
     expect(await screen.findByTestId("idea-review-unclear")).toHaveTextContent("Khán giả là ai?");
     expect(screen.getByTestId("idea-review-suggestions")).toHaveTextContent("hố đen sao hay siêu nặng");
@@ -263,10 +295,11 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(review).not.toHaveBeenCalled();
   });
 
-  it("đánh giá lỗi không làm mất ý tưởng; đánh giá cũ được báo khi ý tưởng đã đổi", async () => {
+  it("đánh giá lỗi không làm mất ý tưởng; chạy lại được", async () => {
     review.mockRejectedValueOnce(new apiClient.ApiError("câu trả lời của AI không dùng được làm đánh giá ý tưởng.", undefined, undefined, 502));
     renderPage();
     await createWithAI();
+    fireEvent.click(screen.getByTestId("idea-review-run"));
     expect(await screen.findByTestId("idea-error")).toHaveTextContent("đánh giá ý tưởng");
     expect(screen.getByTestId("idea-field-central_question")).toHaveTextContent("Người rơi thấy gì");
     expect(screen.getByTestId("idea-review-none")).toBeInTheDocument();
@@ -283,6 +316,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     });
     renderPage();
     await createWithAI();
+    fireEvent.click(screen.getByTestId("idea-review-run"));
     await screen.findByTestId("idea-review-unclear");
 
     const panel = screen.getByTestId("idea-review-panel");
@@ -320,6 +354,8 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     });
     renderPage();
     await createWithAI();
+    fireEvent.click(screen.getByTestId("idea-review-run"));
+    await screen.findByTestId("idea-review-unclear");
 
     fireEvent.click(screen.getByTestId("idea-actions-edit"));
     expect(screen.getByTestId("idea-edit-field-curiosity_points")).toHaveValue("Chân trời sự kiện là gì?\nCơ thể có bị kéo dài không?");
@@ -343,10 +379,9 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(await screen.findByTestId("idea-edit")).toHaveTextContent("về chờ duyệt");
   });
 
-  it("Làm lại kèm ghi chú: nút tím, cần ghi chú, gửi ghi chú cho AI rồi đánh giá lại", async () => {
+  it("Làm lại kèm ghi chú: nút tím, cần ghi chú, gửi ghi chú cho AI; không tự đánh giá", async () => {
     renderPage();
     await createWithAI();
-    await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByTestId("idea-actions-redo"));
     const send = await screen.findByTestId("idea-redo-send");
@@ -359,7 +394,8 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     await waitFor(() =>
       expect(generate).toHaveBeenLastCalledWith(expect.any(String), "nhấn mạnh ngộ nhận", expect.objectContaining({ id: expect.any(String) })),
     );
-    await waitFor(() => expect(review).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByTestId("idea-redo")).not.toBeInTheDocument());
+    expect(review).not.toHaveBeenCalled();
   });
 
   it("đổi model AI ở modal làm lại thì lưu lên project", async () => {

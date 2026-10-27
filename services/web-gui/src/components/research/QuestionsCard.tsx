@@ -3,6 +3,8 @@ import { generateResearchQuestions, type QuestionCoverage, type ResearchBrief, t
 import type { OperationRun } from "../../hooks/useOperationRun";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
+import { useDeepSeekRun } from "../../hooks/useDeepSeekRun";
+import { DeepSeekRunButton } from "../DeepSeekRunButton";
 import { ExternalAiDialog } from "../ExternalAiDialog";
 import { Button, Card, TextInput } from "../ui";
 import unitStyles from "../units/units.module.css";
@@ -127,9 +129,21 @@ export function QuestionsCard({
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<ResearchQuestion | null>(null);
   // Regenerating while the Creator has questions of their own asks first, for the system's AI or an AI outside.
-  const [regenerating, setRegenerating] = useState<"system" | "outside" | null>(null);
+  const [regenerating, setRegenerating] = useState<"system" | "outside" | "deepseek" | null>(null);
   // The dialog of the AI outside the system; the value is whether it replaces the Creator's own questions.
   const [outside, setOutside] = useState<boolean | null>(null);
+  // DeepSeek's answer the step could not read, shown in that dialog for the Creator to fix.
+  const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
+  // Whether the DeepSeek run in progress replaces the Creator's own questions.
+  const deepSeekReplace = useRef(false);
+  const deepSeek = useDeepSeekRun({
+    run: (external) => generateResearchQuestions(projectId, { replaceEdited: deepSeekReplace.current }, { external }),
+    onDone: onReloadInput,
+    onUnreadable: (reply, message) => {
+      setUnreadable({ reply, message });
+      setOutside(deepSeekReplace.current);
+    },
+  });
   // The dialog that shows what the AI reads.
   const [inputOpen, setInputOpen] = useState(false);
   const [inputLoading, setInputLoading] = useState(false);
@@ -156,14 +170,26 @@ export function QuestionsCard({
     void onReloadInput().finally(() => setInputLoading(false));
   }
 
-  function startGenerate(via: "system" | "outside") {
+  function startOutside(replaceEdited: boolean) {
+    setUnreadable(null);
+    setOutside(replaceEdited);
+  }
+
+  function startDeepSeek(replaceEdited: boolean) {
+    deepSeekReplace.current = replaceEdited;
+    void deepSeek.start();
+  }
+
+  function startGenerate(via: "system" | "outside" | "deepseek") {
     if (mine.length > 0) setRegenerating(via);
     else if (via === "system") void onGenerate(false);
-    else setOutside(false);
+    else if (via === "outside") startOutside(false);
+    else startDeepSeek(false);
   }
 
   function chooseGenerate(replaceEdited: boolean) {
-    if (regenerating === "outside") setOutside(replaceEdited);
+    if (regenerating === "outside") startOutside(replaceEdited);
+    else if (regenerating === "deepseek") startDeepSeek(replaceEdited);
     else void onGenerate(replaceEdited);
   }
 
@@ -237,11 +263,17 @@ export function QuestionsCard({
             variant="ghost"
             className={styles.sm}
             onClick={() => startGenerate("outside")}
-            disabled={locked || running}
+            disabled={locked || running || deepSeek.busy}
             data-testid="question-generate-external"
           >
             Dùng AI ngoài
           </Button>
+          <DeepSeekRunButton
+            run={deepSeek}
+            disabled={locked || running}
+            onStart={() => startGenerate("deepseek")}
+            testId="question-generate-deepseek"
+          />
           <Button
             variant={mine.length > 0 && questions.length > 0 ? "impact" : "run"}
             className={styles.sm}
@@ -310,6 +342,8 @@ export function QuestionsCard({
         title="Câu hỏi nghiên cứu · AI ngoài"
         run={(external) => generateResearchQuestions(projectId, { replaceEdited: outside === true }, { external })}
         onDone={onReloadInput}
+        initialReply={unreadable?.reply}
+        initialError={unreadable?.message}
         testId="question-generate-external-dialog"
       />
     </Card>

@@ -22,6 +22,8 @@
   const TOGGLE_SETTLE_MS = 400;
   const COPY_WAIT_MS = 3000;
   const TICK_MS = 1000;
+  /** The wait for the answer looks again on a page change, but not more often than this. */
+  const MIN_CHECK_GAP_MS = 300;
   const HIGHLIGHT_MS = 4000;
   /** How often the wait for the answer logs what it sees. */
   const DIAGNOSE_EVERY_MS = 15 * 1000;
@@ -155,12 +157,27 @@
     input.dispatchEvent(new KeyboardEvent("keyup", init));
   }
 
+  /**
+   * The controls matched by the clickable selector, each as the real button
+   * around it: DeepSeek's buttons hold decorative children whose class also
+   * contains "button" (e.g. "ds-button__background"), which are not controls.
+   */
+  function clickableControls(S) {
+    return queryAll(S.clickable, "clickable")
+      .map(function (el) {
+        return el.closest('button, [role="button"]') || el;
+      })
+      .filter(function (el, i, all) {
+        return all.indexOf(el) === i;
+      });
+  }
+
   /** The send button: its own selector when set, else the last control in the box around the chat input. */
   function findSendButton(S, input) {
     if (S.sendButton) return queryAll(S.sendButton, "sendButton")[0] || null;
     let box = input.parentElement;
     for (let depth = 0; box && depth < 6; depth += 1, box = box.parentElement) {
-      const controls = queryAll(S.clickable, "clickable").filter(function (el) {
+      const controls = clickableControls(S).filter(function (el) {
         return box.contains(el) && !el.contains(input) && !A.hasLabel(el.innerText, S.deepThinkLabels) && !A.hasLabel(el.innerText, S.searchLabels);
       });
       if (controls.length >= 2) return controls[controls.length - 1];
@@ -287,8 +304,29 @@
         log("câu trả lời xong:", text.length, "ký tự, nút Copy", hasActions ? "có" : "không");
         return answer;
       }
-      await wait(TICK_MS);
+      await waitForPageChange(TICK_MS);
     }
+  }
+
+  /**
+   * Waits until the page changes (DeepSeek typing, its icon row appearing) or
+   * `maxMs` passes, so a finished answer is noticed at once instead of at the
+   * next tick. Changes closer together than MIN_CHECK_GAP_MS count once.
+   */
+  function waitForPageChange(maxMs) {
+    return new Promise(function (resolve) {
+      const startedAt = Date.now();
+      const observer = new MutationObserver(function () {
+        if (Date.now() - startedAt >= MIN_CHECK_GAP_MS) done();
+      });
+      const timer = setTimeout(done, maxMs);
+      function done() {
+        observer.disconnect();
+        clearTimeout(timer);
+        resolve();
+      }
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
   }
 
   async function run(work) {

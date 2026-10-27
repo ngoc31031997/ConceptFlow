@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { AiModelSelect } from "../components/AiModelSelect";
+import { DeepSeekRunButton } from "../components/DeepSeekRunButton";
 import { ExternalAiDialog } from "../components/ExternalAiDialog";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { ProjectIdeaCard } from "../components/idea/ProjectIdeaCard";
@@ -18,6 +19,7 @@ import {
   updateProjectTopic,
   type SimilarProject,
 } from "../api/client";
+import { useDeepSeekRun } from "../hooks/useDeepSeekRun";
 import { useProjectIdea } from "../hooks/useProjectIdea";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { FLOW_INIT, flowStepName } from "../utils/flow";
@@ -75,6 +77,16 @@ export function ScriptStepPage() {
   const created = createdFor === draft.projectId || flow.project?.project_id === draft.projectId;
   const checking = !created && !flow.loaded;
   const idea = useProjectIdea(draft.projectId, created);
+  // DeepSeek's answer the step could not read, shown in the outside-AI dialog for the Creator to fix.
+  const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
+  const deepSeek = useDeepSeekRun({
+    run: (external) => generateProjectIdea(draft.projectId, "", { external }),
+    onDone: idea.reload,
+    onUnreadable: (reply, message) => {
+      setUnreadable({ reply, message });
+      setOutsideOpen(true);
+    },
+  });
   const stored = idea.screen?.idea ?? null;
   // A draft reopened from storage may hold text typed before the cleaning existed.
   const text = sanitizeIdeaText(draft.authoringTopic);
@@ -84,7 +96,7 @@ export function ScriptStepPage() {
   const savedText = idea.screen?.subject ?? "";
   const textEdited = created && idea.screen !== null && text.trim() !== savedText.trim() && text.trim().length > 0;
 
-  async function handleCreate(via: "system" | "outside") {
+  async function handleCreate(via: "system" | "outside" | "deepseek") {
     const trimmed = text.trim();
     if (!trimmed) return;
     const projectId = draft.projectId;
@@ -109,7 +121,10 @@ export function ScriptStepPage() {
     } finally {
       setCreating(false);
     }
-    if (via === "outside") setOutsideOpen(true);
+    if (via === "outside") {
+      setUnreadable(null);
+      setOutsideOpen(true);
+    } else if (via === "deepseek") await deepSeek.start();
     else if (aiAvailable) void idea.generate();
   }
 
@@ -194,6 +209,13 @@ export function ScriptStepPage() {
                 <Button variant="ghost" onClick={() => void handleCreate("outside")} disabled={!canCreate} data-testid="script-step-create-external">
                   Tạo project và viết bằng AI ngoài
                 </Button>
+                <DeepSeekRunButton
+                  run={deepSeek}
+                  disabled={!canCreate || creating}
+                  onStart={() => void handleCreate("deepseek")}
+                  label="Tạo project và chạy bằng DeepSeek"
+                  testId="script-step-create-deepseek"
+                />
                 <Button
                   variant={aiAvailable ? "run" : "primary"}
                   onClick={() => void handleCreate("system")}
@@ -235,6 +257,8 @@ export function ScriptStepPage() {
         title="Ý tưởng · AI ngoài"
         run={(external) => generateProjectIdea(draft.projectId, "", { external })}
         onDone={idea.reload}
+        initialReply={unreadable?.reply}
+        initialError={unreadable?.message}
         testId="idea-create-external-dialog"
       />
 

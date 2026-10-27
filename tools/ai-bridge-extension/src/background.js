@@ -40,7 +40,8 @@ async function startRun(message, replyTabId) {
   const job = J.newJob(message.requestId, message.prompt, message.modes || P.readModes(null), replyTabId, now);
   await writeJob(job);
   await toPage(replyTabId, P.toPage("progress", { request_id: job.requestId, stage: "opening" }));
-  const tab = await chrome.tabs.create({ url: DEEPSEEK_URL, active: false });
+  // The tab is shown, not hidden: Chrome slows a hidden tab's timers and page updates, which delays reading the answer.
+  const tab = await chrome.tabs.create({ url: DEEPSEEK_URL, active: true });
   job.providerTabId = tab.id;
   await writeJob(job);
 }
@@ -54,6 +55,24 @@ async function handOutWork(tabId) {
   return { requestId: job.requestId, prompt: job.prompt, modes: job.modes, deadline: job.startedAt + P.MAX_RUN_MS };
 }
 
+/**
+ * Takes the Creator back to the ConceptFlow tab and closes the DeepSeek tab of a
+ * run whose answer was delivered. The job is cleared first, so closing the tab
+ * is not reported as an error.
+ */
+async function finishProviderTab(replyTabId, providerTabId) {
+  try {
+    await chrome.tabs.update(replyTabId, { active: true });
+  } catch (err) {
+    console.warn("ai-bridge: could not show the ConceptFlow tab " + replyTabId + ":", err);
+  }
+  try {
+    await chrome.tabs.remove(providerTabId);
+  } catch (err) {
+    console.warn("ai-bridge: could not close the DeepSeek tab " + providerTabId + ":", err);
+  }
+}
+
 async function forwardFromAdapter(message, tabId) {
   const job = await readJob();
   if (!J.belongsTo(job, tabId, message.requestId)) return;
@@ -64,6 +83,7 @@ async function forwardFromAdapter(message, tabId) {
   await clearJob();
   if (message.kind === "result") {
     await toPage(job.replyTabId, P.toPage("result", { request_id: job.requestId, text: message.text }));
+    await finishProviderTab(job.replyTabId, job.providerTabId);
   } else {
     await toPage(job.replyTabId, P.errorToPage(job.requestId, message.code, message.detail));
   }

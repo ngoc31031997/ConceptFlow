@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { sanitizeIdeaText } from "../../utils/sanitizeIdeaText";
 import { ExternalAiDialog, type ExternalRedo } from "../ExternalAiDialog";
+import { ExternalRedoDeepSeek } from "../ExternalRedoDeepSeek";
 import { Button, Dialog, FormField, TextArea } from "../ui";
 import unitStyles from "../units/units.module.css";
 
@@ -36,13 +37,17 @@ export function BriefRedoModal({
 }: BriefRedoModalProps) {
   const [note, setNote] = useState(initialNote);
   const [outside, setOutside] = useState(false);
+  const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
   const latestInitial = useRef(initialNote);
   useEffect(() => {
     latestInitial.current = initialNote;
   });
   useEffect(() => {
     if (open) setNote(latestInitial.current);
-    else setOutside(false);
+    else {
+      setOutside(false);
+      setUnreadable(null);
+    }
   }, [open]);
 
   return (
@@ -59,14 +64,30 @@ export function BriefRedoModal({
               Huỷ
             </Button>
             {external && (
-              <Button
-                variant="ghost"
-                onClick={() => setOutside(true)}
-                disabled={note.trim().length === 0}
-                data-testid="brief-redo-external"
-              >
-                Dùng AI ngoài
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setUnreadable(null);
+                    setOutside(true);
+                  }}
+                  disabled={note.trim().length === 0}
+                  data-testid="brief-redo-external"
+                >
+                  Dùng AI ngoài
+                </Button>
+                <ExternalRedoDeepSeek
+                  external={external}
+                  note={note.trim()}
+                  onClose={onClose}
+                  onUnreadable={(reply, message) => {
+                    setUnreadable({ reply, message });
+                    setOutside(true);
+                  }}
+                  disabled={note.trim().length === 0}
+                  testId="brief-redo-deepseek"
+                />
+              </>
             )}
             {onSend && (
               <Button
@@ -109,6 +130,8 @@ export function BriefRedoModal({
             await external.onDone();
             onClose();
           }}
+          initialReply={unreadable?.reply}
+          initialError={unreadable?.message}
           testId="brief-redo-external-dialog"
         />
       )}

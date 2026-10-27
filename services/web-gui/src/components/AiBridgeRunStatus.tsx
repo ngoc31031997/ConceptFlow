@@ -14,7 +14,7 @@ interface AiBridgeRunStatusProps {
 function stageText(stage: AiBridgeStage, modes: AiBridgeModes): string {
   switch (stage) {
     case "opening":
-      return "Đang mở DeepSeek trong một tab nền…";
+      return "Đang mở DeepSeek trong một tab mới…";
     case "sending": {
       const on = [modes.deepThink && "DeepThink", modes.search && "Search"]
         .filter(Boolean)
