@@ -8,6 +8,7 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { ScriptBeat, ScriptLine, ScriptState } from "../../src/api/client";
 import type { Project } from "../../src/types";
+import { installFakeAiBridge, type FakeAiBridge } from "../helpers/fakeAiBridge";
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -305,5 +306,46 @@ describe("ScriptWriteStepPage", () => {
     await ready();
     fireEvent.click(screen.getByTestId("script-review-b1-approve"));
     expect(await screen.findByTestId("script-error")).toHaveTextContent("beat chưa có lời thoại");
+  });
+  it("folds an approved beat into one line until it is opened", async () => {
+    state = baseState({ beats: [beat("b1", 1, { status: "approved" }), beat("b2", 2)] });
+    await ready();
+    expect(screen.queryByTestId("script-line-b1.1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("script-line-b2.1")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("script-expand-b1"));
+    expect(screen.getByTestId("script-line-b1.1")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("script-collapse-b1"));
+    expect(screen.queryByTestId("script-line-b1.1")).not.toBeInTheDocument();
+  });
+
+  describe("with the extension's queue", () => {
+    let bridge: FakeAiBridge;
+    afterEach(() => bridge.remove());
+
+    const twoUnwritten = () => baseState({ beats: [beat("b1", 1), beat("b2", 2, { written: false, lines: [] }), beat("b3", 3, { written: false, lines: [] })] });
+
+    it("offers no run-all button when the extension has no queue", async () => {
+      bridge = installFakeAiBridge();
+      state = twoUnwritten();
+      await ready();
+      expect(screen.queryByTestId("script-queue-all")).not.toBeInTheDocument();
+    });
+
+    it("queues one item per beat without dialogue, in the order of the sheet, without calling the AI", async () => {
+      bridge = installFakeAiBridge({ queue: true });
+      state = twoUnwritten();
+      const generate = vi.spyOn(apiClient, "generateScript");
+      await ready();
+      const button = await screen.findByTestId("script-queue-all");
+      expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (2)");
+      fireEvent.click(button);
+      await waitFor(() => expect(bridge.queued).toHaveLength(2));
+      expect(bridge.queued.map((q) => q.item.label)).toEqual(["B2 · Beat b2", "B3 · Beat b3"]);
+      const first = bridge.queued[0].item.request as { method: string; path: string; body: string };
+      expect(first.path).toBe("/v1/projects/p1/script/generate");
+      expect(JSON.parse(first.body)).toEqual({ beat: "b2", note: "" });
+      expect(await screen.findByTestId("script-queue-note")).toHaveTextContent("Đã thêm 2 beat vào hàng đợi DeepSeek");
+      generate.mock.calls.forEach((call) => expect(call[3]).toEqual({ external: { mode: "describe" } }));
+    });
   });
 });

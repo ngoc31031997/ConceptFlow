@@ -8,6 +8,7 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { LockBeat, ReviewFinding, ScriptLockState } from "../../src/api/client";
 import type { Project } from "../../src/types";
+import { installFakeAiBridge } from "../helpers/fakeAiBridge";
 
 function Where() {
   const l = useLocation();
@@ -229,7 +230,29 @@ describe("LockStepPage", () => {
     // A beat with no note offers to write one; a written one has the review bar.
     expect(screen.getByTestId("handoff-write-b3")).toBeInTheDocument();
     expect(screen.getByTestId("handoff-review-b2-approve")).toBeInTheDocument();
+    // An approved note is folded into one line until it is opened.
+    expect(screen.queryByTestId("handoff-review-b1-unapprove")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("handoff-expand-b1"));
     expect(screen.getByTestId("handoff-review-b1-unapprove")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("handoff-collapse-b1"));
+    expect(screen.queryByTestId("handoff-review-b1-unapprove")).not.toBeInTheDocument();
+  });
+
+  it("queues the notes still to write on DeepSeek, one item per beat, without calling the AI", async () => {
+    const bridge = installFakeAiBridge({ queue: true });
+    const generate = vi.spyOn(apiClient, "generateHandoff");
+    await ready();
+    fireEvent.click(screen.getByTestId("lock-tab-handoff"));
+    const button = await screen.findByTestId("handoff-queue-all");
+    expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (1)");
+    fireEvent.click(button);
+    await waitFor(() => expect(bridge.queued).toHaveLength(1));
+    const request = bridge.queued[0].item.request as { path: string; body: string };
+    expect(request.path).toBe("/v1/projects/p1/script-lock/handoff/generate");
+    expect(JSON.parse(request.body)).toEqual({ beat: "b3" });
+    expect(await screen.findByTestId("handoff-queue-note")).toHaveTextContent("Đã thêm 1 beat vào hàng đợi DeepSeek");
+    generate.mock.calls.forEach((call) => expect(call[2]).toEqual({ external: { mode: "describe" } }));
+    bridge.remove();
   });
 
   it("has the AI write the missing notes and offers to approve the ones waiting", async () => {

@@ -1,6 +1,6 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { ScriptState } from "../api/client";
+import { ExternalRequestDescribed, generateScript, type ExternalRequest, type ScriptBeat, type ScriptState } from "../api/client";
 import { AiModelSelect } from "../components/AiModelSelect";
 import { AppShell } from "../components/AppShell";
 import researchStyles from "../components/research/research.module.css";
@@ -11,6 +11,7 @@ import { Button, Card } from "../components/ui";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
+import { useDeepSeekQueue } from "../hooks/useDeepSeekQueue";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useScript, type ScriptControls } from "../hooks/useScript";
 import { VIEW_SCRIPT, beatsRoute, lockRoute, readOnlyReason } from "../utils/flow";
@@ -20,6 +21,17 @@ const SUBTITLE =
 
 const ROLE =
   "Viết toàn bộ lời dẫn theo beat: chuyển tiếp tự nhiên, đủ rõ mà không dài dòng, đúng nhịp với thời lượng mục tiêu. Nghe thử bằng giọng đã chọn.";
+
+/** The request that has the AI write one beat, described and not sent, so the extension can make it later. */
+async function describeWrite(projectId: string, beat: ScriptBeat): Promise<ExternalRequest> {
+  try {
+    await generateScript(projectId, beat.key, "", { external: { mode: "describe" } });
+  } catch (err) {
+    if (err instanceof ExternalRequestDescribed) return err.request;
+    throw err;
+  }
+  throw new Error("Không dựng được yêu cầu viết beat này.");
+}
 
 /** Where the step stands and what comes next, for the line under the heading. */
 function stripOf(state: ScriptState, running: ScriptControls["running"]): StepStripProps {
@@ -40,11 +52,12 @@ function stripOf(state: ScriptState, running: ScriptControls["running"]): StepSt
 }
 
 /**
- * Step 6 of the 21-step flow: writing the script. The AI writes the dialogue of
+ * Writing the script. The AI writes the dialogue of
  * each beat from the approved beat sheet, one beat after another; the Creator
  * edits, redoes and approves each beat and can listen to any line, a beat or the
- * whole script in the voice chosen at Cấu hình. Checks over the opening, the
+ * whole script in the project's voice. Checks over the opening, the
  * closing, long or hard-to-hear lines and the joins between beats only warn.
+ * With the AI Bridge extension, one click queues every beat without dialogue on DeepSeek.
  */
 export function ScriptWriteStepPage() {
   const params = useParams<{ id?: string }>();
@@ -56,6 +69,11 @@ export function ScriptWriteStepPage() {
   const script = useScript(projectId, !!projectId);
   // A line opened from another screen (the lock step's "Mở câu đó") is marked and brought into view.
   const highlight = useSearchParams()[0].get("line");
+  const queue = useDeepSeekQueue((path) => {
+    if (path.startsWith(`/v1/projects/${projectId}/script`)) script.reload();
+  });
+  const [queueing, setQueueing] = useState(false);
+  const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const loaded = script.state !== null;
   useEffect(() => {
     if (highlight && loaded) document.getElementById(`ln-${highlight}`)?.scrollIntoView({ block: "center" });
@@ -67,9 +85,43 @@ export function ScriptWriteStepPage() {
   const locked = !flow.editable;
   const aiAvailable = llm?.enabled === true;
 
+  // One queue item per beat without dialogue, in the order of the sheet, so each beat is
+  // written after the one before it and reads it.
+  async function queueAll(todo: ScriptBeat[]) {
+    setQueueing(true);
+    setQueueNote(null);
+    let added = 0;
+    let already = 0;
+    try {
+      for (const [i, beat] of todo.entries()) {
+        const outcome = await queue.add({
+          label: `B${beat.number} · ${beat.title}`,
+          project: projectId,
+          request: await describeWrite(projectId, beat),
+          modes: { deepThink: true, search: false },
+        });
+        if (!outcome.ok) {
+          setQueueNote({ tone: "error", text: `Dừng ở beat ${i + 1}/${todo.length}: ${outcome.message}` });
+          return;
+        }
+        if (outcome.added) added += 1;
+        else already += 1;
+      }
+      setQueueNote({
+        tone: "ok",
+        text: `Đã thêm ${added} beat vào hàng đợi DeepSeek${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
+      });
+    } catch (err) {
+      setQueueNote({ tone: "error", text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi." });
+    } finally {
+      setQueueing(false);
+    }
+  }
+
   function content(s: ScriptState) {
     const busy = locked || script.busy || script.running !== null;
-    const unwritten = s.beats.filter((b) => !b.written).length;
+    const unwrittenBeats = s.beats.filter((b) => !b.written);
+    const unwritten = unwrittenBeats.length;
     const pending = s.beats.filter((b) => b.written && b.status === "pending").length;
     return (
       <>
@@ -92,8 +144,23 @@ export function ScriptWriteStepPage() {
                   <Button variant="run" onClick={() => void script.generate("", "")} disabled={busy} data-testid="script-generate">
                     {s.stats.written === 0 ? "AI viết lời thoại" : "AI viết các beat còn lại"}
                   </Button>
+                  {queue.available && (
+                    <Button variant="run" onClick={() => void queueAll(unwrittenBeats)} disabled={busy || queueing} data-testid="script-queue-all">
+                      {queueing ? "Đang thêm…" : `Chạy tất cả bằng DeepSeek (${unwritten})`}
+                    </Button>
+                  )}
                   <span className={researchStyles.hint}>Lời thoại đã có giữ nguyên; mỗi beat viết lần lượt, đọc beat liền trước.</span>
                 </div>
+              )}
+              {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
+                <p className={researchStyles.hint} data-testid="script-queue-state">
+                  Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
+                </p>
+              )}
+              {queueNote && (
+                <p className={queueNote.tone === "error" ? researchStyles.error : researchStyles.hint} role={queueNote.tone === "error" ? "alert" : "status"} data-testid="script-queue-note">
+                  {queueNote.text}
+                </p>
               )}
             </div>
           </Card>

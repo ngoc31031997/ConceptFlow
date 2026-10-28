@@ -1,4 +1,5 @@
 import { useState } from "react";
+import beatStyles from "../beats/beats.module.css";
 import { generateScript, redoUnit, scriptBeatUnit, suggestScriptLine, type ScriptBeat, type ScriptLine } from "../../api/client";
 import type { ScriptControls } from "../../hooks/useScript";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
@@ -66,6 +67,8 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
   const [editing, setEditing] = useState(false);
   const [redoing, setRedoing] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  // An approved beat shows as one line until the Creator opens it.
+  const [expanded, setExpanded] = useState(false);
   const unit = scriptBeatUnit(beat.key);
   const deviation = lengthDeviation(beat.seconds, beat.targetSeconds);
   const editImpact = useUnitImpact(projectId, unit, editing);
@@ -130,6 +133,25 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
     </>
   );
 
+  const holdsHighlight = highlight != null && beat.lines.some((l) => l.id === highlight);
+  if (beat.written && beat.status === "approved" && !expanded && !writing && !holdsHighlight) {
+    return (
+      <div className={beatStyles.beatRow} data-testid={`script-beat-${beat.key}`}>
+        <span className={beatStyles.beatRowTitle}>
+          B{beat.number} · {beat.title}
+        </span>
+        <span className={beatStyles.beatRowMeta}>
+          {beat.fn} · {formatSeconds(beat.seconds)}
+        </span>
+        <UnitStatusChip state={beat.status} testId={`script-status-${beat.key}`} />
+        <span className={researchStyles.grow} />
+        <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(true)} data-testid={`script-expand-${beat.key}`}>
+          Mở
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <Card data-testid={`script-beat-${beat.key}`}>
       <div className={researchStyles.body}>
@@ -154,6 +176,12 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
               </span>
             )}
           </span>
+          <span className={researchStyles.grow} />
+          {beat.written && beat.status === "approved" && (
+            <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(false)} data-testid={`script-collapse-${beat.key}`}>
+              Thu gọn
+            </Button>
+          )}
         </div>
         <p className={researchStyles.hint}>Mục tiêu: {beat.goal || "(chưa có)"}</p>
 

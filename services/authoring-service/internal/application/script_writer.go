@@ -207,7 +207,10 @@ func (uc *ScriptDeskUseCase) Generate(ctx context.Context, projectID, beatKey, n
 		if err != nil {
 			return fmt.Errorf("beat %s: %w", sc.beats[at].unit.Key, err)
 		}
-		s, _ := readScriptBeat(unit)
+		s, err := readScriptBeat(unit)
+		if err != nil {
+			return fmt.Errorf("beat %s: %w", sc.beats[at].unit.Key, err)
+		}
 		sc.scripts[unit.Key] = storedScript{unit: unit, ScriptBeat: s}
 	}
 	return nil
@@ -329,7 +332,9 @@ func (uc *ScriptDeskUseCase) Speak(ctx context.Context, projectID string, lineID
 		return nil
 	}
 	if err := uc.dispatcher.DispatchDraftVoice(ctx, projectID); err != nil {
-		_ = uc.voices.FailVoiceLines(ctx, projectID, asked, "không gửi được lệnh đọc giọng: "+err.Error())
+		if markErr := uc.voices.FailVoiceLines(ctx, projectID, asked, "không gửi được lệnh đọc giọng: "+err.Error()); markErr != nil {
+			return fmt.Errorf("gửi lệnh đọc giọng: %w (và không ghi được lỗi vào các câu: %v)", err, markErr)
+		}
 		return fmt.Errorf("gửi lệnh đọc giọng: %w", err)
 	}
 	return nil

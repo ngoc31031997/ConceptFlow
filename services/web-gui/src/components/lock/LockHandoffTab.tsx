@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { generateHandoff, handoffBeatUnit, redoUnit, type LockBeat } from "../../api/client";
+import { ExternalRequestDescribed, generateHandoff, handoffBeatUnit, redoUnit, type ExternalRequest, type LockBeat } from "../../api/client";
 import type { ScriptLockControls } from "../../hooks/useScriptLock";
+import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
 import { ExternalAiButton } from "../ExternalAiButton";
+import beatStyles from "../beats/beats.module.css";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, FormField, TextInput } from "../ui";
 import { UnitEditModal } from "../units/UnitEditModal";
@@ -22,9 +24,22 @@ interface LockHandoffTabProps {
   locked: boolean;
 }
 
+/** The request that has the AI write one beat's handoff note, described and not sent, so the extension can make it later. */
+async function describeWrite(projectId: string, beat: LockBeat): Promise<ExternalRequest> {
+  try {
+    await generateHandoff(projectId, beat.key, { external: { mode: "describe" } });
+  } catch (err) {
+    if (err instanceof ExternalRequestDescribed) return err.request;
+    throw err;
+  }
+  throw new Error("Không dựng được yêu cầu viết ghi chú này.");
+}
+
 function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { projectId: string; beat: LockBeat } & Omit<LockHandoffTabProps, "projectId">) {
   const [editing, setEditing] = useState(false);
   const [redoing, setRedoing] = useState(false);
+  // An approved note shows as one line until the Creator opens it.
+  const [expanded, setExpanded] = useState(false);
   const unit = handoffBeatUnit(beat.key);
   const editImpact = useUnitImpact(projectId, unit, editing);
   const redoImpact = useUnitImpact(projectId, unit, redoing);
@@ -32,6 +47,22 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
   const writing = typeof lock.running === "object" && lock.running !== null && lock.running.beat === beat.key;
   const writingAll = lock.running === "handoff";
   const busy = locked || lock.busy || lock.running !== null;
+
+  if (beat.written && beat.status === "approved" && !beat.stale && !expanded && !writing) {
+    return (
+      <div className={beatStyles.beatRow} data-testid={`handoff-beat-${beat.key}`}>
+        <span className={beatStyles.beatRowTitle}>
+          B{beat.number} · {beat.title}
+        </span>
+        <span className={beatStyles.beatRowMeta}>{beat.fn}</span>
+        <UnitStatusChip state={beat.status} testId={`handoff-status-${beat.key}`} />
+        <span className={researchStyles.grow} />
+        <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(true)} data-testid={`handoff-expand-${beat.key}`}>
+          Mở
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <Card data-testid={`handoff-beat-${beat.key}`}>
@@ -53,6 +84,12 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
               </span>
             )}
           </span>
+          <span className={researchStyles.grow} />
+          {beat.written && beat.status === "approved" && (
+            <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(false)} data-testid={`handoff-collapse-${beat.key}`}>
+              Thu gọn
+            </Button>
+          )}
         </div>
         <p className={researchStyles.hint}>
           <b>Mục tiêu (từ beat sheet):</b> {beat.goal}
@@ -188,10 +225,48 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
   const [adding, setAdding] = useState(false);
   const [term, setTerm] = useState({ term: "", say: "", draw: "", avoid: "" });
   const [error, setError] = useState<string | null>(null);
+  const queue = useDeepSeekQueue((path) => {
+    if (path.startsWith(`/v1/projects/${projectId}/script-lock`)) lock.reload();
+  });
+  const [queueing, setQueueing] = useState(false);
+  const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   if (!state) return null;
   const busy = locked || lock.busy || lock.running !== null;
-  const unwritten = state.beats.filter((b) => !b.written).length;
+  const unwrittenBeats = state.beats.filter((b) => !b.written);
+  const unwritten = unwrittenBeats.length;
   const toApprove = state.beats.filter((b) => b.written && (b.status === "pending" || b.stale)).length;
+
+  // One queue item per beat without a note, in the order of the sheet.
+  async function queueAll(todo: LockBeat[]) {
+    setQueueing(true);
+    setQueueNote(null);
+    let added = 0;
+    let already = 0;
+    try {
+      for (const [i, beat] of todo.entries()) {
+        const outcome = await queue.add({
+          label: `Ghi chú B${beat.number} · ${beat.title}`,
+          project: projectId,
+          request: await describeWrite(projectId, beat),
+          modes: { deepThink: true, search: false },
+        });
+        if (!outcome.ok) {
+          setQueueNote({ tone: "error", text: `Dừng ở beat ${i + 1}/${todo.length}: ${outcome.message}` });
+          return;
+        }
+        if (outcome.added) added += 1;
+        else already += 1;
+      }
+      setQueueNote({
+        tone: "ok",
+        text: `Đã thêm ${added} beat vào hàng đợi DeepSeek${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
+      });
+    } catch (err) {
+      setQueueNote({ tone: "error", text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi." });
+    } finally {
+      setQueueing(false);
+    }
+  }
 
   async function save() {
     setError(null);
@@ -221,9 +296,24 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
                   <Button variant="run" onClick={() => void lock.generate("")} disabled={busy} data-testid="handoff-generate">
                     AI viết ghi chú bàn giao
                   </Button>
+                  {queue.available && (
+                    <Button variant="run" onClick={() => void queueAll(unwrittenBeats)} disabled={busy || queueing} data-testid="handoff-queue-all">
+                      {queueing ? "Đang thêm…" : `Chạy tất cả bằng DeepSeek (${unwritten})`}
+                    </Button>
+                  )}
                   <span className={researchStyles.hint}>Ghi chú đã có giữ nguyên; thuật ngữ AI đề xuất gộp vào bảng chung.</span>
                 </div>
               </>
+            )}
+            {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
+              <p className={researchStyles.hint} data-testid="handoff-queue-state">
+                Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
+              </p>
+            )}
+            {queueNote && (
+              <p className={queueNote.tone === "error" ? researchStyles.error : researchStyles.hint} role={queueNote.tone === "error" ? "alert" : "status"} data-testid="handoff-queue-note">
+                {queueNote.text}
+              </p>
             )}
           </div>
         </Card>
