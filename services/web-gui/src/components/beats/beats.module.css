@@ -141,3 +141,58 @@
   font-size: 12px;
   font-weight: 700;
 }
+
+/* The line under the sheet's title that says what the AI reads. */
+.inputLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+  font-size: 13.5px;
+}
+
+/* Actions of the whole sheet, under the checks. */
+.sheetBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1.5px dashed var(--muted);
+}
+
+/* An approved beat folded to one line. */
+.beatRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+}
+.beatRowTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+}
+.beatRowMeta {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+/* Moves and delete at the foot of a beat. */
+.beatBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1.5px dashed var(--muted);
+}

@@ -2,11 +2,9 @@ import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { BeatState } from "../api/client";
 import { AiModelSelect } from "../components/AiModelSelect";
-import { AiOperationCard } from "../components/AiOperationCard";
 import { AppShell } from "../components/AppShell";
 import { BeatCard } from "../components/beats/BeatCard";
-import { BeatInputCard } from "../components/beats/BeatInputCard";
-import { StructureCard } from "../components/beats/StructureCard";
+import { BeatSheetCard } from "../components/beats/BeatSheetCard";
 import researchStyles from "../components/research/research.module.css";
 import type { StepStripProps } from "../components/StepStrip";
 import { Button, Card } from "../components/ui";
@@ -90,9 +88,6 @@ export function BeatsStepPage() {
   function content(s: BeatState) {
     const busy = locked || beats.busy || beats.running !== null;
     const pendingWithGoal = s.beats.filter((b) => b.status === "pending" && b.goal.trim() !== "").length;
-    const writingSheet = beats.running === "sheet";
-    const writingAdd = beats.running === "add";
-    const skeleton = s.phase === "skeleton";
     return (
       <>
         {!s.storyApproved && (
@@ -100,14 +95,13 @@ export function BeatsStepPage() {
             Duyệt câu chuyện ở bước Câu chuyện trước.
           </p>
         )}
-        {s.storyApproved && <BeatInputCard state={s} onReload={beats.reload} />}
         {s.storyApproved && s.phase === "empty" && (
           <Card data-testid="beats-empty-card">
             <div className={researchStyles.body}>
               <p className={researchStyles.hint}>
                 Chưa có beat sheet. Bộ khung được dựng từ câu chuyện đã duyệt: một beat mở đầu, mỗi bước của chuỗi nhân quả một beat, một beat kết. Không cần AI.
               </p>
-              <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
+              <div className={researchStyles.actions}>
                 <Button onClick={() => void beats.buildSkeleton()} disabled={busy} data-testid="beats-build-skeleton">
                   Dựng bộ khung từ câu chuyện
                 </Button>
@@ -120,46 +114,19 @@ export function BeatsStepPage() {
         )}
         {s.beats.length > 0 && (
           <>
-            <StructureCard state={s} />
+            <BeatSheetCard
+              projectId={projectId}
+              state={s}
+              beats={beats}
+              aiAvailable={aiAvailable}
+              busy={busy}
+              pendingWithGoal={pendingWithGoal}
+              onRewrite={() => setRewriteOpen(true)}
+              onRebuild={() => setRebuildOpen(true)}
+            />
             {s.beats.map((beat, index) => (
               <BeatCard key={beat.key} projectId={projectId} beat={beat} index={index} state={s} beats={beats} aiAvailable={aiAvailable} locked={locked} />
             ))}
-            <AiOperationCard
-              run={beats.run}
-              active={writingSheet || writingAdd}
-              testId="beats-progress"
-              title={writingAdd ? "AI đang viết beat mới" : "AI đang viết nội dung các beat"}
-            />
-            {skeleton && (
-              <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
-                <Button variant="ghost" onClick={() => setRebuildOpen(true)} disabled={busy} data-testid="beats-rebuild-skeleton">
-                  Dựng lại bộ khung
-                </Button>
-                <Button onClick={() => void beats.approveSkeleton()} disabled={busy} data-testid="beats-approve-skeleton">
-                  Duyệt bộ khung
-                </Button>
-              </div>
-            )}
-            {!skeleton && (
-              <>
-                {aiAvailable && <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId="beats-model" />}
-                <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
-                  {aiAvailable && (
-                    <Button variant="ghost" onClick={() => setRewriteOpen(true)} disabled={busy} data-testid="beats-rewrite">
-                      Viết lại cả bảng
-                    </Button>
-                  )}
-                  {aiAvailable && s.unwritten > 0 && (
-                    <Button variant="run" onClick={() => void beats.generate("", true)} disabled={busy} data-testid="beats-generate">
-                      AI viết nội dung các beat chưa có ({s.unwritten})
-                    </Button>
-                  )}
-                  <Button onClick={() => void beats.approveAll()} disabled={busy || pendingWithGoal === 0} data-testid="beats-approve-all">
-                    Duyệt tất cả beat còn lại
-                  </Button>
-                </div>
-              </>
-            )}
           </>
         )}
         {beats.actionError && (

@@ -4,7 +4,6 @@ import type { BeatsControls } from "../../hooks/useBeats";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiButton } from "../ExternalAiButton";
 import { FactTags } from "../story/FactTags";
 import { ImpactConfirm } from "../research/ImpactConfirm";
 import researchStyles from "../research/research.module.css";
@@ -14,6 +13,7 @@ import { UnitRedoModal } from "../units/UnitRedoModal";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import unitStyles from "../units/units.module.css";
 import { UnitStatusChip } from "../units/UnitStatusChip";
+import { BeatAiDialog } from "./BeatAiDialog";
 import styles from "./beats.module.css";
 
 /** How long a closing dialog takes to leave, so the page is scrolled after it has gone. */
@@ -71,6 +71,11 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
   const [editing, setEditing] = useState(false);
   const [redoing, setRedoing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // The AI dialogs: writing this beat, and adding a beat after it.
+  const [writeOpen, setWriteOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  // An approved beat shows as one line until the Creator opens it.
+  const [expanded, setExpanded] = useState(false);
   // Moving a beat changes how it joins its neighbours, so it asks first once dialogue is approved.
   const [moving, setMoving] = useState<-1 | 1 | null>(null);
   const unit = { kind: "beat", key: beat.key };
@@ -85,6 +90,10 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
   const isMine = (field: string) => beat.mine.includes(field);
   const canShorten = beat.dur - BEAT_DURATION_STEP >= BEAT_MIN_SECONDS;
   const skeleton = state.phase === "skeleton";
+  const unwritten = !beat.goal.trim() && !beat.content.trim();
+  const collapsed = !skeleton && beat.status === "approved" && !expanded && !writing;
+  const modelSelect = (id: string) =>
+    aiAvailable ? <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId={id} /> : undefined;
 
   const deleteList = [
     "Beat này bị xoá khỏi bảng; các beat còn lại giữ nguyên.",
@@ -93,6 +102,24 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
       : []),
     "Lời thoại và ghi chú bàn giao của beat này (nếu đã có) sẽ không còn chỗ để bám.",
   ];
+
+  if (collapsed) {
+    return (
+      <div id={`beat-${beat.key}`} className={styles.beatRow} data-testid={`beat-${beat.key}`}>
+        <span className={styles.beatRowTitle}>
+          B{no} · {beat.title}
+        </span>
+        <span className={styles.beatRowMeta}>
+          {beat.fn} · {beat.dur} s
+        </span>
+        <UnitStatusChip state={beat.status} testId={`beat-status-${beat.key}`} />
+        <span className={researchStyles.grow} />
+        <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(true)} data-testid={`beat-expand-${beat.key}`}>
+          Mở
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <Card id={`beat-${beat.key}`} data-testid={`beat-${beat.key}`}>
@@ -114,6 +141,12 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
               </span>
             )}
           </span>
+          <span className={researchStyles.grow} />
+          {!skeleton && beat.status === "approved" && (
+            <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(false)} data-testid={`beat-collapse-${beat.key}`}>
+              Thu gọn
+            </Button>
+          )}
         </div>
 
         <AiOperationCard run={beats.run} active={writing} testId={`beat-progress-${beat.key}`} title="AI đang làm lại beat này" />
@@ -227,61 +260,65 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
           </>
         )}
 
-        <div className={styles.moves}>
+        <div className={styles.beatBar}>
           <Button variant="ghost" className={researchStyles.sm} onClick={() => (state.scriptApproved > 0 ? setMoving(-1) : void beats.move(beat.key, -1))} disabled={busy || index === 0} data-testid={`beat-up-${beat.key}`}>
             ↑ Lên
           </Button>
           <Button variant="ghost" className={researchStyles.sm} onClick={() => (state.scriptApproved > 0 ? setMoving(1) : void beats.move(beat.key, 1))} disabled={busy || last} data-testid={`beat-down-${beat.key}`}>
             ↓ Xuống
           </Button>
-          {!skeleton && !beat.goal.trim() && !beat.content.trim() && (
-            <ExternalAiButton
-              title={`B${no} ${beat.title} · AI ngoài`}
-              label="Viết beat này bằng AI ngoài"
-              run={(external) => redoBeat(projectId, beat.key, "", { external })}
-              onDone={async () => {
-                await beats.reload();
-                showBeat(beat.key);
-              }}
-              disabled={busy}
-              testId={`beat-write-external-${beat.key}`}
-            />
-          )}
-          {!skeleton && aiAvailable && !beat.goal.trim() && !beat.content.trim() && (
-            <Button variant="run" className={researchStyles.sm} onClick={() => void beats.redo(beat.key, "")} disabled={busy} data-testid={`beat-write-${beat.key}`}>
-              AI viết beat này
+          {!skeleton && unwritten && (
+            <Button variant="run" className={researchStyles.sm} onClick={() => setWriteOpen(true)} disabled={busy} data-testid={`beat-write-${beat.key}`}>
+              Viết beat này
             </Button>
           )}
-          {!skeleton && (
-            <ExternalAiButton
-              title={`Thêm beat sau B${no} · AI ngoài`}
-              label="+ Thêm beat sau bằng AI ngoài"
-              run={(external) => addBeat(projectId, beat.key, false, "", { external })}
-              onDone={async (sheet) => {
-                await beats.reload();
-                // The new beat is the one that now follows this one.
-                const at = sheet.beats.findIndex((b) => b.key === beat.key);
-                showBeat(sheet.beats[at + 1]?.key ?? beat.key);
-              }}
-              disabled={busy}
-              testId={`beat-add-external-${beat.key}`}
-            />
-          )}
           <Button
-            variant="run"
+            variant="ghost"
             className={researchStyles.sm}
-            onClick={() => void beats.add(beat.key, skeleton || !aiAvailable, "")}
+            onClick={() => (skeleton ? void beats.add(beat.key, true, "") : setAddOpen(true))}
             disabled={busy}
             data-testid={`beat-add-${beat.key}`}
           >
-            {aiAvailable && !skeleton ? "+ Thêm beat sau" : "+ Thêm beat trống sau"}
+            {skeleton ? "+ Thêm beat trống sau" : "+ Thêm beat sau"}
           </Button>
+          <span className={researchStyles.grow} />
           <Button variant="danger" className={researchStyles.sm} onClick={() => setDeleting(true)} disabled={busy} data-testid={`beat-delete-${beat.key}`}>
             Xoá beat
           </Button>
         </div>
       </div>
 
+      <BeatAiDialog
+        open={writeOpen}
+        onClose={() => setWriteOpen(false)}
+        title={`Viết beat · B${no} ${beat.title}`}
+        modelSelect={modelSelect(`beat-write-model-${beat.key}`)}
+        onSystem={aiAvailable ? (note) => void beats.redo(beat.key, note) : undefined}
+        external={{
+          run: (note, external) => redoBeat(projectId, beat.key, note, { external }),
+          onDone: async () => {
+            await beats.reload();
+            showBeat(beat.key);
+          },
+        }}
+        testId={`beat-write-dialog-${beat.key}`}
+      />
+      <BeatAiDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title={`Thêm beat sau B${no} · ${beat.title}`}
+        modelSelect={modelSelect(`beat-add-model-${beat.key}`)}
+        onSystem={aiAvailable ? (note) => void beats.add(beat.key, false, note) : undefined}
+        onBlank={() => void beats.add(beat.key, true, "")}
+        external={{
+          run: (note, external) => addBeat(projectId, beat.key, false, note, { external }),
+          onDone: async () => {
+            await beats.reload();
+            showBeat(beat.key);
+          },
+        }}
+        testId={`beat-add-dialog-${beat.key}`}
+      />
       <UnitEditModal
         open={editing}
         onClose={() => setEditing(false)}

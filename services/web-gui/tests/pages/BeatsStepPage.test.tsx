@@ -106,7 +106,7 @@ function renderPage() {
 
 async function ready() {
   renderPage();
-  await screen.findByTestId("beats-structure-card");
+  await screen.findByTestId("beats-sheet-card");
 }
 
 describe("BeatsStepPage", () => {
@@ -197,19 +197,20 @@ describe("BeatsStepPage", () => {
     await waitFor(() => expect(approve).toHaveBeenCalledWith("p1"));
   });
 
-  it("puts every action that runs after the beats, and writes only the beats without content from the bottom button", async () => {
+  it("puts every action of the whole sheet above the beats, and writes only the beats without content from its button", async () => {
     state = baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
     const generate = vi.spyOn(apiClient, "generateBeats").mockResolvedValue(baseState());
     await ready();
     const run = screen.getByTestId("beats-generate");
     expect(run).toHaveTextContent("AI viết nội dung các beat chưa có (1)");
-    expect(screen.getByTestId("beat-b3").compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByTestId("beat-b3").compareDocumentPosition(screen.getByTestId("beats-rewrite")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("beats-sheet-card")).toContainElement(run);
+    expect(screen.getByTestId("beats-sheet-card")).toContainElement(screen.getByTestId("beats-approve-all"));
+    expect(run.compareDocumentPosition(screen.getByTestId("beat-b1")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(run);
     await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", "", expect.anything(), true));
   });
 
-  it("offers the bottom run only while some beat has no content", async () => {
+  it("offers the run for the missing beats only while some beat has no content", async () => {
     await ready();
     expect(screen.queryByTestId("beats-generate")).not.toBeInTheDocument();
     expect(screen.getByTestId("beats-rewrite")).toBeInTheDocument();
@@ -221,7 +222,32 @@ describe("BeatsStepPage", () => {
     await ready();
     expect(screen.queryByTestId("beat-write-b1")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("beat-write-b2"));
+    expect(await screen.findByTestId("beat-write-dialog-b2-external")).toBeInTheDocument();
+    expect(screen.getByTestId("beat-write-dialog-b2-note")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-send"));
     await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", "b2", "", expect.anything()));
+  });
+
+  it("sends the note of the write dialog along", async () => {
+    state = baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
+    const redo = vi.spyOn(apiClient, "redoBeat").mockResolvedValue(baseState());
+    await ready();
+    fireEvent.click(screen.getByTestId("beat-write-b2"));
+    fireEvent.change(await screen.findByTestId("beat-write-dialog-b2-note"), { target: { value: "nhấn vào cái giá" } });
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-send"));
+    await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", "b2", "nhấn vào cái giá", expect.anything()));
+  });
+
+  it("folds an approved beat to one line and opens it again", async () => {
+    state = baseState({ beats: [beat("b1", { fn: "Hook", status: "approved" }), beat("b2"), beat("b3", { fn: "Payoff", next: "" })] });
+    await ready();
+    expect(screen.queryByTestId("beat-goal-b1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("beat-status-b1")).toBeInTheDocument();
+    expect(screen.getByTestId("beat-goal-b2")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("beat-expand-b1"));
+    expect(await screen.findByTestId("beat-goal-b1")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("beat-collapse-b1"));
+    await waitFor(() => expect(screen.queryByTestId("beat-goal-b1")).not.toBeInTheDocument());
   });
 
   it("says how many beats were resized to fit the target", async () => {
@@ -313,7 +339,16 @@ describe("BeatsStepPage", () => {
     const add = vi.spyOn(apiClient, "addBeat").mockResolvedValue(baseState());
     await ready();
     fireEvent.click(screen.getByTestId("beat-add-b1"));
+    fireEvent.click(await screen.findByTestId("beat-add-dialog-b1-send"));
     await waitFor(() => expect(add).toHaveBeenCalledWith("p1", "b1", false, "", expect.anything()));
+  });
+
+  it("adds an empty beat from the add dialog without asking the AI", async () => {
+    const add = vi.spyOn(apiClient, "addBeat").mockResolvedValue(baseState());
+    await ready();
+    fireEvent.click(screen.getByTestId("beat-add-b1"));
+    fireEvent.click(await screen.findByTestId("beat-add-dialog-b1-blank"));
+    await waitFor(() => expect(add).toHaveBeenCalledWith("p1", "b1", true, ""));
   });
 
   it("asks before deleting a beat and names the fact the script must state that only it holds", async () => {
