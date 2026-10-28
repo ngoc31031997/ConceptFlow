@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { BeatState } from "../../api/client";
+import { ExternalRequestDescribed, redoBeat, type Beat, type BeatState, type ExternalRequest } from "../../api/client";
 import type { BeatsControls } from "../../hooks/useBeats";
+import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
 import researchStyles from "../research/research.module.css";
@@ -8,6 +9,17 @@ import { Button, Card } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
 import { BeatInputModal } from "./BeatInputModal";
 import styles from "./beats.module.css";
+
+/** The request that has the AI write one beat, described and not sent, so the extension can make it later. */
+async function describeWrite(projectId: string, beat: Beat): Promise<ExternalRequest> {
+  try {
+    await redoBeat(projectId, beat.key, "", { external: { mode: "describe" } });
+  } catch (err) {
+    if (err instanceof ExternalRequestDescribed) return err.request;
+    throw err;
+  }
+  throw new Error("Không dựng được yêu cầu viết beat này.");
+}
 
 interface BeatSheetCardProps {
   projectId: string;
@@ -37,6 +49,45 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
   const writingSheet = beats.running === "sheet";
   const writingAdd = beats.running === "add";
   const approved = state.beats.filter((b) => b.status === "approved").length;
+  const unwrittenBeats = state.beats.filter((b) => !b.goal.trim() && !b.content.trim());
+  const queue = useDeepSeekQueue((path) => {
+    if (path.startsWith(`/v1/projects/${projectId}/beats`)) void beats.reload();
+  });
+  const [queueing, setQueueing] = useState(false);
+  const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
+  // One queue item per beat without content, in the order of the sheet, so each beat is
+  // written after the one before it and reads it.
+  async function queueAll() {
+    setQueueing(true);
+    setQueueNote(null);
+    let added = 0;
+    let already = 0;
+    try {
+      for (const [i, beat] of unwrittenBeats.entries()) {
+        const outcome = await queue.add({
+          label: `B${state.beats.indexOf(beat) + 1} · ${beat.title}`,
+          project: projectId,
+          request: await describeWrite(projectId, beat),
+          modes: { deepThink: true, search: false },
+        });
+        if (!outcome.ok) {
+          setQueueNote({ tone: "error", text: `Dừng ở beat ${i + 1}/${unwrittenBeats.length}: ${outcome.message}` });
+          return;
+        }
+        if (outcome.added) added += 1;
+        else already += 1;
+      }
+      setQueueNote({
+        tone: "ok",
+        text: `Đã thêm ${added} beat vào hàng đợi DeepSeek${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
+      });
+    } catch (err) {
+      setQueueNote({ tone: "error", text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi." });
+    } finally {
+      setQueueing(false);
+    }
+  }
 
   // The input is read again each time the dialog opens, so it shows what the AI will get.
   function openInput() {
@@ -132,6 +183,11 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
                   AI viết nội dung các beat chưa có ({state.unwritten})
                 </Button>
               )}
+              {queue.available && unwrittenBeats.length > 0 && (
+                <Button variant="run" onClick={() => void queueAll()} disabled={busy || queueing} data-testid="beats-queue-all">
+                  {queueing ? "Đang thêm…" : `Chạy tất cả bằng DeepSeek (${unwrittenBeats.length})`}
+                </Button>
+              )}
               <span className={researchStyles.grow} />
               <Button onClick={() => void beats.approveAll()} disabled={busy || pendingWithGoal === 0} data-testid="beats-approve-all">
                 Duyệt tất cả beat còn lại
@@ -139,6 +195,16 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
             </>
           )}
         </div>
+        {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
+          <p className={researchStyles.hint} data-testid="beats-queue-state">
+            Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
+          </p>
+        )}
+        {queueNote && (
+          <p className={queueNote.tone === "error" ? researchStyles.error : researchStyles.hint} role={queueNote.tone === "error" ? "alert" : "status"} data-testid="beats-queue-note">
+            {queueNote.text}
+          </p>
+        )}
       </div>
       <BeatInputModal open={inputOpen} onClose={() => setInputOpen(false)} loading={inputLoading} input={state.input} facts={state.facts} />
     </Card>

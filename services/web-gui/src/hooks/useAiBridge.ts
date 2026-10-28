@@ -40,9 +40,17 @@ export interface AiBridge {
   cancel: () => void;
 }
 
-interface ExtensionMessage {
-  type: "pong" | "progress" | "result" | "error";
+export interface ExtensionMessage {
+  type: "pong" | "progress" | "result" | "error" | "queue_added" | "queue_state" | "queue_item_done";
   request_id?: string;
+  item_id?: string;
+  added?: boolean;
+  path?: string;
+  waiting?: number;
+  running?: number;
+  done?: number;
+  failed?: number;
+  paused?: boolean;
   providers?: AiBridgeProvider[];
   stage?: AiBridgeStage;
   text?: string;
@@ -59,7 +67,7 @@ const NO_ACK =
   "Extension không phản hồi. Tải lại trang hoặc kiểm tra extension đã bật trong chrome://extensions.";
 const UNKNOWN_ERROR = "Extension báo lỗi nhưng không nói lý do.";
 
-function readExtensionMessage(event: MessageEvent): ExtensionMessage | null {
+export function readExtensionMessage(event: MessageEvent): ExtensionMessage | null {
   if (event.source !== window || event.origin !== window.location.origin) return null;
   const data = event.data as Record<string, unknown> | null;
   if (
@@ -72,14 +80,14 @@ function readExtensionMessage(event: MessageEvent): ExtensionMessage | null {
   return data as unknown as ExtensionMessage;
 }
 
-function post(fields: Record<string, unknown>) {
+export function post(fields: Record<string, unknown>) {
   window.postMessage(
     { source: BRIDGE_SOURCE, v: BRIDGE_VERSION, from: "page", ...fields },
     window.location.origin,
   );
 }
 
-function newRequestId(): string {
+export function newRequestId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`;

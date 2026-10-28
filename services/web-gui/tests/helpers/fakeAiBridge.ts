@@ -6,17 +6,20 @@
 export interface FakeAiBridge {
   runs: { requestId: string; provider: string; prompt: string; modes: unknown }[];
   cancels: string[];
+  /** Items the page added to the queue, in order. */
+  queued: { requestId: string; item: Record<string, unknown> }[];
   send: (fields: Record<string, unknown>) => void;
   remove: () => void;
 }
 
 const SOURCE = "conceptflow-ai-bridge";
 
-export function installFakeAiBridge(options: { answersPing?: boolean } = {}): FakeAiBridge {
+export function installFakeAiBridge(options: { answersPing?: boolean; queue?: boolean; refuseQueue?: string } = {}): FakeAiBridge {
   const answersPing = options.answersPing ?? true;
   const fake: FakeAiBridge = {
     runs: [],
     cancels: [],
+    queued: [],
     // jsdom's postMessage leaves `source` and `origin` empty; a real browser sets both, and the page checks them.
     send: (fields) =>
       window.dispatchEvent(
@@ -31,8 +34,18 @@ export function installFakeAiBridge(options: { answersPing?: boolean } = {}): Fa
   function onMessage(event: MessageEvent) {
     const data = event.data as Record<string, unknown> | null;
     if (!data || data.source !== SOURCE || data.from !== "page") return;
-    if (data.type === "ping" && answersPing)
+    if (data.type === "ping" && answersPing) {
       fake.send({ type: "pong", providers: ["deepseek"], version: "1.0.0" });
+      if (options.queue) fake.send({ type: "queue_state", waiting: 0, running: 0, done: 0, failed: 0, paused: false });
+    }
+    if (data.type === "queue_add") {
+      fake.queued.push({ requestId: String(data.request_id), item: data.item as Record<string, unknown> });
+      if (options.refuseQueue) {
+        fake.send({ type: "error", request_id: data.request_id, code: "queue_bad_item", message: options.refuseQueue });
+        return;
+      }
+      fake.send({ type: "queue_added", request_id: data.request_id, item_id: `q${fake.queued.length}`, added: true });
+    }
     if (data.type === "run")
       fake.runs.push({
         requestId: String(data.request_id),

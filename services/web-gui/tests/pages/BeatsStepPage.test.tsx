@@ -8,6 +8,7 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { Beat, BeatFact, BeatState } from "../../src/api/client";
 import type { Project } from "../../src/types";
+import { installFakeAiBridge, type FakeAiBridge } from "../helpers/fakeAiBridge";
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -417,5 +418,62 @@ describe("BeatsStepPage", () => {
     await ready();
     fireEvent.click(screen.getByTestId("beat-down-b1"));
     expect(await screen.findByTestId("beats-error")).toHaveTextContent("thứ tự không hợp lệ");
+  });
+
+  describe("with the extension's queue", () => {
+    let bridge: FakeAiBridge;
+    afterEach(() => bridge.remove());
+
+    const threeUnwritten = () =>
+      baseState({ unwritten: 2, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { goal: "", content: "", fn: "Payoff", next: "" })] });
+
+    it("offers no run-all button when the extension has no queue", async () => {
+      bridge = installFakeAiBridge();
+      state = threeUnwritten();
+      await ready();
+      expect(screen.queryByTestId("beats-queue-all")).not.toBeInTheDocument();
+    });
+
+    it("queues one item per beat without content, in the order of the sheet, without calling the AI", async () => {
+      bridge = installFakeAiBridge({ queue: true });
+      state = threeUnwritten();
+      const redo = vi.spyOn(apiClient, "redoBeat");
+      await ready();
+      const button = await screen.findByTestId("beats-queue-all");
+      expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (2)");
+      fireEvent.click(button);
+      await waitFor(() => expect(bridge.queued).toHaveLength(2));
+      expect(bridge.queued.map((q) => q.item.label)).toEqual(["B2 · Beat b2", "B3 · Beat b3"]);
+      const [first] = bridge.queued.map((q) => q.item.request as { method: string; path: string; body: string });
+      expect(first.method).toBe("POST");
+      expect(first.path).toBe("/v1/projects/p1/beats/b2/redo");
+      expect(JSON.parse(first.body)).toEqual({ note: "" });
+      expect(bridge.queued[0].item.modes).toEqual({ deepThink: true, search: false });
+      expect(await screen.findByTestId("beats-queue-note")).toHaveTextContent("Đã thêm 2 beat vào hàng đợi DeepSeek");
+      // Describing a request makes no AI call: redoBeat ran only in its "describe" mode.
+      redo.mock.calls.forEach((call) => expect(call[3]).toEqual({ external: { mode: "describe" } }));
+    });
+
+    it("hides the run-all button when every beat has content", async () => {
+      bridge = installFakeAiBridge({ queue: true });
+      await ready();
+      await waitFor(() => expect(screen.getByTestId("beats-rewrite")).toBeInTheDocument());
+      expect(screen.queryByTestId("beats-queue-all")).not.toBeInTheDocument();
+    });
+
+    it("says how many are waiting, running or failed, and loads the sheet again when a beat is done", async () => {
+      bridge = installFakeAiBridge({ queue: true });
+      await ready();
+      bridge.send({ type: "queue_state", waiting: 2, running: 1, done: 0, failed: 1, paused: false });
+      expect(await screen.findByTestId("beats-queue-state")).toHaveTextContent("1 đang chạy · 2 chờ · 1 lỗi");
+      const get = vi.mocked(apiClient.getBeats);
+      const before = get.mock.calls.length;
+      bridge.send({ type: "queue_item_done", item_id: "q1", path: "/v1/projects/p1/beats/b2/redo", project: "p1" });
+      await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(before));
+      const afterOther = get.mock.calls.length;
+      bridge.send({ type: "queue_item_done", item_id: "q2", path: "/v1/projects/other/beats/b2/redo", project: "other" });
+      await new Promise((r) => setTimeout(r, 30));
+      expect(get.mock.calls.length).toBe(afterOther);
+    });
   });
 });
