@@ -109,3 +109,67 @@
   align-items: center;
   font-size: 13.5px;
 }
+
+.inputLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+  font-size: 13.5px;
+}
+
+/* The bar that writes the story: engine on the left, the button on the right. */
+.engineBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1.5px dashed var(--muted);
+}
+.seg {
+  display: inline-flex;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.segItem {
+  padding: 4px 12px;
+  border: 0;
+  border-right: var(--border-w) solid var(--border-color);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.segItem:last-child {
+  border-right: 0;
+}
+.segItem:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.segOn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* The approval at the foot of the card. */
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  padding-top: 12px;
+  border-top: var(--border-w) solid var(--border-color);
+}
+.foot > span {
+  margin-right: auto;
+}

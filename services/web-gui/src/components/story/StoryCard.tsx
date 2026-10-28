@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { generateStory, type StoryFieldKey, type StoryPatch, type StoryState } from "../../api/client";
+import { useDeepSeekRun } from "../../hooks/useDeepSeekRun";
 import type { StoryControls } from "../../hooks/useStory";
+import { AiBridgeRunStatus } from "../AiBridgeRunStatus";
+import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiButton } from "../ExternalAiButton";
+import { ExternalAiDialog } from "../ExternalAiDialog";
 import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
 import unitStyles from "../units/units.module.css";
 import { UnitStatusChip } from "../units/UnitStatusChip";
 import { FactTags } from "./FactTags";
 import { StoryArcEditModal } from "./StoryArcEditModal";
+import { StoryInputModal } from "./StoryInputModal";
 import { StoryTextEditModal } from "./StoryTextEditModal";
 import styles from "./story.module.css";
 
@@ -20,7 +24,17 @@ interface StoryCardProps {
   aiAvailable: boolean;
   /** The step cannot be changed now (the project is past editing). */
   locked: boolean;
+  /** Opens "Làm lại kèm ghi chú" for the whole story. */
+  onRedo: () => void;
 }
+
+type Engine = "system" | "deepseek" | "outside";
+
+const ENGINES: { id: Engine; label: string }[] = [
+  { id: "system", label: "AI hệ thống" },
+  { id: "deepseek", label: "DeepSeek" },
+  { id: "outside", label: "AI ngoài" },
+];
 
 const LABELS: Record<StoryFieldKey, string> = {
   central_question: "Câu hỏi trung tâm",
@@ -38,16 +52,35 @@ function Mine({ field, owned }: { field: StoryFieldKey; owned: boolean }) {
 }
 
 /**
- * Section 2 of the story step: the central question, the core answer and the
- * narrative arc. Each reads as text with its own "Sửa tay" (docs/ux-ui-design-rules.md,
- * rule 4); one the Creator wrote is tagged and kept by the AI. The AI writes
- * the whole story, and "Làm lại kèm ghi chú" sits with the approval below.
+ * The story step in one card: what the AI reads, the central question, the
+ * core answer and the narrative arc, the bar that writes the story, and the
+ * approval at the foot. Each field reads as text with its own "Sửa tay"
+ * (docs/ux-ui-design-rules.md, rule 4); one the Creator wrote is tagged and
+ * kept by the AI. With no story yet the bar writes it on the engine picked
+ * beside it; with one, "Làm lại kèm ghi chú" opens the redo dialog.
  */
-export function StoryCard({ projectId, story, state, aiAvailable, locked }: StoryCardProps) {
+export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo }: StoryCardProps) {
   const [editing, setEditing] = useState<"central_question" | "core_answer" | "narrative_arc" | null>(null);
+  const [inputOpen, setInputOpen] = useState(false);
+  const [inputLoading, setInputLoading] = useState(false);
+  const [outside, setOutside] = useState(false);
+  // DeepSeek's answer the step could not read, shown in the outside-AI dialog for the Creator to fix.
+  const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
+  const deepSeek = useDeepSeekRun({
+    run: (external) => generateStory(projectId, "", { external }),
+    onDone: story.reload,
+    onUnreadable: (reply, message) => {
+      setUnreadable({ reply, message });
+      setOutside(true);
+    },
+  });
+  const [pickedEngine, setPickedEngine] = useState<Engine | null>(null);
+  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, deepseek: deepSeek.available, outside: true };
+  // The Creator's pick, or the first engine that can run when that one cannot.
+  const engine: Engine = pickedEngine && engineAvailable[pickedEngine] ? pickedEngine : (ENGINES.find((e) => engineAvailable[e.id])?.id ?? "outside");
   const s = state.story;
   const open = state.briefApproved && state.researchResolved;
-  const busy = locked || story.busy || story.writing;
+  const busy = locked || story.busy || story.writing || deepSeek.busy;
   const owns = (key: StoryFieldKey) => s?.creatorFields.includes(key) ?? false;
   const approved = s?.status === "approved";
 
@@ -60,6 +93,24 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked }: Stor
   async function save(patch: StoryPatch) {
     await story.edit(patch);
   }
+
+  // The input is read again each time the dialog opens, so it shows what the AI will get.
+  function openInput() {
+    setInputOpen(true);
+    setInputLoading(true);
+    void story.reload().finally(() => setInputLoading(false));
+  }
+
+  function generate() {
+    if (engine === "system") void story.generate("");
+    else if (engine === "deepseek") void deepSeek.start();
+    else {
+      setUnreadable(null);
+      setOutside(true);
+    }
+  }
+
+  const factsText = state.researchSkipped ? "bước Nghiên cứu đã bỏ qua, không có dữ kiện" : `${state.facts.length} dữ kiện đang giữ`;
 
   const textField = (key: "central_question" | "core_answer", value: string) => (
     <div className={styles.field} data-testid={`story-field-${key}`}>
@@ -80,8 +131,29 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked }: Stor
     <Card data-testid="story-card">
       <div className={researchStyles.body}>
         <div className={researchStyles.head}>
-          <h3>② Câu chuyện</h3>
+          <h3>Câu chuyện</h3>
           {chip}
+          <span className={researchStyles.grow} />
+          {open && !s && (
+            <Button variant="ghost" className={researchStyles.sm} onClick={() => setEditing("central_question")} disabled={busy} data-testid="story-write-by-hand">
+              Tự viết từng ô
+            </Button>
+          )}
+        </div>
+        <div className={styles.inputLine}>
+          <span data-testid="story-input-summary">
+            <strong>Đầu vào:</strong> {state.briefApproved ? "Brief đã duyệt" : "Brief chưa duyệt"} · {state.researchResolved ? factsText : "bảng dữ kiện chưa duyệt"}
+          </span>
+          <span className={researchStyles.grow} />
+          <Button
+            variant="view"
+            className={researchStyles.sm}
+            onClick={openInput}
+            title="Xem brief và dữ kiện đã duyệt mà AI đọc để viết câu chuyện"
+            data-testid="story-input-open"
+          >
+            Xem đầu vào của AI
+          </Button>
         </div>
         {!open && (
           <p className={researchStyles.hint} data-testid="story-not-open">
@@ -95,20 +167,6 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked }: Stor
                 ? "Chưa có câu chuyện. AI chọn góc kể và xây mạch từ brief và dữ kiện, hoặc bạn tự viết từng ô."
                 : "Chưa có câu chuyện. Chưa cấu hình AI nên bạn tự viết từng ô rồi duyệt."}
             </p>
-            <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
-              <ExternalAiButton
-                title="Câu chuyện · AI ngoài"
-                run={(external) => generateStory(projectId, "", { external })}
-                onDone={story.reload}
-                disabled={busy}
-                testId="story-generate-external"
-              />
-              {aiAvailable && (
-                <Button variant="run" onClick={() => void story.generate("")} disabled={busy} data-testid="story-generate">
-                  AI viết câu chuyện
-                </Button>
-              )}
-            </div>
           </>
         )}
         {s && (state.briefStale || state.researchStale) && (
@@ -146,19 +204,93 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked }: Stor
             </div>
           </>
         )}
-        {open && !s && (
-          <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
-            <Button variant="ghost" onClick={() => setEditing("central_question")} disabled={busy} data-testid="story-write-by-hand">
-              Tự viết từng ô
-            </Button>
+        {open && !approved && (
+          <div className={styles.engineBar}>
+            {s ? (
+              <Button variant="ghost" onClick={onRedo} disabled={busy} data-testid="story-redo-all">
+                Làm lại kèm ghi chú
+              </Button>
+            ) : (
+              <>
+                <span className={researchStyles.hint} id="story-engine-label">
+                  Sinh bằng
+                </span>
+                <div className={styles.seg} role="radiogroup" aria-labelledby="story-engine-label">
+                  {ENGINES.filter((e) => e.id !== "deepseek" || deepSeek.available).map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={engine === e.id}
+                      className={engine === e.id ? `${styles.segItem} ${styles.segOn}` : styles.segItem}
+                      onClick={() => setPickedEngine(e.id)}
+                      disabled={busy || !engineAvailable[e.id]}
+                      title={engineAvailable[e.id] ? undefined : "Chưa cấu hình AI"}
+                      data-testid={`story-engine-${e.id}`}
+                    >
+                      {e.label}
+                    </button>
+                  ))}
+                </div>
+                {engine === "system" && !locked && (
+                  <AiModelSelect projectId={projectId} step="story_frame" label="Model AI cho bước Câu chuyện" testId="story-model" />
+                )}
+                <span className={researchStyles.grow} />
+                {deepSeek.stage !== null ? (
+                  <AiBridgeRunStatus stage={deepSeek.stage} modes={deepSeek.modes} onCancel={deepSeek.cancel} testId="story-generate-deepseek" />
+                ) : (
+                  <Button variant="run" onClick={generate} disabled={busy} data-testid="story-generate">
+                    {deepSeek.busy ? "Đang chạy…" : "Viết câu chuyện"}
+                  </Button>
+                )}
+              </>
+            )}
           </div>
+        )}
+        {deepSeek.error && (
+          <p className={researchStyles.error} role="alert" data-testid="story-generate-deepseek-error">
+            {deepSeek.error}
+          </p>
         )}
         {story.actionError && (
           <p className={researchStyles.error} role="alert" data-testid="story-error">
             {story.actionError}
           </p>
         )}
+        <div className={styles.foot}>
+          <span className={researchStyles.hint}>
+            {approved ? "Bỏ duyệt để sửa hoặc làm lại." : s ? "Duyệt khi cả câu chuyện ổn. Ô bạn tự viết được AI giữ nguyên." : "Cần có câu chuyện mới duyệt được."}
+          </span>
+          {approved ? (
+            <Button variant="ghost" onClick={() => void story.unapprove()} disabled={busy} data-testid="story-unapprove">
+              Bỏ duyệt
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => void story.approve()} disabled={busy || !s} data-testid="story-approve">
+              Duyệt câu chuyện
+            </Button>
+          )}
+        </div>
       </div>
+
+      <StoryInputModal
+        open={inputOpen}
+        onClose={() => setInputOpen(false)}
+        loading={inputLoading}
+        brief={state.brief}
+        facts={state.facts}
+        researchSkipped={state.researchSkipped}
+      />
+      <ExternalAiDialog
+        open={outside}
+        onClose={() => setOutside(false)}
+        title="Câu chuyện · AI ngoài"
+        run={(external) => generateStory(projectId, "", { external })}
+        onDone={story.reload}
+        initialReply={unreadable?.reply}
+        initialError={unreadable?.message}
+        testId="story-generate-external-dialog"
+      />
 
       <StoryTextEditModal
         open={editing === "central_question"}

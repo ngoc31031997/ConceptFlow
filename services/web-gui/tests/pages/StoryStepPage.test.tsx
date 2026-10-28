@@ -301,4 +301,23 @@ describe("StoryStepPage", () => {
     fireEvent.click(screen.getByTestId("story-generate"));
     expect(await screen.findByTestId("story-error")).toHaveTextContent("không dùng được làm câu chuyện");
   });
+
+  it("keeps the approval at the foot of the story card", async () => {
+    await ready();
+    const card = screen.getByTestId("story-card");
+    expect(card).toContainElement(screen.getByTestId("story-approve"));
+    expect(card).toContainElement(screen.getByTestId("story-input-open"));
+    expect(screen.queryByTestId("story-approve-card")).not.toBeInTheDocument();
+  });
+
+  it("picks the engine that writes the story and opens the outside-AI dialog from it", async () => {
+    state = baseState({ story: null });
+    await ready();
+    expect(screen.getByTestId("story-engine-system")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByTestId("story-engine-deepseek")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("story-engine-outside"));
+    expect(screen.getByTestId("story-engine-outside")).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByTestId("story-generate"));
+    expect(await screen.findByTestId("story-generate-external-dialog")).toBeInTheDocument();
+  });
 });

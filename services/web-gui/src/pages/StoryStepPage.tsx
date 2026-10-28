@@ -6,11 +6,9 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import type { StepStripProps } from "../components/StepStrip";
 import { StoryCard } from "../components/story/StoryCard";
-import { StoryInputCard } from "../components/story/StoryInputCard";
 import researchStyles from "../components/research/research.module.css";
-import { Button, Card } from "../components/ui";
+import { Button } from "../components/ui";
 import { UnitRedoModal } from "../components/units/UnitRedoModal";
-import { UnitStatusChip } from "../components/units/UnitStatusChip";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useLlmStatus } from "../hooks/useLlmStatus";
@@ -74,38 +72,9 @@ export function StoryStepPage() {
   const aiAvailable = llm?.enabled === true;
 
   function content(s: StoryState) {
-    const hasStory = s.story !== null;
-    const busy = locked || story.busy || story.writing;
     return (
       <>
-        <StoryInputCard state={s} onReload={story.reload} />
-        <StoryCard projectId={projectId} story={story} state={s} aiAvailable={aiAvailable} locked={locked} />
-        <Card data-testid="story-approve-card">
-          <div className={researchStyles.body}>
-            <div className={researchStyles.head}>
-              <h3>③ Duyệt câu chuyện</h3>
-              <UnitStatusChip state={s.status} testId="story-approve-status" />
-            </div>
-            <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
-              {s.status === "approved" ? (
-                <Button variant="ghost" onClick={() => void story.unapprove()} disabled={busy} data-testid="story-unapprove">
-                  Bỏ duyệt
-                </Button>
-              ) : (
-                <>
-                  {hasStory && (
-                    <Button variant="ghost" onClick={() => setRedoOpen(true)} disabled={busy} data-testid="story-redo-all">
-                      Làm lại kèm ghi chú
-                    </Button>
-                  )}
-                  <Button variant="primary" onClick={() => void story.approve()} disabled={busy || !hasStory} data-testid="story-approve">
-                    Duyệt câu chuyện
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </Card>
+        <StoryCard projectId={projectId} story={story} state={s} aiAvailable={aiAvailable} locked={locked} onRedo={() => setRedoOpen(true)} />
       </>
     );
   }
