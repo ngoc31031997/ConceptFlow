@@ -10,9 +10,21 @@
   /** Extra time past MAX_RUN_MS after which a job left behind (a crashed adapter) no longer blocks a new run. */
   const STALE_GRACE_MS = 60 * 1000;
 
-  /** A new job for a run the page asked for; `providerTabId` is filled once the tab exists. */
-  function newJob(requestId, prompt, modes, replyTabId, now) {
-    return { requestId: requestId, prompt: prompt, modes: modes, replyTabId: replyTabId, providerTabId: null, started: false, startedAt: now };
+  /**
+   * A new job for a run the page asked for; `providerTabId` is filled once the tab exists.
+   * A run for a queue item has no ConceptFlow tab to answer (`replyTabId` null) and names its item.
+   */
+  function newJob(requestId, prompt, modes, replyTabId, now, itemId) {
+    return {
+      requestId: requestId,
+      prompt: prompt,
+      modes: modes,
+      replyTabId: replyTabId,
+      itemId: itemId || null,
+      providerTabId: null,
+      started: false,
+      startedAt: now,
+    };
   }
 
   /** True when a stored job still blocks a new run. */

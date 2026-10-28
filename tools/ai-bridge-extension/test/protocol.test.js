@@ -56,3 +56,17 @@ test("adapter messages only count for the job's own tab and request", () => {
   assert.equal(J.belongsTo(job, 8, "r1"), false);
   assert.equal(J.belongsTo(job, 9, "r2"), false);
 });
+
+test("a queue_add carries the item the page described", () => {
+  const item = { label: "B3", request: { gateway: "http://localhost:8080", method: "POST", path: "/v1/projects/p1/beats/b3/redo" } };
+  assert.deepEqual(P.parsePageMessage(page({ type: "queue_add", request_id: "r1", item })), { type: "queue_add", requestId: "r1", item });
+  assert.equal(P.parsePageMessage(page({ type: "queue_add", request_id: "r1" })), null, "no item");
+  assert.equal(P.parsePageMessage(page({ type: "queue_add", item })), null, "no request id");
+});
+
+test("a job for a queue item names its item and has no ConceptFlow tab to answer", () => {
+  const job = J.newJob("queue-i1", "p", P.readModes(null), null, 1000, "i1");
+  assert.equal(job.itemId, "i1");
+  assert.equal(job.replyTabId, null);
+  assert.equal(J.newJob("r1", "p", P.readModes(null), 7, 1000).itemId, null, "a run from the page has no item");
+});

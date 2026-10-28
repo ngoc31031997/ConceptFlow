@@ -1,0 +1,28 @@
+:root { color-scheme: light dark; --fg: #1a1a1a; --muted: #666; --bg: #fffdf6; --card: #fff; --line: #1a1a1a; --accent: #f5c518; --bad: #c62828; --ok: #2e7d32; --run: #6d4aff; }
+@media (prefers-color-scheme: dark) { :root { --fg: #eee; --muted: #aaa; --bg: #17150f; --card: #22201a; --line: #ddd; --bad: #ef9a9a; --ok: #a5d6a7; --run: #a893ff; } }
+* { box-sizing: border-box; }
+body { width: 380px; min-height: 160px; margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 system-ui, sans-serif; }
+nav { display: flex; border-bottom: 2px solid var(--line); }
+nav button { flex: 1; padding: 8px; border: 0; border-right: 2px solid var(--line); background: var(--card); color: var(--fg); font-weight: 600; cursor: pointer; }
+nav button:last-child { border-right: 0; }
+nav button[aria-selected="true"] { background: var(--accent); color: #1a1a1a; }
+section { padding: 10px 12px 14px; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#summary { margin-left: auto; color: var(--muted); font-size: 12px; }
+button { padding: 4px 10px; border: 2px solid var(--line); border-radius: 4px; background: var(--card); color: var(--fg); font-weight: 600; cursor: pointer; }
+button.primary { background: var(--accent); color: #1a1a1a; }
+button:focus-visible { outline: 3px solid var(--run); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; max-height: 360px; overflow-y: auto; }
+li { border: 2px solid var(--line); border-radius: 4px; background: var(--card); padding: 8px; display: grid; gap: 4px; }
+li .top { display: flex; gap: 6px; align-items: baseline; }
+li .label { font-weight: 700; overflow-wrap: anywhere; }
+li .project { color: var(--muted); font-size: 12px; }
+.badge { flex: none; padding: 0 6px; border: 1.5px solid var(--line); border-radius: 3px; font: 700 11px ui-monospace, monospace; }
+.badge.running { background: var(--run); color: #fff; border-color: var(--run); }
+.badge.done { color: var(--ok); }
+.badge.failed { color: var(--bad); }
+.error { color: var(--bad); overflow-wrap: anywhere; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; }
+.hint { color: var(--muted); margin: 8px 0; }
+details pre { margin: 4px 0 0; max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 11px; background: var(--bg); border: 1.5px solid var(--line); border-radius: 4px; padding: 6px; }

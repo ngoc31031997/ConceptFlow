@@ -21,6 +21,7 @@
     tab_closed: "Tab DeepSeek đã bị đóng trước khi có câu trả lời.",
     busy: "Đang có một lượt chạy DeepSeek khác. Chờ lượt đó xong hoặc huỷ nó.",
     bad_request: "Yêu cầu gửi cho extension không hợp lệ.",
+    queue_bad_item: "Mục không hợp lệ nên không thêm được vào hàng đợi.",
   };
 
   /** Builds a message the extension posts to the page. */
@@ -51,6 +52,10 @@
     if (data.type === "ping") return { type: "ping" };
     if (typeof data.request_id !== "string" || data.request_id === "") return null;
     if (data.type === "cancel") return { type: "cancel", requestId: data.request_id };
+    if (data.type === "queue_add") {
+      if (!data.item || typeof data.item !== "object") return null;
+      return { type: "queue_add", requestId: data.request_id, item: data.item };
+    }
     if (data.type !== "run") return null;
     if (PROVIDERS.indexOf(data.provider) < 0) return null;
     if (typeof data.prompt !== "string" || data.prompt.trim() === "") return null;

@@ -14,6 +14,11 @@
 
   function pong() {
     post(P.toPage("pong", { providers: P.PROVIDERS, version: version }));
+    chrome.runtime.sendMessage({ kind: "queue_get" }).then(function (counts) {
+      if (counts) post(P.toPage("queue_state", counts));
+    }).catch(function (err) {
+      console.warn("ai-bridge: could not read the queue:", err);
+    });
   }
 
   function sendToWorker(message, requestId) {
@@ -32,6 +37,10 @@
     }
     if (msg.type === "cancel") {
       sendToWorker({ kind: "cancel", requestId: msg.requestId });
+      return;
+    }
+    if (msg.type === "queue_add") {
+      sendToWorker({ kind: "queue_add", requestId: msg.requestId, item: msg.item }, msg.requestId);
       return;
     }
     sendToWorker({ kind: "run", requestId: msg.requestId, provider: msg.provider, prompt: msg.prompt, modes: msg.modes }, msg.requestId);

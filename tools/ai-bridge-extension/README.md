@@ -19,7 +19,7 @@ Cần Google Chrome 111 trở lên (hoặc Edge, Brave, Arc, tức là trình du
 1. Mở `chrome://extensions`.
 2. Bật **Developer mode** (góc trên bên phải).
 3. Bấm **Load unpacked** và chọn thư mục này: `tools/ai-bridge-extension` trong repo ConceptFlow.
-4. Extension **ConceptFlow AI Bridge** hiện trong danh sách. Có thể ghim nó lên thanh công cụ nhưng không bắt buộc, vì extension không có popup.
+4. Extension **ConceptFlow AI Bridge** hiện trong danh sách. Nên ghim nó lên thanh công cụ: bấm icon để mở popup **Hàng đợi** và **Cài đặt**.
 5. Mở `https://chat.deepseek.com` và **đăng nhập** một lần. Extension dùng phiên đăng nhập này.
 6. Tải lại tab ConceptFlow nếu nó đang mở, để extension được nạp vào trang.
 
@@ -60,6 +60,19 @@ Muốn dừng: bấm **Huỷ** cạnh dòng tiến độ. ConceptFlow ngừng ch
 Mỗi lần chỉ chạy được một lượt. Mỗi lượt là một cú bấm của bạn; extension không tự chạy lại hay chạy hàng loạt.
 
 Nếu ConceptFlow không đọc được câu trả lời (ví dụ DeepSeek không trả khối JSON), câu trả lời vẫn nằm trong ô ③ kèm lý do. Bạn sửa rồi bấm **Đọc kết quả** lại.
+
+## Hàng đợi DeepSeek
+
+Bấm icon extension để mở popup. Tab **Hàng đợi** liệt kê các mục ConceptFlow đã thêm; chúng chạy lần lượt trên DeepSeek, mỗi lúc một mục, kể cả khi tab ConceptFlow đã đóng hay tải lại (hàng đợi lưu trong `chrome.storage.local`).
+
+Với mỗi mục, extension: (1) gọi API của ConceptFlow với `X-External-AI: prompt` để lấy prompt dựng từ dự án đúng lúc đó (nên beat sau đọc được beat trước vừa viết), (2) chạy prompt trên DeepSeek như một lượt thường, (3) gọi lại API với `X-External-AI: paste` kèm câu trả lời để ConceptFlow đọc và lưu.
+
+- **Tạm dừng / Chạy tiếp**: dừng hay tiếp tục lấy mục kế tiếp; mục đang chạy vẫn chạy nốt.
+- **Mục lỗi** (DeepSeek không trả lời, ConceptFlow không đọc được câu trả lời, tab bị đóng) dừng cả hàng đợi. Popup hiện lý do và câu trả lời của DeepSeek nếu có. **Thử lại** chạy lại mục từ đầu, **Bỏ** xoá mục rồi hàng đợi chạy tiếp.
+- **Huỷ** một mục đang chạy coi như mục lỗi "Đã huỷ".
+- Khởi động lại Chrome giữa lúc một mục đang chạy thì mục đó chạy lại từ đầu.
+- Chrome phải đang mở và DeepSeek đã đăng nhập. Mỗi mục mở một tab DeepSeek rồi đóng nó, nên màn hình nhảy sang DeepSeek mỗi lần. Prompt được dựng lúc tới lượt, nên sửa dự án trong lúc mục còn chờ thì mục đọc theo bản mới; muốn tránh thì bấm Tạm dừng.
+- Extension gọi API ConceptFlow ở `http://localhost:8080`. Gateway ở địa chỉ khác thì sửa `host_permissions` trong `manifest.json`.
 
 ## Xử lý lỗi
 
@@ -110,7 +123,7 @@ ConceptFlow (localhost:3000)                    Chrome extension                
 
 Lỗi "Giao diện DeepSeek đã đổi… (tên phần)" cho biết phần nào không tìm thấy. Bạn sửa được mà không cần sửa code:
 
-1. Bấm **icon ConceptFlow AI Bridge** trên thanh công cụ Chrome. Nếu chưa ghim icon thì vào `chrome://extensions` → **Chi tiết** → **Tuỳ chọn tiện ích**. Trang **Selector DeepSeek** mở ra.
+1. Bấm **icon ConceptFlow AI Bridge** trên thanh công cụ Chrome, sang tab **Cài đặt**, bấm **Mở cài đặt selector**. Nếu chưa ghim icon thì vào `chrome://extensions` → **Chi tiết** → **Tuỳ chọn tiện ích**. Trang **Selector DeepSeek** mở ra.
 2. Mở một tab `chat.deepseek.com` (đã đăng nhập), rồi bấm **Kiểm tra trên tab DeepSeek**. Mỗi ô hiện "Tìm thấy" hoặc "Không tìm thấy". Phần tìm thấy được viền đỏ vài giây trên tab DeepSeek. Với nút DeepThink và Search, trang cũng cho biết nút đang bật hay tắt và class của nút.
 3. Ô nào "Không tìm thấy", hoặc tìm thấy sai phần tử:
    - Sang tab DeepSeek, nhấn **F12**.
@@ -134,7 +147,7 @@ Mở tab DeepSeek mà extension đã tạo, nhấn F12, chọn tab **Console** v
 
 ## Phát triển và test
 
-Phần logic thuần (giao thức, lượt chạy, luật đọc câu trả lời, ghép selector) có test chạy bằng Node 18+, không cần cài gì:
+Phần logic thuần (giao thức, lượt chạy, hàng đợi và hai lời gọi API của nó, luật đọc câu trả lời, ghép selector) có test chạy bằng Node 18+, không cần cài gì:
 
 ```bash
 cd tools/ai-bridge-extension
