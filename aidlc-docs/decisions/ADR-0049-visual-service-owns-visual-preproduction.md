@@ -1,4 +1,4 @@
-# ADR-0048: `visual-service` sở hữu tiền kỳ hình ảnh (bước 8–14)
+# ADR-0049: `visual-service` sở hữu tiền kỳ hình ảnh (bước 8–14)
 
 ## Status
 Proposed
@@ -30,7 +30,7 @@ Bước 8 cần đọc bản chốt của bước 1–7, gọi AI, có đơn v�
 A.
 - `visual-service` viết bằng Go, kiến trúc hexagonal như authoring. Có Postgres riêng (`visual-db`).
 - **Đọc bước 1–7:** authoring thêm route nội bộ chỉ đọc `GET /internal/v1/authoring/{id}/script-versions/latest`. Route trả nguyên bản kịch bản chốt mới nhất của bước 7; bản này đã chụp brief, dữ kiện, câu chuyện, beat, lời thoại, ghi chú bàn giao và thuật ngữ, mỗi phần kèm hash. visual-service không chép các dữ liệu này, chỉ lưu hash của từng phần.
-- **AI:** gọi llm-service (`/v1/chat`, `/v1/chat/external`). Prompt và model mặc định lấy từ thư viện prompt ở llm-service (CR-113, ADR-0049). Model riêng từng video lưu ở visual-service. AI ngoài và DeepSeek chạy qua header `X-External-AI` như ADR-0047; middleware được làm lại trong visual-service.
+- **AI:** gọi llm-service (`/v1/chat`, `/v1/chat/external`). Prompt và model mặc định lấy từ thư viện prompt ở llm-service (CR-113, ADR-0048). Model riêng từng video lưu ở visual-service. AI ngoài và DeepSeek chạy qua header `X-External-AI` như ADR-0047; middleware được làm lại trong visual-service.
 - **Xoá video:** visual-service không giữ file nên không phải một `PurgeTarget`. Giống authoring: ở cuối saga xoá, orchestrator gọi `DELETE /internal/v1/visual/{id}`, cố gắng một lần, lỗi thì ghi log.
 - **Bản chốt** của mỗi bước hình ảnh là một tài liệu JSON bất biến có phiên bản. Bước sau đọc qua route nội bộ của visual-service, theo phần mà bước đó cần.
 - orchestrator `flow.go` không đổi trong CR-112.

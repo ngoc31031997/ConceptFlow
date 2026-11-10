@@ -1,6 +1,6 @@
 # visual-service v1
 
-visual-service giữ các bước tiền kỳ hình ảnh (bước 8–14) và DB riêng `visual-db` (ADR-0048). Mã: `services/visual-service/`.
+visual-service giữ các bước tiền kỳ hình ảnh (bước 8–14) và DB riêng `visual-db` (ADR-0049). Mã: `services/visual-service/`.
 
 ## HTTP nội bộ
 

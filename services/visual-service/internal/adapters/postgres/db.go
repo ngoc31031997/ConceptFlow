@@ -1,5 +1,5 @@
 // Package postgres implements visual-service's persistence. It owns its own
-// database (ADR-0048); the project itself lives in the orchestrator and the
+// database (ADR-0049); the project itself lives in the orchestrator and the
 // script in authoring-service, so nothing here has a foreign key to them.
 package postgres
 

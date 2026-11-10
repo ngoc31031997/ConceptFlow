@@ -18,7 +18,7 @@ type ProjectDataPort interface {
 
 // DeleteProjectUseCase is visual-service's part of deleting a video: the
 // orchestrator calls it once every service holding the project's files has
-// removed them (ADR-0048).
+// removed them (ADR-0049).
 type DeleteProjectUseCase struct {
 	store ProjectDataPort
 }

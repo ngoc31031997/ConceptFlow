@@ -1,5 +1,5 @@
 // Command visual-service is visual-service's composition root. It owns the
-// visual pre-production steps (8–14) and their database (ADR-0048).
+// visual pre-production steps (8–14) and their database (ADR-0049).
 package main
 
 import (

@@ -3,7 +3,7 @@
 Nhánh `feature/cr-112-visual-concept` (worktree riêng). Nguồn:
 - spec Visual Concept của Creator, các quyết định trong session 2026-10-28 đến 2026-11-10;
 - mockup https://claude.ai/artifact/JSuFKcJQBkQ2qAVZRKRsck (v3);
-- ADR-0048, ADR-0047, ADR-0035.
+- ADR-0049, ADR-0047, ADR-0035.
 
 Khuôn của các bước AI: bước 5–7 (CR-108, CR-109, CR-111).
 
