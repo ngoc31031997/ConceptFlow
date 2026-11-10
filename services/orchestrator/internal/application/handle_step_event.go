@@ -114,6 +114,8 @@ type HandleStepEventUseCase struct {
 	errorLog ProjectErrorLogPort
 	// authoringCleanup, when set, runs after the project row is deleted.
 	authoringCleanup AuthoringCleanupPort
+	// visualCleanup, when set, runs after the project row is deleted.
+	visualCleanup VisualCleanupPort
 	// kitKeys supplies the kit render_scenes is drawn with.
 	kitKeys   KitKeyPort
 	publisher domain.CommandPublisherPort
@@ -169,6 +171,20 @@ type AuthoringCleanupPort interface {
 // authoring row is harmless, so a failure is logged, not retried.
 func (uc *HandleStepEventUseCase) WithAuthoringCleanup(c AuthoringCleanupPort) *HandleStepEventUseCase {
 	uc.authoringCleanup = c
+	return uc
+}
+
+// VisualCleanupPort removes a deleted project's visual pre-production data in
+// visual-service.
+type VisualCleanupPort interface {
+	DeleteVisual(ctx context.Context, projectID string) error
+}
+
+// WithVisualCleanup makes the delete saga also remove the project's visual
+// pre-production data once its files are gone. visual-service keeps no files,
+// so it is not a purge target; like the authoring cleanup this is best effort.
+func (uc *HandleStepEventUseCase) WithVisualCleanup(c VisualCleanupPort) *HandleStepEventUseCase {
+	uc.visualCleanup = c
 	return uc
 }
 
@@ -1230,6 +1246,11 @@ func (uc *HandleStepEventUseCase) handlePurgeEvent(ctx context.Context, event St
 	if uc.authoringCleanup != nil {
 		if err := uc.authoringCleanup.DeleteAuthoring(ctx, event.ProjectID); err != nil {
 			uc.logger.WarnContext(ctx, "could not remove the project's authoring row", "project_id", event.ProjectID, "error", err)
+		}
+	}
+	if uc.visualCleanup != nil {
+		if err := uc.visualCleanup.DeleteVisual(ctx, event.ProjectID); err != nil {
+			uc.logger.WarnContext(ctx, "could not remove the project's visual data", "project_id", event.ProjectID, "error", err)
 		}
 	}
 	uc.logger.InfoContext(ctx, "project deleted after all artifact purges", "project_id", event.ProjectID)

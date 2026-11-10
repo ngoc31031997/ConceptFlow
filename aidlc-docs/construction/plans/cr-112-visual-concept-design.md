@@ -19,7 +19,7 @@ Khuôn của các bước AI: bước 5–7 (CR-108, CR-109, CR-111).
 ## Phụ thuộc và trùng lặp
 - **Cần CR-113 xong trước** (thư viện prompt ở llm-service). Phần không dùng prompt (service, DB, route đọc, thư viện tham chiếu, sửa tay, duyệt) làm được song song.
 - Cần bước 7 (kịch bản chốt, `script_versions`, ghi chú bàn giao) đã có trên main.
-- **Chạm vào:** authoring (một route đọc), orchestrator (`PurgeTargets`), api-gateway, docker compose, web-gui. CR-113 cũng chạm authoring và api-gateway nhưng ở phần khác (prompt), nên merge cần pull main mới nhất.
+- **Chạm vào:** authoring (một route đọc), orchestrator (route xoá cuối saga), api-gateway, docker compose, web-gui. CR-113 cũng chạm authoring và api-gateway nhưng ở phần khác (prompt), nên merge cần pull main mới nhất.
 
 ## Input
 | Input | Nguồn | Phần dùng |
@@ -31,7 +31,7 @@ Khuôn của các bước AI: bước 5–7 (CR-108, CR-109, CR-111).
 | script-final | bản chốt bước 7 | số phiên bản, lời thoại theo beat, ghi chú bàn giao, bảng thuật ngữ |
 | tham chiếu | visual-service | các mô tả video này đã chọn |
 
-**Điều kiện vào:** đã có kịch bản chốt. Chưa có thì `409 script_not_locked`, và màn báo "Chốt kịch bản ở bước 7 trước".
+**Điều kiện vào:** đã có kịch bản chốt (authoring trả 404 khi chưa có). Chưa có thì `409 script_not_locked`, và màn báo "Chốt kịch bản ở bước 7 trước".
 
 ## Tài liệu bản chốt (`document`)
 Khuôn là JSON của Creator; khoá có dấu `+` là bổ sung.
@@ -141,10 +141,10 @@ Schema tạo bằng `CREATE TABLE IF NOT EXISTS` lúc khởi động, như autho
 Danh sách font lấy từ rendering hoặc từ một cấu hình dùng chung. Tôi chưa kiểm rendering có route liệt kê font chưa; nếu chưa có thì phải hỏi Creator trước khi chọn cách.
 
 ### authoring-service
-`GET /internal/v1/authoring/{id}/visual-input`: trả brief, dữ kiện, câu chuyện, beat và bản kịch bản chốt mới nhất kèm ghi chú bàn giao và thuật ngữ. Trả `404` khi chưa có dự án, `409 script_not_locked` khi chưa chốt. Có test Go.
+`GET /internal/v1/authoring/{id}/script-versions/latest`: trả nguyên bản kịch bản chốt mới nhất (mọi phần kèm hash). `404` khi chưa chốt. Có test Go.
 
 ### orchestrator
-Thêm `visual-service` vào `PurgeTargets`, kèm routing key và queue mới. Có test cho saga xoá với đủ các target.
+visual-service không giữ file nên không vào `PurgeTargets`. Cuối saga xoá, giống authoring, orchestrator gọi `DELETE /internal/v1/visual/{id}` (cố gắng một lần, lỗi thì ghi log). Có test.
 
 ### Hợp đồng HTTP công khai (qua api-gateway)
 | Phương thức | Đường dẫn | Việc |
@@ -186,13 +186,13 @@ Hai nhóm vai, seed nằm trong visual-service và đẩy lên llm-service theo 
 
 ## Kiểm thử
 - **Go (visual-service):** schema và máy kiểm từng phần, tương phản, phủ thuật ngữ, phủ giả thuyết và ngộ nhận; ghép tài liệu; `accuracy_notes`; stale theo từng nguồn; giữ `creator_fields` khi AI làm lại; đọc reply hỏng; gộp findings; điều kiện chốt; chốt v1 rồi v2; purge; HTTP với fake port; kho Postgres (bỏ qua khi thiếu `TEST_DATABASE_URL`).
-- **Go (authoring):** route `visual-input`.
-- **Go (orchestrator):** purge có thêm target.
+- **Go (authoring):** route `script-versions/latest`.
+- **Go (orchestrator):** saga xoá gọi xoá dữ liệu visual-service, lỗi không chặn saga.
 - **Vitest:** trang bước 8, trang thư viện, rail 23 bước.
 - Không gọi AI thật. Dọn dữ liệu test sau khi chạy.
 
 ## Chia việc
-1. **CR-112a:** dựng service, DB, docker compose, route đọc của authoring, purge ở orchestrator, proxy ở gateway.
+1. **CR-112a:** dựng service, DB, docker compose, route đọc của authoring, xoá dữ liệu cuối saga ở orchestrator. Proxy ở gateway thêm cùng các route công khai ở CR-112b và CR-112c.
 2. **CR-112c:** thư viện tham chiếu (BE và trang Cài đặt).
 3. **CR-112b:** bước 8 (AI, sửa, duyệt, rà soát, chốt, web-gui, flow 23 bước). Làm sau CR-113.
 

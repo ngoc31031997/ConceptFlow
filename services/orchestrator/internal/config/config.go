@@ -23,6 +23,8 @@ type Config struct {
 	// authoring-service; this is where to reach it.
 	AuthoringServiceURL     string
 	AuthoringServiceTimeout time.Duration
+	VisualServiceURL        string
+	VisualServiceTimeout    time.Duration
 	// Base URL of the video-assembly service, whose own database
 	// owns channel_assets — Orchestrator reads it synchronously to attach the
 	// channel intro/outro to assemble_video.
@@ -82,6 +84,15 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	visualServiceURL := os.Getenv("VISUAL_SERVICE_URL")
+	if visualServiceURL == "" {
+		visualServiceURL = "http://visual-service:8000"
+	}
+	visualServiceTimeoutSeconds, err := intEnvOrDefault("VISUAL_SERVICE_TIMEOUT_SECONDS", 10)
+	if err != nil {
+		return nil, err
+	}
+
 	videoAssemblyURL := os.Getenv("VIDEO_ASSEMBLY_URL")
 	if videoAssemblyURL == "" {
 		videoAssemblyURL = "http://video-assembly:8000"
@@ -107,6 +118,8 @@ func Load() (*Config, error) {
 		RabbitMQReconnectMaxDelay:     time.Duration(reconnectMaxMS) * time.Millisecond,
 		AuthoringServiceURL:           authoringServiceURL,
 		AuthoringServiceTimeout:       time.Duration(authoringServiceTimeoutSeconds) * time.Second,
+		VisualServiceURL:              visualServiceURL,
+		VisualServiceTimeout:          time.Duration(visualServiceTimeoutSeconds) * time.Second,
 		VideoAssemblyURL:              videoAssemblyURL,
 		VideoAssemblyTimeout:          time.Duration(videoAssemblyTimeoutSeconds) * time.Second,
 	}, nil

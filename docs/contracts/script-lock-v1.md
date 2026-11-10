@@ -51,6 +51,7 @@ Chốt khi không đủ điều kiện: 409. Chốt khi bản nháp không đổ
 | Phương thức | Đường dẫn | Việc |
 |---|---|---|
 | GET | `/internal/v1/authoring/{id}/handoff?role=…` | Phần của phiên bản chốt mới nhất mà vai đó đọc (FR-32 mục 4). `role`: `art_world`, `storyboard`, `art_color`, `voice`, `illustration`, `code`, `validate`. 404 khi chưa chốt; 400 cho vai lạ |
+| GET | `/internal/v1/authoring/{id}/script-versions/latest` | Phiên bản chốt mới nhất nguyên vẹn: `{project_id, version, note, locked_at, parts[{key, sha, content}]}`. Khoá phần: `brief`, `facts`, `story`, `order`, `glossary`, `review`, `beat:{key}`, `script:{key}`, `handoff:{key}`. `sha` là hash của `content`, bên đọc dùng nó để biết phần nào đổi giữa hai phiên bản. 404 khi chưa chốt. Bên gọi: visual-service (ADR-0048) |
 
 Trả `{version, locked_at, brief?, glossary?, beats:[{key, number, fn?, title?, goal?, next?, lines?, notes:{<mục>:[…]}}]}`. Chưa có bước nào gọi route này; Mỹ thuật lượt 1, Storyboard, Mỹ thuật lượt 2, Giọng, Hình minh hoạ, Code và Validate nối vào khi CR con của chúng vào main. Storyboard, Hình minh hoạ và Code hiện có chưa đọc phiên bản chốt (`flow.go` không đổi).
 

@@ -55,6 +55,10 @@ func (f *fakeLock) Lock(_ context.Context, _, note string) (application.VersionV
 	f.called, f.note = "lock", note
 	return application.VersionView{Version: 1}, f.err
 }
+func (f *fakeLock) LatestVersion(context.Context, string) (domain.ScriptVersion, error) {
+	f.called = "latest"
+	return domain.ScriptVersion{Version: 3, Parts: []domain.VersionPart{{Key: domain.PartBrief, SHA: "abc", Content: []byte(`{}`)}}}, f.err
+}
 func (f *fakeLock) HandoffForRole(_ context.Context, _, role string) (domain.HandoffPackage, error) {
 	f.role = role
 	return domain.HandoffPackage{Version: 2}, f.err
@@ -133,6 +137,20 @@ func TestHandoffRouteReadsTheRoleFromTheQuery(t *testing.T) {
 	}
 	f.err = domain.ErrNoLockedVersion
 	if rec := lockDo(rt, http.MethodGet, "/internal/v1/authoring/p1/handoff?role=code", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("no locked version: status %d, want 404", rec.Code)
+	}
+}
+
+func TestLatestScriptVersionRouteReturnsThePartsWithTheirHashes(t *testing.T) {
+	f := &fakeLock{}
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithScriptLock(f)
+	rec := lockDo(rt, http.MethodGet, "/internal/v1/authoring/p1/script-versions/latest", "")
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || f.called != "latest" || !strings.Contains(body, `"version":3`) || !strings.Contains(body, `"sha":"abc"`) {
+		t.Errorf("status %d called %q body %s", rec.Code, f.called, body)
+	}
+	f.err = domain.ErrNoLockedVersion
+	if rec := lockDo(rt, http.MethodGet, "/internal/v1/authoring/p1/script-versions/latest", ""); rec.Code != http.StatusNotFound {
 		t.Errorf("no locked version: status %d, want 404", rec.Code)
 	}
 }

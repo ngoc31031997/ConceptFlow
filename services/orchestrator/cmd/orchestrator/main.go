@@ -19,6 +19,7 @@ import (
 	"orchestrator/internal/adapters/authoring"
 	httpadapter "orchestrator/internal/adapters/http"
 	"orchestrator/internal/adapters/postgres"
+	"orchestrator/internal/adapters/visual"
 	"orchestrator/internal/application"
 	"orchestrator/internal/config"
 	"orchestrator/internal/domain"
@@ -94,6 +95,7 @@ func main() {
 		WithQCReports(qcReportRepo).
 		WithErrorLog(projectRepo).
 		WithAuthoringCleanup(authoringClient).
+		WithVisualCleanup(visual.NewClient(cfg.VisualServiceURL, cfg.VisualServiceTimeout)).
 		WithKitKeys(authoringClient)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 	// Cancel goes straight to the broker (a fanout to every worker), not through

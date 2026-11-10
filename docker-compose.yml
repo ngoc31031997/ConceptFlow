@@ -324,6 +324,10 @@ services:
       # search, list summaries, a fork's copy and cleanup after a delete.
       AUTHORING_SERVICE_URL: http://authoring-service:8000
       AUTHORING_SERVICE_TIMEOUT_SECONDS: ${AUTHORING_SERVICE_TIMEOUT_SECONDS:-10}
+      # visual-service keeps the visual pre-production steps; the orchestrator
+      # only removes a deleted project's data there at the end of the delete saga.
+      VISUAL_SERVICE_URL: http://visual-service:8000
+      VISUAL_SERVICE_TIMEOUT_SECONDS: ${VISUAL_SERVICE_TIMEOUT_SECONDS:-10}
       # Cổng chặn publish của QC, TẮT ở giai đoạn đầu.
       #
       # Tắt không có nghĩa là QC không chạy: báo cáo vẫn được chấm đầy đủ và
@@ -407,6 +411,54 @@ services:
     # degrades on its own when the other is down.
     depends_on:
       authoring-service-db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  # The visual pre-production steps (8-14): the visual concept, the reference
+  # library and what later visual steps read (ADR-0048). Own database; the
+  # locked script is read from authoring-service over HTTP.
+  visual-db:
+    image: postgres:16-alpine
+    container_name: visual-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: visual
+    # Opened on the host's loopback only, so a database client (DBeaver) can connect.
+    ports:
+      - "127.0.0.1:5436:5432"
+    volumes:
+      - visual_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d visual"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  visual-service:
+    build: ./services/visual-service
+    container_name: visual-service
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@visual-db:5432/visual
+      DATABASE_MAX_CONNS: "10"
+    deploy:
+      resources:
+        limits:
+          memory: ${VISUAL_SERVICE_MEMORY_LIMIT:-256M}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      visual-db:
         condition: service_healthy
     networks:
       - backend
@@ -604,6 +656,7 @@ volumes:
   orchestrator_db_data:
   llm_db_data:
   authoring_db_data:
+  visual_db_data:
   loki_data:
   grafana_data:
 

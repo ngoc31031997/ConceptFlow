@@ -43,3 +43,23 @@ func TestLoad_RejectsAnUnparseableNumber(t *testing.T) {
 		t.Fatal("a misspelled number must be an error, not a silent zero")
 	}
 }
+
+func TestLoad_VisualServiceDefaultsAndOverrides(t *testing.T) {
+	setRequired(t)
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.VisualServiceURL != "http://visual-service:8000" || cfg.VisualServiceTimeout != 10*time.Second {
+		t.Fatalf("unexpected defaults %q %v", cfg.VisualServiceURL, cfg.VisualServiceTimeout)
+	}
+	t.Setenv("VISUAL_SERVICE_URL", "http://localhost:9200")
+	t.Setenv("VISUAL_SERVICE_TIMEOUT_SECONDS", "4")
+	cfg, err = config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.VisualServiceURL != "http://localhost:9200" || cfg.VisualServiceTimeout != 4*time.Second {
+		t.Fatalf("overrides ignored: %q %v", cfg.VisualServiceURL, cfg.VisualServiceTimeout)
+	}
+}

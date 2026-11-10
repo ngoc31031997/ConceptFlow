@@ -31,9 +31,11 @@ type scriptLockUseCase interface {
 	ConfirmHandoff(ctx context.Context, projectID, beatKey string) error
 	Lock(ctx context.Context, projectID, note string) (application.VersionView, error)
 	HandoffForRole(ctx context.Context, projectID, role string) (domain.HandoffPackage, error)
+	LatestVersion(ctx context.Context, projectID string) (domain.ScriptVersion, error)
 }
 
-// WithScriptLock enables the /script-lock routes and the internal handoff route.
+// WithScriptLock enables the /script-lock routes and the internal routes that
+// hand the locked versions to the steps after the script.
 func (rt *Router) WithScriptLock(uc scriptLockUseCase) *Router {
 	rt.scriptLock = uc
 	return rt
@@ -58,6 +60,7 @@ func (rt *Router) scriptLockRoutes(r chi.Router) {
 	r.Post(base+"/handoff/{key}/confirm", rt.handleScriptLockConfirm)
 	r.Post(base+"/lock", rt.handleScriptLockLock)
 	r.Get("/internal/v1/authoring/{project_id}/handoff", rt.handleHandoffForRole)
+	r.Get("/internal/v1/authoring/{project_id}/script-versions/latest", rt.handleLatestScriptVersion)
 }
 
 func (rt *Router) scriptLockEnabled(w http.ResponseWriter) bool {
@@ -233,4 +236,19 @@ func (rt *Router) handleHandoffForRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, pkg)
+}
+
+// handleLatestScriptVersion returns the newest locked version with every frozen
+// part and its hash, for services that build on the locked script; 404 while
+// no version is locked.
+func (rt *Router) handleLatestScriptVersion(w http.ResponseWriter, r *http.Request) {
+	if !rt.scriptLockEnabled(w) {
+		return
+	}
+	v, err := rt.scriptLock.LatestVersion(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeUnitError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
 }

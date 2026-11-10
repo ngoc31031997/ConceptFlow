@@ -843,6 +843,11 @@ func (uc *ScriptLockDeskUseCase) Lock(ctx context.Context, projectID, note strin
 	return VersionView{Version: v.Version, LockedAt: v.LockedAt, Note: v.Note}, nil
 }
 
+// LatestVersion returns the newest locked version, or domain.ErrNoLockedVersion.
+func (uc *ScriptLockDeskUseCase) LatestVersion(ctx context.Context, projectID string) (domain.ScriptVersion, error) {
+	return uc.versions.LatestScriptVersion(ctx, projectID)
+}
+
 // HandoffForRole returns what a role reads from the latest locked version.
 func (uc *ScriptLockDeskUseCase) HandoffForRole(ctx context.Context, projectID, role string) (domain.HandoffPackage, error) {
 	v, err := uc.versions.LatestScriptVersion(ctx, projectID)
