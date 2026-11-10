@@ -18,6 +18,15 @@ import (
 // is in prompt_repository.go.
 type PromptTemplateRepository struct {
 	pool *pgxpool.Pool
+	// defaults gives the default model of a step a project made no choice for;
+	// llm-service owns that setting.
+	defaults application.StepDefaultModelsPort
+}
+
+// WithStepDefaults sets where the default model of a step is read from.
+func (r *PromptTemplateRepository) WithStepDefaults(src application.StepDefaultModelsPort) *PromptTemplateRepository {
+	r.defaults = src
+	return r
 }
 
 // NewPromptTemplateRepository constructs the repository over an already-open pool.
@@ -271,7 +280,10 @@ func (r *PromptTemplateRepository) GetAuthoringModels(ctx context.Context, proje
 	if err != nil {
 		return domain.AuthoringStepModels{}, err
 	}
-	defaults, err := r.GetStepDefaultModels(ctx)
+	if r.defaults == nil {
+		return domain.AuthoringStepModels{}, errors.New("the step default models are not configured")
+	}
+	defaults, err := r.defaults.GetStepDefaultModels(ctx)
 	if err != nil {
 		return domain.AuthoringStepModels{}, err
 	}

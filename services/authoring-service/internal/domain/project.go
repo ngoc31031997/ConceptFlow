@@ -509,69 +509,6 @@ type AuthoringModelOption struct {
 	Local bool `json:"local"`
 }
 
-// AuthoringModelCatalog is the fixed list the picker offers. "" is not listed
-// (the GUI shows the concrete model instead, via /v1/llm/status default_model)
-// but stays valid on the write path: it means "use the server's configured
-// default" (HIVE_MODEL), which is what an empty/legacy project_authoring row
-// still means today.
-var AuthoringModelCatalog = []AuthoringModelOption{
-	// Local model served by the `ollama` container. llm-service routes any id
-	// "ollama" or "ollama/<model>" to Ollama instead of Hive; bare "ollama"
-	// means whatever OLLAMA_MODEL is set to. It is listed first because the
-	// first model is the default of every step with none saved.
-	{ID: "ollama", Label: "Ollama (local AI)", Local: true},
-	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash"},
-	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash"},
-}
-
-// ValidAuthoringModel reports whether id is "" (server default) or one of
-// AuthoringModelCatalog's entries. Like ValidAuthoringMode, the write path
-// rejects anything else rather than silently falling back — a client and
-// server that disagree about which models exist need to be told, not papered
-// over with a default that quietly ignores the Creator's choice.
-func ValidAuthoringModel(id string) bool {
-	if id == "" {
-		return true
-	}
-	for _, opt := range AuthoringModelCatalog {
-		if opt.ID == id {
-			return true
-		}
-	}
-	return false
-}
-
-// ConfigurableModelSteps are the steps that call an AI and can carry a default
-// model: the seven of AuthoringStepModels and the drawings of the illustration
-// library, which belong to no project.
-var ConfigurableModelSteps = []string{
-	"brief", "research", "story_frame", "beat_sheet", "story", "storyboard", "code", "publish", "illustrations",
-}
-
-// WithStepModelFallback returns the default model of every configurable step:
-// the one saved for it, else the first model of AuthoringModelCatalog.
-func WithStepModelFallback(saved map[string]string) map[string]string {
-	out := make(map[string]string, len(ConfigurableModelSteps))
-	for _, step := range ConfigurableModelSteps {
-		if model := saved[step]; model != "" {
-			out[step] = model
-		} else {
-			out[step] = AuthoringModelCatalog[0].ID
-		}
-	}
-	return out
-}
-
-// ValidModelStep reports whether step is one of ConfigurableModelSteps.
-func ValidModelStep(step string) bool {
-	for _, s := range ConfigurableModelSteps {
-		if s == step {
-			return true
-		}
-	}
-	return false
-}
-
 // AuthoringStepModels is the per-step model choice for one project — one Hive
 // model id (or "" for the server default) per tab of "Bước 1 — Script". Only
 // meaningful when AuthoringMode is "ai"; a manual project simply carries

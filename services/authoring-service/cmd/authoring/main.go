@@ -45,29 +45,21 @@ func main() {
 	}
 	defer pool.Close()
 
-	// The prompt library. Legacy override rows/tables are purged first so
-	// none of them can hold an active slot when the system rows are seeded.
-	// (Per the re-seed memory: seeding upserts, so a changed seed needs a rebuild
-	// and restart of this service, and prompt_overrides must not shadow it.)
-	authoringRepo := postgres.NewPromptTemplateRepository(pool)
-	if n, err := authoringRepo.PurgeLegacyPrompts(ctx); err != nil {
-		logger.Warn("could not purge legacy prompts", "error", err)
-	} else if n > 0 {
-		logger.Warn("purged legacy prompts", "count", n)
-	}
-	if err := authoringRepo.SeedPrompts(ctx); err != nil {
-		logger.Warn("could not seed system prompts", "error", err)
-	}
+	// The one path to a language model, and the owner of the prompt library, the
+	// model catalog and the default model of each step.
+	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
+	authoringRepo := postgres.NewPromptTemplateRepository(pool).WithStepDefaults(llmClient)
+	// The system prompts ship in this binary and are pushed to llm-service, which
+	// keeps them next to the Creator's own. Until the push lands, a step that needs
+	// a prompt answers with the error llm-service gave.
+	go pushSystemPrompts(ctx, logger, llmClient)
 
 	projects := orchestrator.NewClient(cfg.OrchestratorURL, cfg.OrchestratorTimeout)
 
-	// The one path to a language model.
-	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
 	var llmProvider application.LLMProviderPort = application.NewExternalAIProvider(llmClient, llmClient)
 	logger.Info("llm-service configured", "url", cfg.LLMServiceURL, "model", cfg.HiveModel)
 
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient).WithModels(authoringRepo)
-	defaultModel := application.NewDefaultModelUseCase(authoringRepo)
 
 	if err := authoringRepo.SeedVideoArchetypes(ctx); err != nil {
 		logger.Warn("could not seed system video archetypes", "error", err)
@@ -95,13 +87,12 @@ func main() {
 		// The rules and the kit a drawing is made under are its language's.
 		WithLanguages(visualLanguages).
 		// A drawing that names no model runs on the model saved for the drawings.
-		WithStepDefaults(authoringRepo)
+		WithStepDefaults(llmClient)
 	// Each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
 		authoringRepo, illustrations, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens).
 		WithDrawConcurrency(cfg.IllustrationDrawConcurrency)
 
-	prompts := application.NewPromptsUseCase(authoringRepo)
 	// Every authoring save shares the same lock check (the project
 	// must still be a draft, read from the orchestrator), and clears the steps
 	// built on the one it overwrote.
@@ -110,23 +101,23 @@ func main() {
 	saveAuthoringCode := application.NewSaveAuthoringCodeUseCase(authoringRepo, projects, authoringRepo)
 	getAuthoringState := application.NewGetAuthoringStateUseCase(authoringRepo)
 	saveAuthoringMode := application.NewSaveAuthoringModeUseCase(authoringRepo)
-	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(authoringRepo)
+	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(authoringRepo, llmClient)
 
 	// The first step's idea: written from the text the Creator typed, which the
 	// orchestrator keeps with the project.
 	projectIdea := application.NewProjectIdeaUseCase(
-		authoringRepo, projects, authoringRepo, projects, authoringRepo,
+		authoringRepo, projects, authoringRepo, projects, llmClient,
 		llmProvider, cfg.HiveMaxOutputTokens)
 	// The second step's brief: written from the approved idea.
 	projectBrief := application.NewProjectBriefUseCase(
-		authoringRepo, projectIdea, projects, projects, authoringRepo, projects, authoringRepo,
+		authoringRepo, projectIdea, projects, projects, authoringRepo, projects, llmClient,
 		llmProvider, cfg.HiveMaxOutputTokens)
 	// The research step: its questions and gate are review units, its facts rows
 	// of project_research, planned from the approved idea and brief.
 	// The pages facts cite are checked in the background, by a fetcher that
 	// reaches only public hosts.
 	research := application.NewResearchDeskUseCase(
-		authoringRepo, projectIdea, projectBrief, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens)
+		authoringRepo, projectIdea, projectBrief, projects, projects, llmClient, llmProvider, cfg.HiveMaxOutputTokens)
 	sourceVerifier := application.NewSourceVerifier(authoringRepo, sourcefetch.New())
 	sourceVerifier.Start(ctx)
 	research.WithVerifier(sourceVerifier)
@@ -140,23 +131,23 @@ func main() {
 	// facts and stored in project_story; the research step asks it which work
 	// rests on a fact.
 	story := application.NewStoryDeskUseCase(
-		authoringRepo, projectBrief, research, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens)
+		authoringRepo, projectBrief, research, projects, projects, llmClient, llmProvider, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(story.FactDependents())
 	// The beat sheet step: the gate is a row of project_beat_sheet and each beat a row of project_beat.
 	beats := application.NewBeatDeskUseCase(
-		authoringRepo, authoringRepo, story, projectBrief, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens)
+		authoringRepo, authoringRepo, story, projectBrief, projects, projects, llmClient, llmProvider, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(beats.FactDependents())
 	// The script step: each beat's dialogue is a review unit stored in project_script; the voice lines
 	// hold the reading of each line, which the orchestrator gets read.
 	script := application.NewScriptDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens, beats).
+		authoringRepo, projects, projects, llmClient, llmProvider, cfg.HiveMaxOutputTokens, beats).
 		WithVoices(authoringRepo, projects)
 	voiceLines := application.NewVoiceLinesUseCase(authoringRepo)
 	research.RegisterFactDependents(script.FactDependents())
 	// The lock step: the handoff note of each beat is a review unit; the review
 	// and the glossary are units of their own; locking writes a version.
 	scriptLock := application.NewScriptLockDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens, beats, script, authoringRepo, projectBrief)
+		authoringRepo, projects, projects, llmClient, llmProvider, cfg.HiveMaxOutputTokens, beats, script, authoringRepo, projectBrief)
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
 		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
 		Register(domain.UnitKindHandoffBeat, scriptLock.HandoffUnitKind()).
@@ -166,13 +157,12 @@ func main() {
 
 	renderContext := orchestrator.PromptRenderContext{Projects: projects, Authoring: authoringRepo}
 	// The renderer behind the Copy button.
-	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).
+	renderPrompt := application.NewRenderPromptUseCase(llmClient, renderContext, projects, projects).
 		WithArchetypes(authoringRepo).
 		WithBrief(projectBrief).
 		WithLanguages(visualLanguages)
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithOperations(application.NewOperations()).
-		WithPrompts(prompts).
 		WithArchetypes(archetypes).
 		WithVisualLanguages(visualLanguages).
 		WithIllustrations(illustrations).
@@ -184,7 +174,7 @@ func main() {
 		WithAuthoringState(getAuthoringState).
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
-		WithDefaultModelSetting(defaultModel).
+		WithModelInfo(llmClient, llmClient).
 		WithLLMStatus(llmClient).
 		WithReviewUnits(reviewUnits).
 		WithIdea(projectIdea).
@@ -252,6 +242,32 @@ func keepLanguageSamples(ctx context.Context, logger *slog.Logger, languages *ap
 				continue
 			}
 			logger.Info("pruned the shared stills", "removed", len(removed))
+		}
+	}
+}
+
+// systemPromptOwner names this service as the owner of the system prompts it
+// pushes, so a push never removes another service's.
+const systemPromptOwner = "authoring"
+
+// pushSystemPrompts sends the shipped prompts to llm-service, retrying with a
+// growing pause until it accepts them or the process stops.
+func pushSystemPrompts(ctx context.Context, logger *slog.Logger, client *llm.Client) {
+	pause := 2 * time.Second
+	for {
+		err := client.PushSystemPrompts(ctx, systemPromptOwner, domain.SystemPrompts())
+		if err == nil {
+			logger.Info("system prompts pushed to llm-service", "count", len(domain.SystemPrompts()))
+			return
+		}
+		logger.Error("could not push the system prompts to llm-service; retrying", "error", err.Error(), "in", pause.String())
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(pause):
+		}
+		if pause < time.Minute {
+			pause *= 2
 		}
 	}
 }

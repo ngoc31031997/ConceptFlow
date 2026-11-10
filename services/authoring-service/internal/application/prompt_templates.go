@@ -322,10 +322,11 @@ type AuthoringModelsReaderPort interface {
 // together here rather than being locked in per-tab.
 type SaveAuthoringModelsUseCase struct {
 	authoring AuthoringModelsPort
+	catalog   ModelCatalogPort
 }
 
-func NewSaveAuthoringModelsUseCase(authoring AuthoringModelsPort) *SaveAuthoringModelsUseCase {
-	return &SaveAuthoringModelsUseCase{authoring: authoring}
+func NewSaveAuthoringModelsUseCase(authoring AuthoringModelsPort, catalog ModelCatalogPort) *SaveAuthoringModelsUseCase {
+	return &SaveAuthoringModelsUseCase{authoring: authoring, catalog: catalog}
 }
 
 // Execute validates every non-empty model id against the catalog and saves
@@ -337,12 +338,25 @@ func (uc *SaveAuthoringModelsUseCase) Execute(ctx context.Context, projectID str
 	if projectID == "" {
 		return fmt.Errorf("project_id is required")
 	}
+	known, err := uc.catalog.ModelCatalog(ctx)
+	if err != nil {
+		return err
+	}
 	for _, id := range []string{models.Brief, models.Publish, models.Research, models.StoryFrame, models.BeatSheet, models.Story, models.Storyboard, models.Code} {
-		if !domain.ValidAuthoringModel(id) {
+		if id != "" && !hasModel(known, id) {
 			return fmt.Errorf("unknown model %q", id)
 		}
 	}
 	return uc.authoring.SaveAuthoringModels(ctx, projectID, models)
+}
+
+func hasModel(catalog []domain.AuthoringModelOption, id string) bool {
+	for _, m := range catalog {
+		if m.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // SimilarProject is one match the topic-collision check surfaces back to the Creator when a

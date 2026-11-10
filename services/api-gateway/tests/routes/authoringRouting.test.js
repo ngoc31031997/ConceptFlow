@@ -15,7 +15,7 @@ function buildApp(clients) {
     next();
   });
   app.use(projectsRouter(clients.orchestrator, '/shared', clients.orchestratorAi, clients.authoring, clients.authoringAi));
-  app.use(promptsRouter(clients.authoring));
+  app.use(promptsRouter(clients.authoring, clients.llm));
   return app;
 }
 
@@ -24,7 +24,7 @@ function buildApp(clients) {
 describe('routing between orchestrator and authoring-service', () => {
   let clients;
   beforeEach(() => {
-    clients = { orchestrator: ok(), orchestratorAi: ok(), authoring: ok(), authoringAi: ok() };
+    clients = { orchestrator: ok(), orchestratorAi: ok(), authoring: ok(), authoringAi: ok(), llm: ok() };
   });
 
   test.each([
@@ -103,12 +103,18 @@ describe('routing between orchestrator and authoring-service', () => {
     ['get', '/v1/projects/p1/beats/b2/impact', 'authoring'],
     ['get', '/v1/projects/p1/units/fact/F01/impact', 'authoring'],
     ['post', '/v1/projects/p1/units/research/main/approve', 'authoring'],
-    ['get', '/v1/prompts/story_architect', 'authoring'],
+    ['get', '/v1/prompts/story_architect', 'llm'],
     ['post', '/v1/prompt-renders', 'authoring'],
-    ['get', '/v1/admin/prompts', 'authoring'],
+    ['get', '/v1/admin/prompts', 'llm'],
+    ['post', '/v1/admin/prompts', 'llm'],
+    ['post', '/v1/admin/prompts/x1/copy', 'llm'],
+    ['put', '/v1/admin/prompts/x1', 'llm'],
+    ['post', '/v1/admin/prompts/x1/activate', 'llm'],
+    ['delete', '/v1/admin/prompts/x1', 'llm'],
+    ['get', '/v1/projects/p1/prompts/beat_sheet', 'authoring'],
     ['get', '/v1/llm/status', 'authoring'],
-    ['get', '/v1/settings/ai-model', 'authoring'],
-    ['put', '/v1/settings/ai-model/steps/brief', 'authoring'],
+    ['get', '/v1/settings/ai-model', 'llm'],
+    ['put', '/v1/settings/ai-model/steps/brief', 'llm'],
     ['get', '/v1/operations/op-1', 'authoring'],
     ['get', '/v1/operations/delete:p1', 'orchestrator'],
     ['post', '/v1/operations/op-1/cancel', 'authoring'],

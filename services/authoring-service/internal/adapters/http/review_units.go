@@ -48,69 +48,18 @@ type projectBriefUseCase interface {
 	Review(ctx context.Context, projectID string) (domain.BriefReview, error)
 }
 
-// defaultModelUseCase is the app setting for the default AI model of each step.
-type defaultModelUseCase interface {
-	StepModels(ctx context.Context) (map[string]string, error)
-	SetStep(ctx context.Context, step, model string) error
-}
-
 // effectiveStepDefaults is the default model of every configurable step. An
 // unreadable setting is logged and read as none, so the GUI still opens.
 func (rt *Router) effectiveStepDefaults(ctx context.Context) map[string]string {
-	if rt.defaultModelSetting == nil {
+	if rt.stepDefaults == nil {
 		return map[string]string{}
 	}
-	steps, err := rt.defaultModelSetting.StepModels(ctx)
+	steps, err := rt.stepDefaults.GetStepDefaultModels(ctx)
 	if err != nil {
 		slog.Warn("could not read the step default models", "error", err.Error())
 		return map[string]string{}
 	}
 	return steps
-}
-
-// aiModelSettingResponse is GET /v1/settings/ai-model: the default model of
-// every step, and the steps that can carry one.
-type aiModelSettingResponse struct {
-	StepModels map[string]string `json:"step_models"`
-	Steps      []string          `json:"steps"`
-}
-
-func (rt *Router) handleGetAIModelSetting(w http.ResponseWriter, r *http.Request) {
-	if rt.defaultModelSetting == nil {
-		writeError(w, http.StatusNotFound, "default model setting is not enabled")
-		return
-	}
-	steps, err := rt.defaultModelSetting.StepModels(r.Context())
-	if err != nil {
-		slog.Error("read step default models failed", "error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	writeJSON(w, http.StatusOK, aiModelSettingResponse{StepModels: steps, Steps: domain.ConfigurableModelSteps})
-}
-
-func (rt *Router) handlePutAIModelStep(w http.ResponseWriter, r *http.Request) {
-	if rt.defaultModelSetting == nil {
-		writeError(w, http.StatusNotFound, "default model setting is not enabled")
-		return
-	}
-	var body struct {
-		Model string `json:"model"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := rt.defaultModelSetting.SetStep(r.Context(), chi.URLParam(r, "step"), body.Model); err != nil {
-		if errors.Is(err, domain.ErrInvalidWizardInput) {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		slog.Error("save step default model failed", "error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // WithReviewUnits enables the /units routes.
@@ -126,8 +75,6 @@ func (rt *Router) WithIdea(uc ideaUseCase) *Router {
 }
 
 func (rt *Router) reviewUnitRoutes(r chi.Router) {
-	r.Get("/v1/settings/ai-model", rt.handleGetAIModelSetting)
-	r.Put("/v1/settings/ai-model/steps/{step}", rt.handlePutAIModelStep)
 	rt.projectBriefRoutes(r)
 	r.Get("/v1/projects/{project_id}/idea", rt.handleGetIdea)
 	r.Post("/v1/projects/{project_id}/idea/generate", rt.handleGenerateIdea)

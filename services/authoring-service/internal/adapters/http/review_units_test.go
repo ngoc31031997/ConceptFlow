@@ -103,51 +103,52 @@ func TestImpactReturnsItsItems(t *testing.T) {
 	}
 }
 
-// fakeDefaultModel keeps the default model of each step in memory.
-type fakeDefaultModel struct {
+// fakeModelInfo is llm-service's catalog and step defaults with fixed answers.
+type fakeModelInfo struct {
 	steps map[string]string
 	err   error
 }
 
-func (f *fakeDefaultModel) StepModels(context.Context) (map[string]string, error) {
-	return domain.WithStepModelFallback(f.steps), nil
-}
-
-func (f *fakeDefaultModel) SetStep(_ context.Context, step, model string) error {
+func (f *fakeModelInfo) ModelCatalog(context.Context) ([]domain.AuthoringModelOption, error) {
 	if f.err != nil {
-		return f.err
+		return nil, f.err
 	}
-	if f.steps == nil {
-		f.steps = map[string]string{}
-	}
-	f.steps[step] = model
-	return nil
+	return []domain.AuthoringModelOption{{ID: "ollama", Label: "Ollama", Local: true}, {ID: "m2", Label: "M2"}}, nil
 }
 
-func TestStepDefaultModelSettingRoundTripsAndFeedsTheLLMStatus(t *testing.T) {
-	setting := &fakeDefaultModel{}
-	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(&fakeUnits{}).WithDefaultModelSetting(setting)
-	do := func(method, path, body string) *httptest.ResponseRecorder {
-		rec := httptest.NewRecorder()
-		rt.Handler().ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
-		return rec
+func (f *fakeModelInfo) GetStepDefaultModels(context.Context) (map[string]string, error) {
+	if f.err != nil {
+		return nil, f.err
 	}
-	var got aiModelSettingResponse
-	if err := json.Unmarshal(do("GET", "/v1/settings/ai-model", "").Body.Bytes(), &got); err != nil {
+	return f.steps, nil
+}
+
+func TestLLMStatusReportsTheCatalogAndStepDefaultsFromLLMService(t *testing.T) {
+	info := &fakeModelInfo{steps: map[string]string{"brief": "m2", "code": "ollama"}}
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithLLMStatus(&fakeLLMStatus{ready: true}).WithModelInfo(info, info)
+	rec := httptest.NewRecorder()
+	rt.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/llm/status", nil))
+	var got llmStatusResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.StepModels["brief"] != "ollama" || len(got.StepModels) != len(domain.ConfigurableModelSteps) || len(got.Steps) != len(domain.ConfigurableModelSteps) {
-		t.Fatalf("with nothing saved every step is on the first catalog model, got %+v", got)
+	if !got.Enabled || len(got.Models) != 2 || got.Models[0].ID != "ollama" || got.StepDefaults["brief"] != "m2" {
+		t.Fatalf("status = %+v", got)
 	}
-	if rec := do("PUT", "/v1/settings/ai-model/steps/brief", `{"model":"zai-org/glm-5.3-flash"}`); rec.Code != http.StatusNoContent {
-		t.Fatalf("put: status %d %s", rec.Code, rec.Body.String())
+}
+
+// An llm-service that cannot give the catalog is said so, not papered over with a list of our own.
+func TestLLMStatusSaysWhenTheCatalogCannotBeRead(t *testing.T) {
+	info := &fakeModelInfo{err: fmt.Errorf("llm-service down")}
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithLLMStatus(&fakeLLMStatus{ready: true}).WithModelInfo(info, info)
+	rec := httptest.NewRecorder()
+	rt.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/llm/status", nil))
+	var got llmStatusResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
 	}
-	if steps := rt.effectiveStepDefaults(context.Background()); steps["brief"] != "zai-org/glm-5.3-flash" || steps["code"] != "ollama" {
-		t.Errorf("the status must report the saved default and leave other steps alone, got %v", steps)
-	}
-	setting.err = fmt.Errorf("%w: step", domain.ErrInvalidWizardInput)
-	if rec := do("PUT", "/v1/settings/ai-model/steps/render", `{"model":"ollama"}`); rec.Code != http.StatusBadRequest {
-		t.Errorf("a refused step must be a 400, got %d", rec.Code)
+	if got.Enabled || !strings.Contains(got.Reason, "llm-service down") || len(got.Models) != 0 {
+		t.Fatalf("status = %+v", got)
 	}
 }
 

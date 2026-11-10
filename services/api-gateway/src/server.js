@@ -73,7 +73,7 @@ function main() {
   app.use(sagasRouter(orchestratorClient));
   app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient, authoringClient, authoringAiClient));
   app.use(channelAssetsRouter(orchestratorClient, config.sharedDir));
-  app.use(promptsRouter(authoringClient));
+  app.use(promptsRouter(authoringClient, llmClient));
   app.use(llmCallsRouter(llmClient));
   app.use(illustrationsRouter(authoringClient, authoringAiClient));
   app.use(visualLanguagesRouter(authoringClient, authoringAiClient, config.sharedDir));

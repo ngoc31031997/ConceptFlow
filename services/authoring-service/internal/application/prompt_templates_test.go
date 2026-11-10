@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"authoring/internal/application"
@@ -326,12 +327,53 @@ func TestSaveAuthoringModeRejectsUnknownMode(t *testing.T) {
 // Every step, the code step included, may be set to the local Ollama model.
 func TestSaveAuthoringModelsAcceptsOllamaForAnyStep(t *testing.T) {
 	store := newFakeAuthoringStore()
-	uc := application.NewSaveAuthoringModelsUseCase(store)
+	uc := application.NewSaveAuthoringModelsUseCase(store, fakeCatalog{models: []string{"ollama", "m2"}})
 	if err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Story: "ollama", Code: "ollama"}); err != nil {
 		t.Fatalf("ollama refused: %v", err)
 	}
 	if store.models["p1"].Code != "ollama" {
 		t.Fatalf("saved code model = %q, want ollama", store.models["p1"].Code)
+	}
+}
+
+// fakeCatalog is llm-service's model catalog with fixed ids.
+type fakeCatalog struct {
+	models []string
+	err    error
+}
+
+func (f fakeCatalog) ModelCatalog(context.Context) ([]domain.AuthoringModelOption, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	var out []domain.AuthoringModelOption
+	for _, id := range f.models {
+		out = append(out, domain.AuthoringModelOption{ID: id, Label: id})
+	}
+	return out, nil
+}
+
+// A model outside llm-service's catalog is refused, and nothing is saved.
+func TestSaveAuthoringModelsRefusesAnUnknownModel(t *testing.T) {
+	store := newFakeAuthoringStore()
+	uc := application.NewSaveAuthoringModelsUseCase(store, fakeCatalog{models: []string{"ollama"}})
+	if err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Story: "gpt-x"}); err == nil {
+		t.Fatal("want an error for a model that is not in the catalog")
+	}
+	if _, saved := store.models["p1"]; saved {
+		t.Fatal("a refused choice must not be saved")
+	}
+}
+
+// With llm-service unreachable the choice cannot be checked, so it is refused rather than trusted.
+func TestSaveAuthoringModelsFailsWhenTheCatalogCannotBeRead(t *testing.T) {
+	store := newFakeAuthoringStore()
+	uc := application.NewSaveAuthoringModelsUseCase(store, fakeCatalog{err: errors.New("llm-service down")})
+	if err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Story: "ollama"}); err == nil {
+		t.Fatal("want the catalog error")
+	}
+	if _, saved := store.models["p1"]; saved {
+		t.Fatal("nothing may be saved when the catalog is unreadable")
 	}
 }
 
