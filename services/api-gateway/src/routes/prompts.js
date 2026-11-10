@@ -4,11 +4,11 @@ const express = require('express');
 const { proxyHandler } = require('../handlers/proxyHandler');
 
 /**
- * prompt-template CRUD, proxied straight through to Orchestrator
- * (same passthrough posture as sagasRouter/projectsRouter, no
- * transformation at the Gateway boundary):
+ * The prompt library and the default models belong to llm-service; the filled-in
+ * prompts and the video-archetype table to authoring-service. All are proxied
+ * straight through (no transformation at the Gateway boundary):
  *
- * `GET /v1/prompts/:role` — the raw template for one pipeline role.
+ * `GET /v1/prompts/:role` — the raw template for one pipeline role (llm-service).
  * `GET /v1/projects/:projectId/prompts/:role` — the same
  * template with every {{variable}} already substituted from that project.
  * This is what web-gui's Copy button uses: the browser does not do the
@@ -27,28 +27,30 @@ const { proxyHandler } = require('../handlers/proxyHandler');
  * `DELETE /v1/admin/prompts/:id` — delete (system rows answer 403).
  * `GET /v1/prompts/:role` serves the role's active prompt.
  *
- * These are served by authoring-service.
+ * `GET /v1/settings/ai-model`, `PUT /v1/settings/ai-model/steps/:step` — the
+ * default model of each step (llm-service).
  *
  * @param {import('../clients/httpClient').HttpClient} authoringClient
+ * @param {import('../clients/httpClient').HttpClient} llmClient
  */
-function promptsRouter(authoringClient) {
+function promptsRouter(authoringClient, llmClient) {
   const router = express.Router();
-  router.get('/v1/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
+  router.get('/v1/prompts/:role', proxyHandler(llmClient, 'llm-service'));
   router.get('/v1/projects/:projectId/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
   router.post('/v1/prompt-renders', proxyHandler(authoringClient, 'authoring-service'));
   // Nút "Chạy bằng AI" có gọi được gì không: web-gui hỏi
   // trước khi vẽ nút, để chỗ nào thiếu key thì giải thích chứ không hiện một
   // nút bấm vào là lỗi.
   router.get('/v1/llm/status', proxyHandler(authoringClient, 'authoring-service'));
-  // Model AI mặc định của từng bước (Cài đặt): đọc cả bảng, đổi từng bước.
-  router.get('/v1/settings/ai-model', proxyHandler(authoringClient, 'authoring-service'));
-  router.put('/v1/settings/ai-model/steps/:step', proxyHandler(authoringClient, 'authoring-service'));
-  router.get('/v1/admin/prompts', proxyHandler(authoringClient, 'authoring-service'));
-  router.post('/v1/admin/prompts', proxyHandler(authoringClient, 'authoring-service'));
-  router.post('/v1/admin/prompts/:id/copy', proxyHandler(authoringClient, 'authoring-service'));
-  router.put('/v1/admin/prompts/:id', proxyHandler(authoringClient, 'authoring-service'));
-  router.post('/v1/admin/prompts/:id/activate', proxyHandler(authoringClient, 'authoring-service'));
-  router.delete('/v1/admin/prompts/:id', proxyHandler(authoringClient, 'authoring-service'));
+  // Model AI mặc định của từng bước (Cài đặt): đọc cả bảng, đổi từng bước. llm-service giữ.
+  router.get('/v1/settings/ai-model', proxyHandler(llmClient, 'llm-service'));
+  router.put('/v1/settings/ai-model/steps/:step', proxyHandler(llmClient, 'llm-service'));
+  router.get('/v1/admin/prompts', proxyHandler(llmClient, 'llm-service'));
+  router.post('/v1/admin/prompts', proxyHandler(llmClient, 'llm-service'));
+  router.post('/v1/admin/prompts/:id/copy', proxyHandler(llmClient, 'llm-service'));
+  router.put('/v1/admin/prompts/:id', proxyHandler(llmClient, 'llm-service'));
+  router.post('/v1/admin/prompts/:id/activate', proxyHandler(llmClient, 'llm-service'));
+  router.delete('/v1/admin/prompts/:id', proxyHandler(llmClient, 'llm-service'));
   // The table of video kinds the Story Architect chooses from.
   router.get('/v1/video-archetypes', proxyHandler(authoringClient, 'authoring-service'));
   router.post('/v1/admin/video-archetypes', proxyHandler(authoringClient, 'authoring-service'));

@@ -35,14 +35,14 @@ type InternalAuthoring interface {
 // Router holds authoring-service's REST handlers' use case dependencies.
 type Router struct {
 	suggestPublishMetadata  suggestPublishMetadataUseCase
-	prompts                 promptsUseCase
 	archetypes              archetypesUseCase
 	visualLanguages         visualLanguagesUseCase
 	illustrations           illustrationsUseCase
 	projectIllustrations    projectIllustrationsUseCase
 	renderPrompt            renderPromptUseCase
 	llmStatus               llmStatusSource
-	defaultModelSetting     defaultModelUseCase
+	modelCatalog            application.ModelCatalogPort
+	stepDefaults            application.StepDefaultModelsPort
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
@@ -76,8 +76,6 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/operations/{operation_id}/cancel", rt.handleCancelOperation)
 	r.Get("/v1/projects/{project_id}/operations", rt.handleListProjectOperations)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
-	// Prompt wording lives in the DB. Public read (the wizard fetches the
-	// current template at runtime); admin list/update (the PromptSettingsPage editor).
 	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
 	rt.visualLanguageRoutes(r)
 	rt.illustrationRoutes(r)
@@ -98,13 +96,6 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
 	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)
 	r.Delete("/v1/admin/video-archetypes/{id}", rt.handleDeleteArchetype)
-	r.Get("/v1/prompts/{role}", rt.handleGetActivePrompt)
-	r.Get("/v1/admin/prompts", rt.handleListPrompts)
-	r.Post("/v1/admin/prompts", rt.handleCreatePrompt)
-	r.Post("/v1/admin/prompts/{id}/copy", rt.handleCopyPrompt)
-	r.Put("/v1/admin/prompts/{id}", rt.handleUpdatePrompt)
-	r.Post("/v1/admin/prompts/{id}/activate", rt.handleActivatePrompt)
-	r.Delete("/v1/admin/prompts/{id}", rt.handleDeletePrompt)
 	r.Post("/v1/projects/{project_id}/authoring/story", rt.handleSaveAuthoringStory)
 	r.Post("/v1/projects/{project_id}/authoring/storyboard", rt.handleSaveAuthoringStoryboard)
 	r.Post("/v1/projects/{project_id}/authoring/code", rt.handleSaveAuthoringCode)
@@ -230,18 +221,6 @@ type suggestPublishMetadataUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.SuggestPublishMetadataOutput, error)
 }
 
-// promptsUseCase backs the prompt library: a list of prompts per
-// role, one active. System rows are read-only; Creator rows are editable.
-type promptsUseCase interface {
-	Active(ctx context.Context, role domain.PromptRole) (domain.Prompt, error)
-	List(ctx context.Context, role domain.PromptRole) ([]domain.Prompt, error)
-	Create(ctx context.Context, role domain.PromptRole, name, templateText string) (domain.Prompt, error)
-	Copy(ctx context.Context, id string) (domain.Prompt, error)
-	Update(ctx context.Context, id, name, templateText string) (domain.Prompt, error)
-	Activate(ctx context.Context, id string) (domain.Prompt, error)
-	Delete(ctx context.Context, id string) error
-}
-
 // renderPromptUseCase backs GET
 // /v1/projects/{id}/prompts/{role} — the prompt fully substituted, so the
 // Copy button and the server's own generate call use the same text.
@@ -318,23 +297,16 @@ func (rt *Router) WithAuthoringModels(saveAuthoringModels saveAuthoringModelsUse
 	return rt
 }
 
-// WithDefaultModelSetting enables the app setting that names the default model
-// of each step, and makes GET /v1/llm/status report them.
-func (rt *Router) WithDefaultModelSetting(uc defaultModelUseCase) *Router {
-	rt.defaultModelSetting = uc
+// WithModelInfo gives GET /v1/llm/status the model catalog and the default model
+// of each step; both are owned by llm-service.
+func (rt *Router) WithModelInfo(catalog application.ModelCatalogPort, defaults application.StepDefaultModelsPort) *Router {
+	rt.modelCatalog = catalog
+	rt.stepDefaults = defaults
 	return rt
 }
 
 // codeStatsWindow is how far back the code step's model numbers look.
 const codeStatsWindow = 30 * 24 * time.Hour
-
-// WithPrompts attaches the prompt library, enabling GET
-// /v1/prompts/{role} and the /v1/admin/prompts routes. Without it the routes
-// answer 404, the same "unwired means absent" posture as WithQCReports.
-func (rt *Router) WithPrompts(prompts promptsUseCase) *Router {
-	rt.prompts = prompts
-	return rt
-}
 
 // WithAuthoringStory attaches step 1's save-story use case, enabling
 // POST /v1/projects/{project_id}/authoring/story.
@@ -461,148 +433,6 @@ func writeJSON(w http.ResponseWriter, status int, body interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
-}
-
-// promptError maps the library's failures to HTTP: a missing row is 404, an
-// attempt to change a system row is 403, anything else the caller sent wrong
-// is 400.
-func promptError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, application.ErrPromptNotFound):
-		writeError(w, http.StatusNotFound, "prompt not found")
-	case errors.Is(err, application.ErrPromptReadOnly):
-		writeError(w, http.StatusForbidden, "system prompts are read-only — copy it to make one you can edit")
-	default:
-		writeError(w, http.StatusBadRequest, err.Error())
-	}
-}
-
-// handleGetActivePrompt serves the wording a role currently runs on — what the
-// wizard reads: template_text, with the library facts alongside.
-func (rt *Router) handleGetActivePrompt(w http.ResponseWriter, r *http.Request) {
-	if rt.prompts == nil {
-		writeError(w, http.StatusNotFound, "prompts are not enabled")
-		return
-	}
-	role := chi.URLParam(r, "role")
-	if !domain.ValidPromptRole(role) {
-		writeError(w, http.StatusBadRequest, "unknown role")
-		return
-	}
-	p, err := rt.prompts.Active(r.Context(), domain.PromptRole(role))
-	if err != nil {
-		promptError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, p)
-}
-
-// handleListPrompts serves the library for the admin screen, optionally one
-// role via ?role=.
-func (rt *Router) handleListPrompts(w http.ResponseWriter, r *http.Request) {
-	if rt.prompts == nil {
-		writeError(w, http.StatusNotFound, "prompts are not enabled")
-		return
-	}
-	prompts, err := rt.prompts.List(r.Context(), domain.PromptRole(r.URL.Query().Get("role")))
-	if err != nil {
-		promptError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"prompts": prompts})
-}
-
-type promptBody struct {
-	Role         string `json:"role"`
-	Name         string `json:"name"`
-	TemplateText string `json:"template_text"`
-}
-
-func decodePromptBody(w http.ResponseWriter, r *http.Request) (promptBody, bool) {
-	var req promptBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return req, false
-	}
-	return req, true
-}
-
-// handleCreatePrompt adds a Creator-owned prompt to a role's list.
-func (rt *Router) handleCreatePrompt(w http.ResponseWriter, r *http.Request) {
-	if rt.prompts == nil {
-		writeError(w, http.StatusNotFound, "prompts are not enabled")
-		return
-	}
-	req, ok := decodePromptBody(w, r)
-	if !ok {
-		return
-	}
-	p, err := rt.prompts.Create(r.Context(), domain.PromptRole(req.Role), req.Name, req.TemplateText)
-	if err != nil {
-		promptError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, p)
-}
-
-// handleCopyPrompt duplicates a row into a new Creator-owned one — the only
-// way to start from a system prompt.
-func (rt *Router) handleCopyPrompt(w http.ResponseWriter, r *http.Request) {
-	if rt.prompts == nil {
-		writeError(w, http.StatusNotFound, "prompts are not enabled")
-		return
-	}
-	p, err := rt.prompts.Copy(r.Context(), chi.URLParam(r, "id"))
-	if err != nil {
-		promptError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, p)
-}
-
-// handleUpdatePrompt edits a Creator-owned prompt; a system one answers 403.
-func (rt *Router) handleUpdatePrompt(w http.ResponseWriter, r *http.Request) {
-	if rt.prompts == nil {
-		writeError(w, http.StatusNotFound, "prompts are not enabled")
-		return
-	}
-	req, ok := decodePromptBody(w, r)
-	if !ok {
-		return
-	}
-	p, err := rt.prompts.Update(r.Context(), chi.URLParam(r, "id"), req.Name, req.TemplateText)
-	if err != nil {
-		promptError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, p)
-}
-
-// handleActivatePrompt makes a row the one its role runs on.
-func (rt *Router) handleActivatePrompt(w http.ResponseWriter, r *http.Request) {
-	if rt.prompts == nil {
-		writeError(w, http.StatusNotFound, "prompts are not enabled")
-		return
-	}
-	p, err := rt.prompts.Activate(r.Context(), chi.URLParam(r, "id"))
-	if err != nil {
-		promptError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, p)
-}
-
-// handleDeletePrompt removes a Creator-owned prompt; a system one answers 403.
-func (rt *Router) handleDeletePrompt(w http.ResponseWriter, r *http.Request) {
-	if rt.prompts == nil {
-		writeError(w, http.StatusNotFound, "prompts are not enabled")
-		return
-	}
-	if err := rt.prompts.Delete(r.Context(), chi.URLParam(r, "id")); err != nil {
-		promptError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleSaveAuthoringStory stores the Story Architect output a Creator
@@ -879,8 +709,8 @@ type llmStatusResponse struct {
 	// the file the Creator has to edit — a disabled button that does not say
 	// why leaves the Creator stuck.
 	Reason string `json:"reason,omitempty"`
-	// Models is the model-per-step picker's catalog (domain.
-	// AuthoringModelCatalog) — served here rather than hardcoded a second
+	// Models is the model-per-step picker's catalog (llm-service's
+	// model catalog) — served here rather than hardcoded a second
 	// time in web-gui, so the GUI's dropdown and the server's own validation
 	// (SaveAuthoringModelsUseCase) can never drift apart. Empty when the AI
 	// path itself is unavailable — nothing to pick a model for.
@@ -898,10 +728,20 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	resp := llmStatusResponse{
-		Enabled: true, Provider: rt.llmStatus.Name(),
-		Models: domain.AuthoringModelCatalog, StepDefaults: rt.effectiveStepDefaults(r.Context()),
+	resp := llmStatusResponse{Enabled: true, Provider: rt.llmStatus.Name()}
+	if rt.modelCatalog != nil {
+		models, err := rt.modelCatalog.ModelCatalog(r.Context())
+		if err != nil {
+			slog.Warn("could not read the model catalog", "error", err.Error())
+			writeJSON(w, http.StatusOK, llmStatusResponse{
+				Enabled: false,
+				Reason:  "Không đọc được danh sách model từ llm-service: " + err.Error(),
+			})
+			return
+		}
+		resp.Models = models
 	}
+	resp.StepDefaults = rt.effectiveStepDefaults(r.Context())
 	writeJSON(w, http.StatusOK, resp)
 }
 

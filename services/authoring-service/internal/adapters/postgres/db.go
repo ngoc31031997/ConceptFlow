@@ -39,21 +39,6 @@ CREATE INDEX IF NOT EXISTS project_authoring_topic_lang ON project_authoring (la
 -- Model calls are logged by llm-service in its own database.
 DROP TABLE IF EXISTS llm_usage;
 
--- The prompt library. Each pipeline role owns a list of prompts and
--- exactly one of them is active; is_system rows ship in the binary.
-CREATE TABLE IF NOT EXISTS prompts (
-    id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    role          TEXT NOT NULL,
-    name          TEXT NOT NULL,
-    template_text TEXT NOT NULL,
-    is_system     BOOLEAN NOT NULL DEFAULT false,
-    is_active     BOOLEAN NOT NULL DEFAULT false,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_active_per_role ON prompts (role) WHERE is_active;
-CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) WHERE is_system;
-
 -- Video archetypes the Story Architect can be told to make. System rows
 -- ship in the binary (read-only); the Creator adds their own.
 CREATE TABLE IF NOT EXISTS video_archetypes (

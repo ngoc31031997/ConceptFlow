@@ -17,16 +17,25 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
-from app import errors, tasks
+from app import errors, modelcatalog, tasks
 from app import storyboard as sbm
 from app.calllog import CallFilter, CallLogPort, CallRecord, PgCallLog, new_call_id
 from app.config import Config
 from app.errors import LLMError, Usage
 from app.frame import LANDSCAPE, MAX_HEIGHT, Frame, frame_of
 from app.jsonreply import first_json_object, repair_prompt
+from app.library import (
+    PgLibraryStore,
+    PromptConflict,
+    PromptInvalid,
+    PromptLibrary,
+    PromptNotFound,
+    PromptReadOnly,
+    SystemPrompt,
+)
 from app.pipeline.checker import CheckerPort, RenderingChecker
 from app.pipeline.checker import CheckerUnavailable as _CheckerUnavailable
 from app.pipeline.extract import ExtractError
@@ -192,6 +201,31 @@ class SegmentParseBody(CodeBody):
     reply: str
 
 
+class PromptBody(BaseModel):
+    role: str = ""
+    name: str = ""
+    template_text: str = ""
+
+
+class SystemPromptItem(BaseModel):
+    role: str
+    name: str
+    template_text: str
+
+
+class SystemPromptsBody(BaseModel):
+    owner: str
+    prompts: list[SystemPromptItem]
+
+
+class StepModelBody(BaseModel):
+    model: str = ""
+
+
+class StepModelsBody(BaseModel):
+    models: dict[str, str]
+
+
 class DeleteCallsBody(BaseModel):
     """Exactly one way to choose the rows to delete."""
 
@@ -282,12 +316,16 @@ async def _suggestion(stream: bool, run):
 
 def create_app(
     config: Config | None = None, providers: Providers | None = None, checker: CheckerPort | None = None,
-    call_log: CallLogPort | None = None,
+    call_log: CallLogPort | None = None, library: PromptLibrary | None = None,
 ) -> FastAPI:
     config = config or Config.from_env()
     owned_log = call_log is None
     if call_log is None:
         call_log = PgCallLog(config.database_url)
+    owned_store: PgLibraryStore | None = None
+    if library is None:
+        owned_store = PgLibraryStore(config.database_url)
+        library = PromptLibrary(owned_store)
     providers = providers or Providers(config, call_log)
     checker = checker or RenderingChecker(config.rendering_url, config.rendering_check_timeout)
 
@@ -295,7 +333,11 @@ def create_app(
     async def lifespan(_: FastAPI):
         if owned_log:
             await call_log.start()
+        if owned_store is not None:
+            await owned_store.start()
         yield
+        if owned_store is not None:
+            await owned_store.stop()
         if owned_log:
             await call_log.stop()
 
@@ -415,6 +457,106 @@ def create_app(
         else:
             deleted = await call_log.delete_all()
         return {"deleted": deleted}
+
+    async def _library_call(work: Callable[[], Awaitable[Response]]) -> Response:
+        """Run a library call and answer its refusals in the `{"error": "<message>"}` shape the GUI reads."""
+        try:
+            return await work()
+        except PromptInvalid as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        except PromptNotFound:
+            return JSONResponse({"error": "prompt not found"}, status_code=404)
+        except PromptReadOnly:
+            return JSONResponse(
+                {"error": "system prompts are read-only — copy it to make one you can edit"}, status_code=403)
+        except PromptConflict as exc:
+            return JSONResponse({"error": str(exc)}, status_code=409)
+
+    async def _active_prompt(role: str) -> Response:
+        return JSONResponse((await library.active(role)).to_dict())
+
+    @app.get("/v1/prompts/{role}")
+    async def prompt_active(role: str):
+        """The wording a role currently runs on."""
+        return await _library_call(lambda: _active_prompt(role))
+
+    @app.get("/internal/v1/prompts/{role}")
+    async def internal_prompt_active(role: str):
+        return await _library_call(lambda: _active_prompt(role))
+
+    @app.get("/v1/admin/prompts")
+    async def prompts_list(role: str = ""):
+        async def work() -> Response:
+            return JSONResponse({"prompts": [p.to_dict() for p in await library.list(role)]})
+        return await _library_call(work)
+
+    @app.post("/v1/admin/prompts")
+    async def prompts_create(body: PromptBody):
+        async def work() -> Response:
+            return JSONResponse(
+                (await library.create(body.role, body.name, body.template_text)).to_dict(), status_code=201)
+        return await _library_call(work)
+
+    @app.post("/v1/admin/prompts/{prompt_id}/copy")
+    async def prompts_copy(prompt_id: str):
+        async def work() -> Response:
+            return JSONResponse((await library.copy(prompt_id)).to_dict(), status_code=201)
+        return await _library_call(work)
+
+    @app.put("/v1/admin/prompts/{prompt_id}")
+    async def prompts_update(prompt_id: str, body: PromptBody):
+        async def work() -> Response:
+            return JSONResponse((await library.update(prompt_id, body.name, body.template_text)).to_dict())
+        return await _library_call(work)
+
+    @app.post("/v1/admin/prompts/{prompt_id}/activate")
+    async def prompts_activate(prompt_id: str):
+        async def work() -> Response:
+            return JSONResponse((await library.activate(prompt_id)).to_dict())
+        return await _library_call(work)
+
+    @app.delete("/v1/admin/prompts/{prompt_id}")
+    async def prompts_delete(prompt_id: str):
+        async def work() -> Response:
+            await library.delete(prompt_id)
+            return Response(status_code=204)
+        return await _library_call(work)
+
+    @app.put("/internal/v1/prompts/system")
+    async def prompts_replace_system(body: SystemPromptsBody):
+        """A service's whole set of system prompts: written, and the ones it no longer lists removed."""
+        async def work() -> Response:
+            items = [SystemPrompt(p.role, p.name, p.template_text) for p in body.prompts]
+            return JSONResponse(await library.replace_system(body.owner, items))
+        return await _library_call(work)
+
+    @app.get("/v1/settings/ai-model")
+    async def ai_model_get():
+        """The default model of every step, and the steps that can carry one."""
+        return await library.step_models()
+
+    @app.put("/v1/settings/ai-model/steps/{step}")
+    async def ai_model_put(step: str, body: StepModelBody):
+        async def work() -> Response:
+            await library.set_step_model(step, body.model)
+            return Response(status_code=204)
+        return await _library_call(work)
+
+    @app.get("/internal/v1/step-models")
+    async def internal_step_models():
+        return await library.step_models()
+
+    @app.put("/internal/v1/step-models")
+    async def internal_step_models_put(body: StepModelsBody):
+        async def work() -> Response:
+            await library.set_step_models(body.models)
+            return Response(status_code=204)
+        return await _library_call(work)
+
+    @app.get("/internal/v1/models")
+    async def internal_models():
+        """The catalog of models a step can run on."""
+        return {"models": [m.to_dict() for m in modelcatalog.CATALOG]}
 
     @app.post("/v1/suggest-metadata")
     async def suggest_metadata(body: MetadataBody):
