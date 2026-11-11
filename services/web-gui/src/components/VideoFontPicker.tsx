@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { listVideoFonts } from "../api/client";
 import { SelectableOption } from "./SelectableOption";
 import glass from "../styles/glass.module.css";
 import selectable from "../styles/selectable.module.css";
@@ -8,20 +10,37 @@ interface VideoFontPickerProps {
   onChange: (font: string) => void;
 }
 
-// Must match the fonts the rendering image installs
-// (services/rendering/remotion_project/src/conceptflow-mini/primitives.tsx
-// INSTALLED_FONTS); anything else renders as Be Vietnam Pro.
-const OPTIONS: { value: string; label: string }[] = [
-  { value: "Be Vietnam Pro", label: "Be Vietnam Pro" },
-  { value: "Montserrat", label: "Montserrat" },
-  { value: "Cormorant Garamond", label: "Cormorant Garamond" },
-];
+type FontState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; fonts: string[] };
 
 /**
  * Font for text drawn inside a Remotion video — labels, numbers, titles.
- * Subtitles have their own font in the subtitle style panel.
+ * Subtitles have their own font in the subtitle style panel. The choices come
+ * from the rendering service, which owns the list of installed fonts.
  */
 export function VideoFontPicker({ value, onChange }: VideoFontPickerProps) {
+  const [state, setState] = useState<FontState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    listVideoFonts()
+      .then((list) => {
+        if (!cancelled) setState({ status: "ready", fonts: list.fonts });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const fonts = state.status === "ready" ? state.fonts : [];
+  // A font saved on the video that rendering no longer offers stays visible.
+  const orphan = state.status === "ready" && value && !fonts.includes(value) ? value : null;
+
   return (
     <div className={`${glass.card} ${styles.card}`} data-testid="video-font-picker">
       <div className={styles.text}>
@@ -29,18 +48,38 @@ export function VideoFontPicker({ value, onChange }: VideoFontPickerProps) {
         <p className={styles.hint} style={{ fontFamily: `'${value}', sans-serif`, fontSize: 14 }}>
           Nhãn, con số, tiêu đề hiện trên hình — Aa Ăă Ơơ Ưư 0123
         </p>
+        {state.status === "error" && (
+          <p className={styles.hint} role="alert" data-testid="video-font-error">
+            Không lấy được danh sách font từ rendering
+          </p>
+        )}
+        {state.status === "loading" && (
+          <p className={styles.hint} data-testid="video-font-loading">
+            Đang tải danh sách font…
+          </p>
+        )}
       </div>
       <div className={selectable.row} role="radiogroup" aria-label="Font chữ trong video">
-        {OPTIONS.map((option) => (
+        {fonts.map((font) => (
           <SelectableOption
-            key={option.value}
-            selected={value === option.value}
-            onSelect={() => onChange(option.value)}
-            label={option.label}
+            key={font}
+            selected={value === font}
+            onSelect={() => onChange(font)}
+            label={font}
             inline
-            testId={`video-font-${option.value}`}
+            testId={`video-font-${font}`}
           />
         ))}
+        {orphan && (
+          <SelectableOption
+            key={orphan}
+            selected
+            onSelect={() => onChange(orphan)}
+            label={`${orphan} (không có trong rendering)`}
+            inline
+            testId={`video-font-${orphan}`}
+          />
+        )}
       </div>
     </div>
   );

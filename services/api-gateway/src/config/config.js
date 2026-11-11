@@ -17,6 +17,7 @@
  *   authoringServiceUrl: string,
  *   llmServiceUrl: string,
  *   visualServiceUrl: string,
+ *   renderingUrl: string,
  * }}
  */
 function loadConfig(env = process.env) {
@@ -25,6 +26,7 @@ function loadConfig(env = process.env) {
     authoringServiceUrl: env.AUTHORING_SERVICE_URL || 'http://authoring-service:8000',
     llmServiceUrl: env.LLM_SERVICE_URL || 'http://llm-service:8000',
     visualServiceUrl: env.VISUAL_SERVICE_URL || 'http://visual-service:8000',
+    renderingUrl: env.RENDERING_URL || 'http://rendering:8000',
     publisherUrl: env.PUBLISHER_URL || 'http://publisher:8000',
     rabbitmqUrl: env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672/',
     port: Number(env.PORT) || 8080,
