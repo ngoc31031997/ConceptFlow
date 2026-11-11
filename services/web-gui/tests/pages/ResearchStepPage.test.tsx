@@ -130,7 +130,7 @@ describe("ResearchStepPage", () => {
   it("shows the three sections with the questions and their coverage, the prompt and paste log, and the facts", async () => {
     await ready();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Nghiên cứu và kiểm chứng");
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 3/21");
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 3/23");
     expect(screen.getByTestId("rail-step-3")).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("question-input-Q1")).toHaveValue("Quả sung có phải là hoa không?");
     await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());

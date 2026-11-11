@@ -28,6 +28,7 @@ import { ScriptWriteStepPage } from "./pages/ScriptWriteStepPage";
 import { ResearchStepPage } from "./pages/ResearchStepPage";
 import { BeatsStepPage } from "./pages/BeatsStepPage";
 import { StoryStepPage } from "./pages/StoryStepPage";
+import { VisualConceptStepPage } from "./pages/VisualConceptStepPage";
 import { comingRoute } from "./utils/flow";
 
 /** A wizard address of a step the app does not have yet opens that step's "not developed" page. */
@@ -73,9 +74,9 @@ export function App() {
             {/* The old wizard's script, storyboard, drawings and code screens are gone:
                 each address opens the page of the step that is not developed yet. */}
             <Route path="/create/script/outline" element={<Navigate to="/create/script/brief" replace />} />
-            <Route path="/create/script/storyboard" element={<ComingWizardStep n={9} />} />
-            <Route path="/create/script/illustrations" element={<ComingWizardStep n={13} />} />
-            <Route path="/create/script/code" element={<ComingWizardStep n={14} />} />
+            <Route path="/create/script/storyboard" element={<ComingWizardStep n={11} />} />
+            <Route path="/create/script/illustrations" element={<ComingWizardStep n={15} />} />
+            <Route path="/create/script/code" element={<ComingWizardStep n={16} />} />
             {/* Read-only preview of a step not reached yet. */}
             <Route path="/create/preview/:step" element={<StepPreviewPage />} />
             <Route path="/create/settings" element={<Navigate to="/create/script/brief" replace />} />
@@ -99,6 +100,7 @@ export function App() {
             <Route path="/projects/:id/beats" element={<BeatsStepPage />} />
             <Route path="/projects/:id/script" element={<ScriptWriteStepPage />} />
             <Route path="/projects/:id/lock" element={<LockStepPage />} />
+            <Route path="/projects/:id/visual-concept" element={<VisualConceptStepPage />} />
             <Route path="/projects/:id/coming/:n" element={<ComingStepPage />} />
             <Route path="/create/coming/:n" element={<ComingStepPage />} />
             <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />

@@ -29,7 +29,7 @@ function renderMap() {
 describe("FlowMapPage", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("shows the 21 steps in four phases, ◆ on the steps the Creator approves, “sắp có” on the ones not built", () => {
+  it("shows the 23 steps in four phases, ◆ on the steps the Creator approves, “sắp có” on the ones not built", () => {
     renderMap();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bản đồ luồng");
     const phases = screen.getAllByTestId("flow-map-phase");
@@ -39,12 +39,13 @@ describe("FlowMapPage", () => {
       "Sản xuất",
       "Hậu kỳ",
     ]);
-    for (let step = 1; step <= 21; step += 1) expect(screen.getByTestId(`flow-map-step-${step}`)).toBeInTheDocument();
-    expect(screen.getByTestId("flow-map-step-9")).toHaveTextContent("◆ bạn duyệt");
-    expect(screen.getByTestId("flow-map-step-17")).toHaveTextContent("tự chạy");
+    for (let step = 1; step <= 23; step += 1) expect(screen.getByTestId(`flow-map-step-${step}`)).toBeInTheDocument();
+    expect(screen.getByTestId("flow-map-step-11")).toHaveTextContent("◆ bạn duyệt");
+    expect(screen.getByTestId("flow-map-step-19")).toHaveTextContent("tự chạy");
     expect(screen.getByTestId("flow-map-step-2")).toHaveTextContent("◆ bạn duyệt");
-    expect(screen.getByTestId("flow-map-step-13")).not.toHaveTextContent("◆");
-    expect(screen.getByTestId("flow-map-step-8")).toHaveTextContent("sắp có");
+    expect(screen.getByTestId("flow-map-step-15")).not.toHaveTextContent("◆");
+    expect(screen.getByTestId("flow-map-step-9")).toHaveTextContent("sắp có");
+    expect(screen.getByTestId("flow-map-step-8")).not.toHaveTextContent("sắp có");
     expect(screen.getByTestId("flow-map-step-6")).not.toHaveTextContent("sắp có");
     expect(screen.getByTestId("flow-map-step-7")).not.toHaveTextContent("sắp có");
     // The research step has a screen of its own, so it is not “sắp có”; it is optional.
@@ -54,8 +55,8 @@ describe("FlowMapPage", () => {
 
   it("opens the not-developed page of a step that is not built", () => {
     renderMap();
-    fireEvent.click(screen.getByTestId("flow-map-step-8"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/create/coming/8");
+    fireEvent.click(screen.getByTestId("flow-map-step-9"));
+    expect(screen.getByTestId("where")).toHaveTextContent("/create/coming/9");
   });
 
   it("opens the research screen of the video last worked on, and only when there is one", async () => {
@@ -87,12 +88,12 @@ describe("FlowMapPage", () => {
 
   it("opens a step's preview", () => {
     renderMap();
-    fireEvent.click(screen.getByTestId("flow-map-step-13"));
+    fireEvent.click(screen.getByTestId("flow-map-step-15"));
     expect(screen.getByTestId("where")).toHaveTextContent("/create/preview/5");
   });
 
   it("is in the main menu with how many steps it shows", () => {
     renderMap();
-    expect(screen.getByTestId("nav-flow-map")).toHaveTextContent("Bản đồ luồngxem cả 21 bước");
+    expect(screen.getByTestId("nav-flow-map")).toHaveTextContent("Bản đồ luồngxem cả 23 bước");
   });
 });

@@ -61,7 +61,7 @@ function stripOf(state: BeatState, running: BeatsControls["running"]): StepStrip
 }
 
 /**
- * Step 5 of the 21-step flow: the beat sheet, in two phases. First a skeleton
+ * Step 5 of the 23-step flow: the beat sheet, in two phases. First a skeleton
  * built from the approved story with no AI (one beat per step of the chain,
  * each with a function and its facts) which the Creator reviews and approves;
  * then the AI writes the content and length of each beat, one at a time, and

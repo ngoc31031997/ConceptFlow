@@ -58,7 +58,7 @@ function Mark({ status, n }: { status: StepStatus; n: number }) {
 interface StepRailProps {
   /** Bước chạy mà màn đang mở hiển thị; trống ở màn của một bước không có bước chạy (xem `viewStep`). */
   currentStep?: number;
-  /** Số của bước trong 21 bước mà màn đang mở hiển thị, khi nó không có bước chạy phía sau. */
+  /** Số của bước trong 23 bước mà màn đang mở hiển thị, khi nó không có bước chạy phía sau. */
   viewStep?: number;
   /** Tên video hiển thị ở đầu menu ("Video mới" khi chưa có chủ đề). */
   title: string;
@@ -70,7 +70,7 @@ interface StepRailProps {
 }
 
 /**
- * The state of a step of the 21-step view from the running steps it shows:
+ * The state of a step of the 23-step view from the running steps it shows:
  * done when all are done, otherwise the state of the first one not done.
  */
 function viewStatus(view: FlowViewStep, status: (step: number) => StepStatus): StepStatus {
@@ -80,7 +80,7 @@ function viewStatus(view: FlowViewStep, status: (step: number) => StepStatus): S
 }
 
 /**
- * Menu dọc thứ hai, cạnh menu chính: "video này đang ở đâu trong luồng", 21
+ * Menu dọc thứ hai, cạnh menu chính: "video này đang ở đâu trong luồng", 23
  * bước của luồng mục tiêu (ADR-0042), từ bước 1 (trước khi có project) tới lúc
  * đăng.
  *

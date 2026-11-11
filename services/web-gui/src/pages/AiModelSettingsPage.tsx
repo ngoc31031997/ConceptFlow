@@ -17,6 +17,7 @@ const STEP_LABELS: Record<string, string> = {
   code: "Viết code",
   publish: "Gợi ý tiêu đề, mô tả, thẻ khi đăng",
   illustrations: "Vẽ hình minh hoạ (Thư viện hình)",
+  visual_concept: "Ngôn ngữ hình ảnh",
 };
 
 /** Steps whose output is code, where the local model can time out. */

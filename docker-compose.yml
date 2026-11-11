@@ -448,6 +448,12 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@visual-db:5432/visual
       DATABASE_MAX_CONNS: "10"
+      # Step 8 reads the locked script from authoring-service and asks the AI,
+      # its prompts and its models through llm-service.
+      AUTHORING_SERVICE_URL: http://authoring-service:8000
+      LLM_SERVICE_URL: http://llm-service:8000
+      # Rendering lists the fonts the typography part is checked against.
+      RENDERING_URL: http://rendering:8000
     deploy:
       resources:
         limits:
@@ -540,6 +546,7 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8000
       AUTHORING_SERVICE_URL: http://authoring-service:8000
       LLM_SERVICE_URL: http://llm-service:8000
+      VISUAL_SERVICE_URL: http://visual-service:8000
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
       WEB_GUI_ORIGIN: http://localhost:3000

@@ -104,7 +104,7 @@ describe("StoryStepPage", () => {
   it("shows the input, the three fields of the story and the approval", async () => {
     await ready();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Xây dựng câu chuyện");
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 4/21");
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 4/23");
     expect(screen.getByTestId("rail-step-4")).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("story-input-summary")).toHaveTextContent("Brief đã duyệt · 3 dữ kiện đang giữ");
     expect(screen.getByTestId("story-field-central_question")).toHaveTextContent("Vì sao ong chết trong quả sung?");

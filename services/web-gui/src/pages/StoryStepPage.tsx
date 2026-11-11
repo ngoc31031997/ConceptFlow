@@ -49,7 +49,7 @@ function stripOf(state: StoryState, writing: boolean): StepStripProps {
 }
 
 /**
- * Step 4 of the 21-step flow: build the story. The AI reads the brief approved
+ * Step 4 of the 23-step flow: build the story. The AI reads the brief approved
  * on step 2 and the facts kept on step 3 and writes the central question, the
  * core answer and the narrative arc; the Creator edits each field or has the
  * AI redo it with a note, and approves the story as a whole. Changing any

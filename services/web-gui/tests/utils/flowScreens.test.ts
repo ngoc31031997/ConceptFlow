@@ -6,6 +6,7 @@ import {
   VIEW_RESEARCH,
   VIEW_SCRIPT,
   VIEW_STORY,
+  VIEW_VISUAL_CONCEPT,
   beatsRoute,
   comingRoute,
   isBuilt,
@@ -16,6 +17,7 @@ import {
   screenStatus,
   scriptRoute,
   storyRoute,
+  visualConceptRoute,
 } from "../../src/utils/flow";
 
 describe("steps with a screen of their own", () => {
@@ -40,7 +42,7 @@ describe("steps with a screen of their own", () => {
 
   it("leaves the steps nobody has built as not built", () => {
     const notBuilt = FLOW_VIEW.filter((v) => !isBuilt(v)).map((v) => v.n);
-    expect(notBuilt).toEqual([8, 9, 10, 11, 12, 13, 14, 18]);
+    expect(notBuilt).toEqual([9, 10, 11, 12, 13, 14, 15, 16, 20]);
   });
 
   it("addresses the research screen under its video and a not-developed step under a video or alone", () => {
@@ -49,7 +51,7 @@ describe("steps with a screen of their own", () => {
     expect(comingRoute(7, "")).toBe("/create/coming/7");
   });
 
-  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false };
+  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, conceptLocked: false };
   const researched = { ...none, researchResolved: true };
   const storied = { ...researched, storyApproved: true };
   const beaten = { ...storied, beatsApproved: true };
@@ -104,12 +106,31 @@ describe("steps with a screen of their own", () => {
     expect(screenRoute(lock, "p1")).toBe("/projects/p1/lock");
   });
 
-  it("finds the phase of a step by its place in the 21 steps", () => {
+  it("finds the phase of a step by its place in the 23 steps", () => {
     expect(phaseOfView(3)?.name).toBe("Tiền kỳ · Nội dung");
     expect(phaseOfView(9)?.name).toBe("Tiền kỳ · Hình ảnh");
-    expect(phaseOfView(21)?.name).toBe("Hậu kỳ");
-    expect(phaseOfView(22)).toBeNull();
+    expect(phaseOfView(23)?.name).toBe("Hậu kỳ");
+    expect(phaseOfView(24)).toBeNull();
     // The running-step form still agrees with it.
     expect(phaseOf(3)).toEqual(phaseOfView(6));
+  });
+});
+
+describe("the visual concept step", () => {
+  const concept = FLOW_VIEW[VIEW_VISUAL_CONCEPT - 1];
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: false, conceptLocked: false };
+
+  it("is step 8 with a screen of its own", () => {
+    expect(concept.label).toBe("Ngôn ngữ hình ảnh");
+    expect(concept.phase).toBe(1);
+    expect(isBuilt(concept)).toBe(true);
+    expect(screenRoute(concept, "p1")).toBe("/projects/p1/visual-concept");
+    expect(visualConceptRoute("p1")).toBe("/projects/p1/visual-concept");
+  });
+
+  it("opens once the script is locked and passes once a visual concept is locked", () => {
+    expect(screenStatus(concept, 3, none)).toBe("pending");
+    expect(screenStatus(concept, 3, { ...none, scriptLocked: true })).toBe("waiting");
+    expect(screenStatus(concept, 3, { ...none, scriptLocked: true, conceptLocked: true })).toBe("done");
   });
 });

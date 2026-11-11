@@ -151,7 +151,7 @@ describe("LockStepPage", () => {
   it("opens on the review tab with the findings as the server says", async () => {
     await ready();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rà soát và chốt kịch bản");
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 7/21");
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 7/23");
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chưa chốt · 4 mục rà soát cần xử lý");
     expect(screen.getByTestId("finding-m-must")).toHaveAttribute("data-state", "ok");
     expect(screen.getByTestId("finding-r1")).toHaveAttribute("data-state", "open");

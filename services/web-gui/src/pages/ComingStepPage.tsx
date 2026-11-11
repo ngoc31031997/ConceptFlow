@@ -6,7 +6,7 @@ import { FLOW_VIEW, comingRoute, isBuilt, previewRoute, screenRoute } from "../u
 import styles from "./ComingStepPage.module.css";
 
 /**
- * The page of a step of the 21-step flow that the app does not have yet: it
+ * The page of a step of the 23-step flow that the app does not have yet: it
  * says the step is not developed, what the step will be for (the "Bước này:"
  * line), and offers the step before it. A step the app does have opens its own
  * screen instead.

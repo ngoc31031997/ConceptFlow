@@ -24,6 +24,17 @@ const ROLES: { value: PromptRole; label: string }[] = [
   { value: "script_writer", label: "0f. Viết kịch bản — AI viết lời thoại từng beat và gợi ý sửa câu (bước Viết kịch bản)" },
   { value: "script_review", label: "0g. Rà soát kịch bản — AI đọc cả kịch bản và nêu các mục cần xử lý (bước Rà soát và chốt)" },
   { value: "script_handoff", label: "0h. Ghi chú bàn giao — AI viết năm mục bàn giao của một beat (bước Rà soát và chốt)" },
+  // Bước Ngôn ngữ hình ảnh (visual-service) và prompt chép sang AI ngoài của Thư viện tham chiếu.
+  { value: "visual_concept_creative_direction", label: "1. Định hướng sáng tạo — AI chọn phong cách hình ảnh (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_color_system", label: "2. Bảng màu và tương phản — AI đặt bảng màu theo hành trình câu chuyện (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_visual_language", label: "3. Hình dạng, nét, ánh sáng, bề mặt, layout — AI đặt quy tắc dựng hình (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_representation_rules", label: "4. Cách vẽ nhân vật, vật thể, khái niệm — AI đặt quy tắc thể hiện (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_typography", label: "5. Chữ, nhãn, chú thích — AI đặt quy tắc chữ trên hình (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_motion_language", label: "6. Nguyên tắc chuyển động — AI đặt nhịp và chuyển cảnh (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_do_not_use", label: "7. Cách thể hiện không được dùng — AI liệt kê điều cấm (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_feasibility", label: "8. Kiểm tra khả thi — AI đánh giá khả năng sản xuất (bước Ngôn ngữ hình ảnh)" },
+  { value: "visual_concept_review", label: "Rà soát ngôn ngữ hình ảnh — AI đọc cả tám phần và nêu vấn đề (bước Ngôn ngữ hình ảnh)" },
+  { value: "reference_style_youtube", label: "Đọc link YouTube thành mô tả tham chiếu — prompt chép sang AI ngoài (Thư viện tham chiếu)" },
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
@@ -42,6 +53,7 @@ const NEW_ROW = "new";
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */
 const PREVIEW_SAMPLE: Record<string, string> = {
   topic: "Vì sao bầu trời có màu xanh",
+  url: "(đường link YouTube Creator dán ở Thư viện tham chiếu sẽ hiện ở đây)",
   video_archetypes: "(danh sách kiểu video và playbook từng kiểu — lấy từ mục Kiểu video — sẽ hiện ở đây)",
   format_beats: "(danh sách beat của format đã chọn sẽ hiện ở đây)",
   narration_language_rule: "Toàn bộ lời thoại phải viết bằng TIẾNG VIỆT.",

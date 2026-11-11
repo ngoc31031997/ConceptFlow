@@ -59,7 +59,9 @@ describe("PromptSettingsPage — thư viện prompt", () => {
     expect(screen.queryByTestId("prompt-delete-button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("prompt-save-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("prompt-copy-button")).toBeInTheDocument();
-    expect(screen.getByTestId("prompt-in-use")).toHaveTextContent("Mặc định của hệ thống (hệ thống)");
+    expect(screen.getByTestId("prompt-in-use")).toHaveTextContent(
+      "Mặc định của hệ thống (hệ thống)",
+    );
   });
 
   it("Copy dòng hệ thống tạo dòng mới rồi chọn nó", async () => {
@@ -81,15 +83,21 @@ describe("PromptSettingsPage — thư viện prompt", () => {
   it("dòng của người dùng sửa được, bật được và xóa được", async () => {
     vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM, MINE]);
     const update = vi.spyOn(apiClient, "updatePrompt").mockResolvedValue(MINE);
-    const activate = vi.spyOn(apiClient, "activatePrompt").mockResolvedValue({ ...MINE, is_active: true });
+    const activate = vi
+      .spyOn(apiClient, "activatePrompt")
+      .mockResolvedValue({ ...MINE, is_active: true });
     const del = vi.spyOn(apiClient, "deletePrompt").mockResolvedValue(undefined);
     renderPage();
 
     await waitFor(() => expect(screen.getByTestId("prompt-row-u1")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("prompt-row-u1"));
-    await waitFor(() => expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("BẢN CỦA TÔI"));
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("BẢN CỦA TÔI"),
+    );
 
-    fireEvent.change(screen.getByTestId("prompt-template-textarea"), { target: { value: "chữ mới" } });
+    fireEvent.change(screen.getByTestId("prompt-template-textarea"), {
+      target: { value: "chữ mới" },
+    });
     fireEvent.click(screen.getByTestId("prompt-save-button"));
     await waitFor(() => expect(update).toHaveBeenCalledWith("u1", "Bản của tôi", "chữ mới"));
 
@@ -123,10 +131,43 @@ describe("PromptSettingsPage — thư viện prompt", () => {
     expect(screen.getByTestId("prompt-save-button")).toBeDisabled();
 
     fireEvent.change(screen.getByTestId("prompt-name-input"), { target: { value: "Bản mới" } });
-    fireEvent.change(screen.getByTestId("prompt-template-textarea"), { target: { value: "nội dung" } });
+    fireEvent.change(screen.getByTestId("prompt-template-textarea"), {
+      target: { value: "nội dung" },
+    });
     fireEvent.click(screen.getByTestId("prompt-save-button"));
 
-    await waitFor(() => expect(create).toHaveBeenCalledWith("story_architect", "Bản mới", "nội dung"));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith("story_architect", "Bản mới", "nội dung"),
+    );
+  });
+
+  it("có các vai trò của bước Ngôn ngữ hình ảnh và prompt đọc link YouTube của Thư viện tham chiếu", async () => {
+    vi.spyOn(apiClient, "listPrompts").mockResolvedValue([
+      SYSTEM,
+      aPrompt({
+        id: "system-reference_style_youtube",
+        role: "reference_style_youtube",
+        name: "Đọc link YouTube thành mô tả tham chiếu",
+        template_text: "Link: {{url}}",
+      }),
+    ]);
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-row-system-story_architect")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("prompt-role-select"));
+    for (const role of [
+      "visual_concept_creative_direction",
+      "visual_concept_typography",
+      "visual_concept_review",
+    ]) {
+      expect(screen.getByTestId(`prompt-role-select-option-${role}`)).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByTestId("prompt-role-select-option-reference_style_youtube"));
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("Link: {{url}}"),
+    );
   });
 
   it("đổi vai trò thì chỉ hiện các dòng của vai trò đó", async () => {
@@ -136,12 +177,16 @@ describe("PromptSettingsPage — thư viện prompt", () => {
     ]);
     renderPage();
 
-    await waitFor(() => expect(screen.getByTestId("prompt-row-system-story_architect")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-row-system-story_architect")).toBeInTheDocument(),
+    );
     expect(screen.queryByTestId("prompt-row-system-visual_director")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("prompt-role-select"));
     fireEvent.click(screen.getByTestId("prompt-role-select-option-visual_director"));
-    await waitFor(() => expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("ĐẠO DIỄN"));
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("ĐẠO DIỄN"),
+    );
     expect(screen.queryByTestId("prompt-row-system-story_architect")).not.toBeInTheDocument();
   });
 });

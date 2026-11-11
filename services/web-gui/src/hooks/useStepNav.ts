@@ -34,7 +34,7 @@ export interface StepNav {
   /** Mở màn của bước `step` (thật hoặc xem trước), kể cả khi đó là bước đang xem. */
   open: (step: number) => void;
   /**
-   * Mở màn của một bước trong 21 bước không có bước chạy phía sau: màn riêng
+   * Mở màn của một bước trong 23 bước không có bước chạy phía sau: màn riêng
    * của nó (cần project) hoặc màn "chưa phát triển".
    */
   openView: (view: FlowViewStep) => void;
@@ -47,7 +47,7 @@ export interface StepNavOptions {
    */
   preview?: boolean;
   /**
-   * Màn đang mở là màn của một bước trong 21 bước không có số bước chạy
+   * Màn đang mở là màn của một bước trong 23 bước không có số bước chạy
    * (Nghiên cứu, hay màn "chưa phát triển"): `currentStep` trống nhưng thanh
    * bước vẫn bấm được.
    */

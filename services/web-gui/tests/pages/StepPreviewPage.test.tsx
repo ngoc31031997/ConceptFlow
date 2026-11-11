@@ -54,7 +54,7 @@ describe("StepPreviewPage — xem trước bước chưa tới", () => {
     expect(document.querySelector("textarea, input, select")).toBeNull();
     // The step menu marks the previewed step as the one on screen.
     await waitFor(() =>
-      expect(screen.getByTestId("rail-step-9")).toHaveAttribute("aria-current", "step"),
+      expect(screen.getByTestId("rail-step-11")).toHaveAttribute("aria-current", "step"),
     );
   });
 

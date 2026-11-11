@@ -25,7 +25,7 @@ interface AppShellProps {
   /** Bước trong flow 13 bước mà màn này đang hiển thị (1-13). */
   currentStep?: number;
   /**
-   * Số, trong 21 bước, của bước mà màn này hiển thị khi nó không có bước chạy
+   * Số, trong 23 bước, của bước mà màn này hiển thị khi nó không có bước chạy
    * phía sau (Nghiên cứu, hay màn "chưa phát triển"). Dùng thay `currentStep`.
    */
   viewStep?: number;
@@ -77,7 +77,7 @@ export function AppShell({ currentStep, viewStep, title, subtitle, wide, headerA
   const flow = useProjectFlow();
   const recent = useRecentProject(routeProjectId || draft.projectId);
   const recentName = recent ? recent.topic?.trim() || recent.project_id.slice(0, 8) : "";
-  // "Tiền kỳ · Nội dung · Ý tưởng": the phase and the step, not a bare "9/21".
+  // "Tiền kỳ · Nội dung · Ý tưởng": the phase and the step, not a bare "9/23".
   const recentStep = recent?.flow_step ?? 0;
   const recentPhase = phaseOf(recentStep);
   const recentWhere = recentPhase ? `${recentPhase.name} · ${viewStepOf(recentStep)?.label ?? ""}` : "";

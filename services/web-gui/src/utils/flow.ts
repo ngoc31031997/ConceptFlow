@@ -72,7 +72,7 @@ export const FLOW_VIEW_PHASES = [
 ] as const satisfies readonly { name: string; tone: PhaseTone }[];
 
 /**
- * One step of the 21-step flow the Creator sees (ADR-0042, the mockup). The
+ * One step of the 23-step flow the Creator sees (ADR-0042, the mockup). The
  * project still runs the 13 steps above; `server` lists which of them this
  * step shows, and is empty for a step not built yet. Render (17) shows both
  * the voice and the render, which run as one stretch after Review.
@@ -93,7 +93,7 @@ export interface FlowViewStep {
    * The step has a screen of its own that no running step stands behind (it
    * is not one of the 13 steps the server derives a project's position from).
    */
-  screen?: "research" | "story" | "beats" | "script" | "lock";
+  screen?: "research" | "story" | "beats" | "script" | "lock" | "visual-concept";
   /** The step's screen was taken out and comes back in a later version: it shows the "not developed" page. */
   comingSoon?: boolean;
   /** What the step holds, in a few words, for the flow map. */
@@ -108,34 +108,36 @@ export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], screen: "beats", note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },
   { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], screen: "script", note: "Lời thoại theo beat, chuyển tiếp, nghe thử" },
   { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], screen: "lock", note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
-  { n: 8, phase: 1, label: "Mỹ thuật · lượt 1", title: "Thiết kế mỹ thuật · lượt 1", gate: true, server: [], note: "Diễn viên và phim trường dùng chung cả video" },
-  { n: 9, phase: 1, label: "Storyboard", gate: true, server: [4], comingSoon: true, note: "Cảnh, shot, lời đọc, hình trên màn" },
-  { n: 10, phase: 1, label: "Mỹ thuật · lượt 2", title: "Thiết kế mỹ thuật · lượt 2", gate: true, server: [], note: "Màu và ánh sáng từng phần của chuyện; khung mẫu" },
-  { n: 11, phase: 1, label: "Giọng sơ bộ", server: [], note: "Giọng chính thức từng câu, tự chạy" },
-  { n: 12, phase: 1, label: "Animatic", gate: true, server: [], note: "Khung tĩnh và giọng, chốt nhịp" },
-  { n: 13, phase: 2, label: "Hình minh hoạ", server: [5], comingSoon: true, note: "Hình riêng của từng shot" },
-  { n: 14, phase: 2, label: "Code", server: [6], comingSoon: true, note: "Code Remotion theo cảnh, tự kiểm lỗi" },
-  { n: 15, phase: 2, label: "Validate", server: [7], note: "Kiểm code và luật" },
-  { n: 16, phase: 2, label: "Review", gate: true, server: [8], note: "Nhìn lại, bắt đầu tạo video" },
-  { n: 17, phase: 3, label: "Render từng cảnh", server: [9, 10], note: "Giọng đọc rồi render từng cảnh, tự chạy" },
-  { n: 18, phase: 3, label: "Dựng", server: [], note: "Ghi chú theo mốc, làm lại một cảnh" },
-  { n: 19, phase: 3, label: "Merge + QC", server: [11], note: "Ghép, âm lượng, QC" },
-  { n: 20, phase: 3, label: "Kết quả", server: [12], note: "Xem, tải, làm Shorts" },
-  { n: 21, phase: 3, label: "Publish", server: [13], note: "Đăng YouTube" },
+  { n: 8, phase: 1, label: "Ngôn ngữ hình ảnh", gate: true, server: [], screen: "visual-concept", note: "Phong cách, bảng màu, cách vẽ khái niệm, chữ, chuyển động, điều không dùng, kiểm khả thi" },
+  { n: 9, phase: 1, label: "Phương án hình ảnh", gate: true, server: [], note: "Cách minh hoạ từng beat theo ngôn ngữ hình ảnh đã chốt" },
+  { n: 10, phase: 1, label: "Diễn tiến hình ảnh", gate: true, server: [], note: "Hình ảnh đổi thế nào qua hành trình câu chuyện" },
+  { n: 11, phase: 1, label: "Storyboard", gate: true, server: [4], comingSoon: true, note: "Cảnh, shot, lời đọc, hình trên màn" },
+  { n: 12, phase: 1, label: "Thiết kế tài nguyên", gate: true, server: [], note: "Nhân vật, vật thể, bối cảnh dùng chung cả video" },
+  { n: 13, phase: 1, label: "Thiết kế chuyển động", gate: true, server: [], note: "Chuyển động và chuyển cảnh của từng shot" },
+  { n: 14, phase: 1, label: "Animatic và duyệt", gate: true, server: [], note: "Khung tĩnh và giọng, chốt nhịp" },
+  { n: 15, phase: 2, label: "Hình minh hoạ", server: [5], comingSoon: true, note: "Hình riêng của từng shot" },
+  { n: 16, phase: 2, label: "Code", server: [6], comingSoon: true, note: "Code Remotion theo cảnh, tự kiểm lỗi" },
+  { n: 17, phase: 2, label: "Validate", server: [7], note: "Kiểm code và luật" },
+  { n: 18, phase: 2, label: "Review", gate: true, server: [8], note: "Nhìn lại, bắt đầu tạo video" },
+  { n: 19, phase: 3, label: "Render từng cảnh", server: [9, 10], note: "Giọng đọc rồi render từng cảnh, tự chạy" },
+  { n: 20, phase: 3, label: "Dựng", server: [], note: "Ghi chú theo mốc, làm lại một cảnh" },
+  { n: 21, phase: 3, label: "Merge + QC", server: [11], note: "Ghép, âm lượng, QC" },
+  { n: 22, phase: 3, label: "Kết quả", server: [12], note: "Xem, tải, làm Shorts" },
+  { n: 23, phase: 3, label: "Publish", server: [13], note: "Đăng YouTube" },
 ];
 
-/** The step of the 21-step flow that shows running step `step`, if any. */
+/** The step of the 23-step flow that shows running step `step`, if any. */
 export function viewStepOf(step: number): FlowViewStep | undefined {
   return FLOW_VIEW.find((v) => v.server.includes(step));
 }
 
-/** The number, in the 21-step flow, of the research step. */
+/** The number, in the 23-step flow, of the research step. */
 export const VIEW_RESEARCH = 3;
 
-/** The number, in the 21-step flow, of the story step. */
+/** The number, in the 23-step flow, of the story step. */
 export const VIEW_STORY = 4;
 
-/** The number, in the 21-step flow, of the beat sheet step. */
+/** The number, in the 23-step flow, of the beat sheet step. */
 export const VIEW_BEATS = 5;
 
 /** Whether the app has a screen for the step: a running step behind it, or a screen of its own. */
@@ -143,12 +145,12 @@ export function isBuilt(view: FlowViewStep): boolean {
   return !view.comingSoon && (view.server.length > 0 || !!view.screen);
 }
 
-/** The screen that tells the Creator step `n` of the 21-step flow is not developed yet. */
+/** The screen that tells the Creator step `n` of the 23-step flow is not developed yet. */
 export function comingRoute(n: number, projectId: string): string {
   return projectId ? `/projects/${projectId}/coming/${n}` : `/create/coming/${n}`;
 }
 
-/** The screen of a step of the 21-step flow that has one of its own (not a running step's). */
+/** The screen of a step of the 23-step flow that has one of its own (not a running step's). */
 export function screenRoute(view: FlowViewStep, projectId: string): string {
   return `/projects/${projectId}/${view.screen}`;
 }
@@ -167,6 +169,8 @@ export interface ScreenStanding {
   scriptApproved: boolean;
   /** A version of the script is locked. */
   scriptLocked: boolean;
+  /** A version of the visual concept is locked. */
+  conceptLocked: boolean;
 }
 
 /**
@@ -191,17 +195,28 @@ export function screenStatus(view: FlowViewStep, flowStep: number, standing: Scr
     case "lock":
       if (!standing.scriptApproved) return "pending";
       return standing.scriptLocked ? "done" : "waiting";
+    case "visual-concept":
+      if (!standing.scriptLocked) return "pending";
+      return standing.conceptLocked ? "done" : "waiting";
     default:
       if (!standing.beatsApproved) return "pending";
       return standing.scriptApproved ? "done" : "waiting";
   }
 }
 
-/** The number, in the 21-step flow, of the script step. */
+/** The number, in the 23-step flow, of the script step. */
 export const VIEW_SCRIPT = 6;
 
-/** The number, in the 21-step flow, of the lock step. */
+/** The number, in the 23-step flow, of the lock step. */
 export const VIEW_LOCK = 7;
+
+/** The number, in the 23-step flow, of the visual concept step. */
+export const VIEW_VISUAL_CONCEPT = 8;
+
+/** The screen of the visual concept step. */
+export function visualConceptRoute(projectId: string): string {
+  return `/projects/${projectId}/visual-concept`;
+}
 
 /** The screen of the lock step. */
 export function lockRoute(projectId: string): string {
@@ -218,7 +233,7 @@ export function beatsRoute(projectId: string): string {
   return `/projects/${projectId}/beats`;
 }
 
-/** The phase that holds step `n` of the 21-step flow, or null for a number outside it. */
+/** The phase that holds step `n` of the 23-step flow, or null for a number outside it. */
 export function phaseOfView(n: number): FlowPhase | null {
   const view = FLOW_VIEW.find((v) => v.n === n);
   if (!view) return null;
@@ -227,10 +242,10 @@ export function phaseOfView(n: number): FlowPhase | null {
 }
 
 /**
- * "Bước 9 — Storyboard": a step named with its number in the 21-step flow,
+ * "Bước 9 — Storyboard": a step named with its number in the 23-step flow,
  * for text that stands alone (the AI chain's progress, the video list). A
  * screen's own title is just the name (flowStepName): the line above it
- * already says "<nhóm> · Bước n/21". Both use the step rail's names.
+ * already says "<nhóm> · Bước n/23". Both use the step rail's names.
  */
 export function flowTitle(step: number): string {
   // A step outside the flow (a stale or hand-edited ?step=) keeps its number

@@ -1,0 +1,182 @@
+.kv {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 13.5px;
+}
+.kv dt {
+  font-weight: 700;
+}
+.kv dd {
+  margin: 0;
+  color: var(--ink-soft);
+  min-width: 0;
+}
+.list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+}
+.swatch {
+  display: inline-block;
+  width: 18px;
+  height: 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+.tag {
+  display: inline-flex;
+  font: 700 11px/1.5 var(--f-mono, monospace);
+  padding: 0 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--info-soft);
+  margin: 0 4px 4px 0;
+}
+.tagWarn {
+  background: var(--warn-soft);
+}
+.mine {
+  font: 700 10.5px var(--f-mono, monospace);
+  color: var(--info);
+  margin-left: 6px;
+}
+.folded {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.unitNo {
+  font: 700 12px var(--f-mono, monospace);
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  padding: 0 6px;
+  background: var(--muted);
+}
+.summary {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline {
+  display: flex;
+  height: 30px;
+  border: 2px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 520px;
+}
+.timeline div {
+  border-right: 1.5px solid var(--line);
+  font: 700 10px/1.2 var(--f-mono, monospace);
+  padding: 3px 5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.timeline div:last-child {
+  border-right: 0;
+}
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.check {
+  font: 11.5px var(--f-mono, monospace);
+  padding: 2px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--ok-soft);
+}
+.checkWarn {
+  background: var(--warn-soft);
+}
+.refs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+.ref {
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  align-content: start;
+}
+.refOn {
+  background: var(--accent-soft);
+  box-shadow: 2px 2px 0 var(--line);
+}
+.refLabel {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.problems {
+  margin: 0;
+  padding: 8px 12px 8px 26px;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  background: var(--warn-soft);
+  font-size: 13px;
+}
+.formRows {
+  display: grid;
+  gap: 10px;
+}
+.formRow {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+}
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 12px;
+}
+.criteria {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.criteria li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 13.5px;
+}
+.critOk {
+  color: var(--ok);
+  font-weight: 700;
+}
+.critNo {
+  color: var(--warn);
+  font-weight: 700;
+}
+.pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font: 12px/1.55 var(--f-mono, monospace);
+  max-height: 260px;
+  overflow: auto;
+}

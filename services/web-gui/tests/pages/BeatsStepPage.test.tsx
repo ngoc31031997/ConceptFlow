@@ -114,7 +114,7 @@ describe("BeatsStepPage", () => {
   it("shows the structure strip, its checks and one card per beat", async () => {
     await ready();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Dàn ý · beat sheet");
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 5/21");
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 5/23");
     expect(screen.getByTestId("rail-step-5")).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("beats-timeline").children).toHaveLength(3);
     expect(screen.getByTestId("beats-checks").querySelectorAll("[data-ok='false']")).toHaveLength(1);

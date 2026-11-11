@@ -203,6 +203,12 @@ async def test_step_models_fall_back_to_the_catalog_and_refuse_strangers(lib):
     assert (await lib.step_models())["step_models"]["code"] == "zai-org/glm-5.3-flash"
 
 
+async def test_the_visual_concept_step_has_a_default_model(lib):
+    assert "visual_concept" in (await lib.step_models())["step_models"]
+    await lib.set_step_model("visual_concept", "zai-org/glm-5.3-flash")
+    assert (await lib.step_models())["step_models"]["visual_concept"] == "zai-org/glm-5.3-flash"
+
+
 @pytest.fixture
 def client(store):
     cfg = config()

@@ -20,6 +20,7 @@ type deleteProjectUseCase interface {
 // Router builds visual-service's routes.
 type Router struct {
 	deleteProject deleteProjectUseCase
+	concept       conceptDesk
 }
 
 // NewRouter returns the router.
@@ -32,6 +33,9 @@ func (rt *Router) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/health", rt.handleHealth)
 	r.Delete("/internal/v1/visual/{project_id}", rt.handleDeleteProject)
+	if rt.concept != nil {
+		rt.mountConcept(r)
+	}
 	return r
 }
 

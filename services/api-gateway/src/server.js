@@ -20,6 +20,7 @@ const { visualLanguagesRouter } = require('./routes/visualLanguages');
 const { authRouter } = require('./routes/auth');
 const { progressRouter } = require('./routes/progress');
 const { healthRouter } = require('./routes/health');
+const { visualConceptRouter } = require('./routes/visualConcept');
 
 const logger = pino({ level: 'warn' });
 
@@ -52,6 +53,10 @@ function main() {
   // The call log and its statistics are llm-service's own.
   const llmClient = createHttpClient(config.llmServiceUrl);
   const publisherClient = createHttpClient(config.publisherUrl);
+  // The visual pre-production steps are visual-service's; its AI routes wait
+  // on the model like authoring-service's.
+  const visualClient = createHttpClient(config.visualServiceUrl);
+  const visualAiClient = createHttpClient(config.visualServiceUrl, { timeoutMs: 0 });
 
   // 3. Connect to RabbitMQ (amqpClient), declare exclusive queue bound to progress.fanout.
   const progress = progressHandler();
@@ -78,6 +83,7 @@ function main() {
   app.use(illustrationsRouter(authoringClient, authoringAiClient));
   app.use(visualLanguagesRouter(authoringClient, authoringAiClient, config.sharedDir));
   app.use(authRouter(publisherClient));
+  app.use(visualConceptRouter(visualClient, visualAiClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());
 

@@ -541,7 +541,19 @@ export type PromptRole =
   | "remotion_adjust"
   | "thumbnail_design"
   // Luật style hình minh hoạ mà AI vẽ hình phải theo; không render cho AI ngoài.
-  | "illustration_style";
+  | "illustration_style"
+  // Ngôn ngữ hình ảnh (visual-service): tám phần và rà soát; prompt đọc link YouTube
+  // chép sang AI ngoài để tạo một dòng thư viện tham chiếu.
+  | "visual_concept_creative_direction"
+  | "visual_concept_color_system"
+  | "visual_concept_visual_language"
+  | "visual_concept_representation_rules"
+  | "visual_concept_typography"
+  | "visual_concept_motion_language"
+  | "visual_concept_do_not_use"
+  | "visual_concept_feasibility"
+  | "visual_concept_review"
+  | "reference_style_youtube";
 
 /**
  * Một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại
@@ -3423,4 +3435,209 @@ export function confirmHandoff(projectId: string, beat: string): Promise<ScriptL
 /** Freezes the script and its handoff as the next version. */
 export function lockScript(projectId: string, note: string): Promise<ScriptLockState> {
   return lockCall(projectId, "/lock", { note });
+}
+
+// --- Step 8 · Ngôn ngữ hình ảnh (visual-service, docs/contracts/visual-concept-v1.md) ---
+
+/** Keys of the eight parts of the visual concept, in the order the AI writes them. */
+export type VisualConceptUnitKey =
+  | "creative_direction"
+  | "color_system"
+  | "visual_language"
+  | "representation_rules"
+  | "typography"
+  | "motion_language"
+  | "do_not_use"
+  | "feasibility";
+
+/** One part of the visual concept as the screen shows it. */
+export interface VisualConceptUnit {
+  key: VisualConceptUnitKey;
+  number: number;
+  title: string;
+  status: "pending" | "approved" | "running";
+  written: boolean;
+  /** The part's JSON as the document holds it; null until written. */
+  content: Record<string, unknown> | null;
+  /** Top-level fields the Creator wrote; the AI keeps them. */
+  creator_fields: string[];
+  /** Names of the inputs the part is written from. */
+  reads: string[];
+  /** An input the part reads changed since it was written. */
+  stale: boolean;
+  stale_sources: string[];
+  /** What fails the part's checks; a part with problems cannot be approved. */
+  problems: string[];
+  redo_count: number;
+}
+
+/** A description of the shared reference library, and whether this video picked it. */
+export interface VisualReference {
+  ref_id: string;
+  name: string;
+  summary: string;
+  tags: string[];
+  /** How the style is drawn and laid out; every field may be empty. */
+  drawing: Record<string, string>;
+  layout: Record<string, string>;
+  picked: boolean;
+}
+
+/** One machine check of the whole concept, with the Creator's acceptance. */
+export interface VisualConceptCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  accepted: boolean;
+  why: string;
+}
+
+/** One issue the AI found in the concept. */
+export interface VisualConceptFinding {
+  id: string;
+  group: "accuracy" | "consistency" | "clarity" | "feasibility";
+  group_label: string;
+  unit_key: VisualConceptUnitKey;
+  unit_number: number;
+  unit_title: string;
+  field: string;
+  text: string;
+  detail: string;
+  fix: string;
+  state: "open" | "fixed" | "applied" | "accepted";
+  why: string;
+}
+
+/** A locked version of the visual concept (`document` only when asked for one version). */
+export interface VisualConceptVersion {
+  version: number;
+  script_version: number;
+  note: string;
+  locked_at: string;
+  document?: Record<string, unknown>;
+}
+
+/** The whole screen of step 8. */
+export interface VisualConceptState {
+  input: {
+    script_version: number;
+    facts_count: number;
+    research_skipped: boolean;
+    beats: { key: string; number: number; fn: string; title: string; dur: number }[];
+    terms_count: number;
+    refs_count: number;
+  };
+  /** Each input as the AI reads it. */
+  input_view: { key: string; label: string; text: string }[];
+  refs: VisualReference[];
+  units: VisualConceptUnit[];
+  approved_count: number;
+  checks: VisualConceptCheck[];
+  /** Why rendering could not list its fonts ("" when it did); the typography part cannot be approved or locked meanwhile. */
+  fonts_error: string;
+  /** The fonts rendering draws text in. */
+  fonts: string[];
+  review: {
+    reviewed: boolean;
+    rounds: number;
+    running: boolean;
+    findings: VisualConceptFinding[];
+    notes: string[];
+    open_count: number;
+  };
+  criteria: { label: string; ok: boolean; detail: string }[];
+  blockers: string[];
+  can_lock: boolean;
+  versions: VisualConceptVersion[];
+  locked_version: number;
+  next_version: number;
+  /** What differs from the latest locked version. */
+  draft: string[];
+  /** The video's model; "" = the step default. */
+  model: string;
+  default_model: string;
+  models: { id: string; label: string; local: boolean }[];
+}
+
+const visualConceptPath = (projectId: string) => `/v1/projects/${projectId}/visual-concept`;
+
+/** The screen of step 8; rejects with code `script_not_locked` before the script is locked. */
+export function getVisualConcept(projectId: string): Promise<VisualConceptState> {
+  return apiFetch<VisualConceptState>(visualConceptPath(projectId));
+}
+
+function sendVisualConcept(projectId: string, method: string, sub: string, body?: object, call?: AiCall): Promise<VisualConceptState> {
+  const init = operationInit(call);
+  return apiFetch<VisualConceptState>(`${visualConceptPath(projectId)}${sub}`, {
+    method,
+    headers: { ...JSON_HEADERS, ...init.headers },
+    signal: init.signal,
+    body: operationBody(body ?? {}, call),
+  });
+}
+
+/** Replaces the reference descriptions the video's step 8 reads. */
+export function setVisualConceptRefs(projectId: string, refIds: string[]): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "PUT", "/refs", { ref_ids: refIds });
+}
+
+/** Saves the model step 8 runs on for this video; "" = the step default. */
+export function setVisualConceptModel(projectId: string, model: string): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "PUT", "/model", { model });
+}
+
+/** The AI writes the empty parts one after another, or with `rewriteAll` every part. */
+export function generateVisualConcept(projectId: string, note: string, rewriteAll: boolean, call?: OperationCall): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", "/generate", { note, rewrite_all: rewriteAll }, call);
+}
+
+/** The AI writes or rewrites one part, with the Creator's note; can run through an AI outside the system. */
+export function generateVisualConceptUnit(projectId: string, key: VisualConceptUnitKey, note: string, call?: AiCall): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", `/units/${key}/generate`, { note }, call);
+}
+
+/** Saves the Creator's fields of one part; they become the Creator's and the part goes back to review. */
+export function editVisualConceptUnit(projectId: string, key: VisualConceptUnitKey, fields: Record<string, unknown>): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "PUT", `/units/${key}`, { fields });
+}
+
+/** Approves one part. */
+export function approveVisualConceptUnit(projectId: string, key: VisualConceptUnitKey): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", `/units/${key}/approve`);
+}
+
+/** Puts one approved part back to review. */
+export function unapproveVisualConceptUnit(projectId: string, key: VisualConceptUnitKey): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", `/units/${key}/unapprove`);
+}
+
+/** Approves every written part that passes its checks and whose inputs did not change. */
+export function approveAllVisualConcept(projectId: string): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", "/approve-all");
+}
+
+/** The AI reviews the whole concept; can run through an AI outside the system. */
+export function reviewVisualConcept(projectId: string, note: string, call?: AiCall): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", "/review", { note }, call);
+}
+
+/** Writes a finding's fix into its field. */
+export function applyVisualConceptFinding(projectId: string, findingId: string): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", `/findings/${findingId}/apply`);
+}
+
+/** Accepts a finding or a failing machine check with a reason. */
+export function acceptVisualConceptFinding(projectId: string, findingId: string, why: string): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", `/findings/${findingId}/accept`, { why });
+}
+
+/** Locks the next version of the visual concept. */
+export function lockVisualConcept(projectId: string, note: string): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", "/lock", { note });
+}
+
+/** One locked version with its document. */
+export function getVisualConceptVersion(projectId: string, version: number): Promise<VisualConceptVersion> {
+  return apiFetch<VisualConceptVersion>(`${visualConceptPath(projectId)}/versions/${version}`);
 }

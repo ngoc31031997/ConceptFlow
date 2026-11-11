@@ -9,13 +9,29 @@ func TestLoad_RequiresTheDatabase(t *testing.T) {
 	}
 }
 
+func TestLoad_RequiresTheServicesItReads(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("AUTHORING_SERVICE_URL", "")
+	t.Setenv("LLM_SERVICE_URL", "http://llm")
+	if _, err := Load(); err == nil {
+		t.Fatal("a missing AUTHORING_SERVICE_URL must be an error")
+	}
+	t.Setenv("AUTHORING_SERVICE_URL", "http://authoring")
+	t.Setenv("LLM_SERVICE_URL", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("a missing LLM_SERVICE_URL must be an error")
+	}
+}
+
 func TestLoad_DefaultsAndOverrides(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("AUTHORING_SERVICE_URL", "http://authoring")
+	t.Setenv("LLM_SERVICE_URL", "http://llm")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPPort != "8000" || cfg.DatabaseMaxConns != 10 {
+	if cfg.HTTPPort != "8000" || cfg.DatabaseMaxConns != 10 || cfg.LLMTimeoutSeconds != 0 || cfg.MaxOutputTokens != 128000 || cfg.RenderingURL != "http://rendering:8000" {
 		t.Fatalf("defaults %+v", cfg)
 	}
 	t.Setenv("HTTP_PORT", "9000")

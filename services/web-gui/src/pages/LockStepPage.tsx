@@ -14,7 +14,7 @@ import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useScriptLock } from "../hooks/useScriptLock";
-import { VIEW_LOCK, comingRoute, readOnlyReason, scriptRoute } from "../utils/flow";
+import { VIEW_LOCK, readOnlyReason, scriptRoute, visualConceptRoute } from "../utils/flow";
 
 const SUBTITLE =
   "Máy và AI rà soát kịch bản; bạn xử lý từng mục. Viết ghi chú bàn giao cho các vai AI phía sau rồi chốt một phiên bản.";
@@ -44,11 +44,11 @@ function stripOf(s: ScriptLockState, running: boolean): StepStripProps {
       message: `Các bước sau vẫn dùng v${s.lockedVersion} tới khi bạn chốt bản mới.`,
     };
   }
-  return { tone: "ok", label: `Đã chốt v${s.lockedVersion}`, message: "Tiếp theo: Mỹ thuật lượt 1 đọc bộ bàn giao này." };
+  return { tone: "ok", label: `Đã chốt v${s.lockedVersion}`, message: "Tiếp theo: Ngôn ngữ hình ảnh đọc phiên bản đã chốt." };
 }
 
 /**
- * Step 7 of the 21-step flow: reviewing and locking the script. Three tabs: the
+ * Step 7 of the 23-step flow: reviewing and locking the script. Three tabs: the
  * review of the whole script (machine checks and the AI), the handoff note of
  * each beat with the shared glossary, and the package with the version history.
  * Locking freezes a version the steps after the script read.
@@ -140,11 +140,11 @@ export function LockStepPage() {
 
       <WizardNav
         allowWhenLocked
-        hint={state && state.lockedVersion > 0 ? `Đã chốt v${state.lockedVersion}. Sang Mỹ thuật lượt 1.` : "Chốt một phiên bản để sang Mỹ thuật lượt 1."}
+        hint={state && state.lockedVersion > 0 ? `Đã chốt v${state.lockedVersion}. Sang Ngôn ngữ hình ảnh.` : "Chốt một phiên bản để sang Ngôn ngữ hình ảnh."}
         onBack={() => navigate(scriptRoute(projectId))}
-        onNext={() => navigate(comingRoute(VIEW_LOCK + 1, projectId))}
+        onNext={() => navigate(visualConceptRoute(projectId))}
         nextDisabled={!state || state.lockedVersion === 0}
-        nextLabel="Sang Mỹ thuật lượt 1"
+        nextLabel="Sang Ngôn ngữ hình ảnh"
         nextTestId="lock-next"
       />
     </div>

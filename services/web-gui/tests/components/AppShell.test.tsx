@@ -58,40 +58,40 @@ function renderShell(p: Project | null, currentStep: number, recent: ProjectSumm
   );
 }
 
-describe("AppShell — the 21-step flow", () => {
+describe("AppShell — the 23-step flow", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
   });
 
-  it("shows all 21 steps, with the current one marked", async () => {
+  it("shows all 23 steps, with the current one marked", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
     await waitForStepRail();
-    for (let i = 1; i <= 21; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
-    expect(screen.queryByTestId("rail-step-22")).not.toBeInTheDocument();
-    // Running step 3 (the script) is step 6 of the 21.
+    for (let i = 1; i <= 23; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
+    expect(screen.queryByTestId("rail-step-24")).not.toBeInTheDocument();
+    // Running step 3 (the script) is step 6 of the 23.
     expect(screen.getByTestId("rail-step-6")).toHaveAttribute("aria-current", "step");
   });
 
   it("opens a step the project has reached, and keeps the ones after it closed", async () => {
     renderShell(project({ status: "rendering", flow_step: 10, run_state: "running" }), 5);
     await waitForStepRail();
-    await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-reached", "true"));
-    expect(screen.getByTestId("rail-step-16")).toHaveAttribute("data-reached", "true");
-    expect(screen.getByTestId("rail-step-19")).toHaveAttribute("data-reached", "false");
-    expect(screen.getByTestId("rail-step-21")).toBeDisabled();
+    await waitFor(() => expect(screen.getByTestId("rail-step-19")).toHaveAttribute("data-reached", "true"));
+    expect(screen.getByTestId("rail-step-18")).toHaveAttribute("data-reached", "true");
+    expect(screen.getByTestId("rail-step-21")).toHaveAttribute("data-reached", "false");
+    expect(screen.getByTestId("rail-step-23")).toBeDisabled();
     // A step the app does not have yet opens a page that says it is not developed.
-    expect(screen.getByTestId("rail-step-18")).not.toBeDisabled();
+    expect(screen.getByTestId("rail-step-20")).not.toBeDisabled();
 
-    fireEvent.click(screen.getByTestId("rail-step-17"));
+    fireEvent.click(screen.getByTestId("rail-step-19"));
     expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/render$/);
-    fireEvent.click(screen.getByTestId("rail-step-18"));
-    expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/coming\/18$/);
+    fireEvent.click(screen.getByTestId("rail-step-20"));
+    expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/coming\/20$/);
   });
 
   it("shows the phase and step above the title", async () => {
     renderShell(project({ status: "draft", flow_step: 4, run_state: "idle" }), 4);
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Hình ảnh · Bước 9/21");
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Hình ảnh · Bước 11/23");
   });
 
   it("shows the step menu on step 1, before the server has a project", async () => {
@@ -104,7 +104,7 @@ describe("AppShell — the 21-step flow", () => {
     await waitForStepRail();
     for (const step of [2, 3, 4]) expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
     // The storyboard screen was taken out: it reads as a step that is coming, not as one that is locked.
-    expect(screen.getByTestId("rail-step-9")).toHaveAttribute("data-status", "coming");
+    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "coming");
   });
 
   it("names the phase and the step on the sidebar's resume link, not a bare step count", async () => {
@@ -115,7 +115,7 @@ describe("AppShell — the 21-step flow", () => {
     const link = await screen.findByTestId("resume-recent-project");
     expect(link).toHaveTextContent("Tiếp tục · đang chạy");
     expect(link).toHaveTextContent("Hậu kỳ · Render");
-    expect(link).not.toHaveTextContent("/21");
+    expect(link).not.toHaveTextContent("/23");
   });
 
   it("locks the authoring screens read-only while the project is rendering, and says why", async () => {

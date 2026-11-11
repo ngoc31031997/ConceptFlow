@@ -10,7 +10,7 @@ Khuôn của các bước AI: bước 5–7 (CR-108, CR-109, CR-111).
 ## Creator đã chốt
 1. Flow còn **23 bước**: bỏ bước Phân rã kịch bản; bước 8 là Ngôn ngữ hình ảnh; các bước sau lùi một số.
 2. Bước 8 làm theo spec Visual Concept: 9 việc; output `visual-concept` và `visual-concept-review`; 5 tiêu chí hoàn thành.
-3. **Tham chiếu phong cách chỉ là mô tả dạng chữ**, lưu ở Cài đặt › Thư viện tham chiếu, dùng chung mọi video. Bước 8 tick chọn mô tả. Không có file hình; AI không đọc hình.
+3. **Tham chiếu phong cách chỉ là mô tả dạng chữ có trường**, lưu ở Cài đặt › Thư viện tham chiếu, dùng chung mọi video. Mỗi mô tả: `name`, `summary` (bắt buộc), `tags`, `source{url,title,kind}`, `drawing{medium,shape,outline,fill,shading,light,depth,perspective,texture}`, `layout{structure,layering,persistent_elements}`; trường khác để trống được. Tham chiếu chỉ cho **cách vẽ và layout**: không có màu, bố cục, nhân vật, chữ, chuyển động, điều tránh, vì chúng phụ thuộc chủ đề và cảnh nên AI bước 8 tự suy ra; mức đơn giản hay chi tiết cũng do chủ đề và cảnh quyết. Bước 8 tick chọn mô tả. Không có file hình; AI không đọc hình.
 4. **Phong cách do AI đề xuất tự do**: bỏ quyết định cũ "một ngôn ngữ hình được ghim".
 5. Style frame làm sau.
 6. Service mới `visual-service`. Prompt và model mặc định nằm ở llm-service (CR-113). visual-service tham gia saga xoá video.
@@ -29,7 +29,7 @@ Khuôn của các bước AI: bước 5–7 (CR-108, CR-109, CR-111).
 | story-structure | bước 4 | câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff |
 | beat-sheet | bước 5 | key, chức năng, tiêu đề, mục tiêu, thời lượng |
 | script-final | bản chốt bước 7 | số phiên bản, lời thoại theo beat, ghi chú bàn giao, bảng thuật ngữ |
-| tham chiếu | visual-service | các mô tả video này đã chọn |
+| tham chiếu | visual-service | các mô tả video này đã chọn (tên, tóm tắt, cách vẽ, layout); chỉ phần 1 và 3 đọc |
 
 **Điều kiện vào:** đã có kịch bản chốt (authoring trả 404 khi chưa có). Chưa có thì `409 script_not_locked`, và màn báo "Chốt kịch bản ở bước 7 trước".
 
@@ -45,7 +45,7 @@ Khuôn là JSON của Creator; khoá có dấu `+` là bổ sung.
   "color_system": { "background", "palette[{token, hex, role, +name}]",
     "+journey[{beat_keys[], mood, accent_token}]", "+contrast{text_min, subject_vs_bg, accent_per_frame}",
     "+exceptions[{token, beat_keys[], why}]", "+examples[]" },
-  "visual_language": { "shape_rules[]", "line_rules[]", "lighting_rules[]", "depth_rules[]", "+composition_rules[]", "+examples[]" },
+  "visual_language": { "shape_rules[]", "line_rules[]", "lighting_rules[]", "depth_rules[]", "+surface_rules[]", "+layout_rules[]", "+composition_rules[]", "+examples[]" },
   "representation_rules": {
     "characters": { "approach", "allowed_variations[]", "+items[{concept_id, term, draw, must_not_imply[], facts[]}]" },
     "+objects[]", "+invisible[]",
@@ -56,12 +56,12 @@ Khuôn là JSON của Creator; khoá có dấu `+` là bổ sung.
   "do_not_use[{text, +why, +facts[], +source: accuracy|style}]",
   "+feasibility": { "scope{beats, est_shots, settings, characters}", "checks[{item, assessment, verdict: ok|risk, mitigation}]" },
   "+accuracy_notes[{fact, note}]",
-  "+reference_styles[{ref_id, name, description}]",
+  "+reference_styles[{ref_id, name, summary, drawing, layout}]",
   "review": { "reviewer": "creator", "approved_at", "comments[{+id, +group, text, +decision, +why}]" }
 }
 ```
 
-So với JSON gốc: `do_not_use` đổi từ mảng chuỗi sang mảng object; `reference_assets` (đường dẫn file) đổi thành `reference_styles` (văn bản); `review.comments` lấy từ các vấn đề rà soát.
+So với JSON gốc: `do_not_use` đổi từ mảng chuỗi sang mảng object; `reference_assets` (đường dẫn file) đổi thành `reference_styles` (văn bản có trường, chép nguyên văn `summary`, `drawing`, `layout`); `review.comments` lấy từ các vấn đề rà soát.
 
 ## 8 phần trên màn hình (đơn vị duyệt)
 Mỗi phần là một đơn vị `kind = visual_concept`, `unit_key` là tên phần trong tài liệu. Cột "Việc" là số việc trong spec.
@@ -70,7 +70,7 @@ Mỗi phần là một đơn vị `kind = visual_concept`, `unit_key` là tên p
 |---|---|---|---|---|
 | 1 | `creative_direction` | 1, 2 | `creative_direction` | `abstraction_level` và `level` thuộc enum; `refs_used` ⊆ mô tả đang chọn |
 | 2 | `color_system` | 3 | `color_system` | hex hợp lệ; `token` duy nhất; mọi beat có trong `journey`; `accent_token` có trong `palette` |
-| 3 | `visual_language` | 4 | `visual_language` | không mảng nào rỗng |
+| 3 | `visual_language` | 4 | `visual_language` | `shape_rules`, `line_rules`, `lighting_rules`, `depth_rules`, `composition_rules` không rỗng; `surface_rules`, `layout_rules` không rỗng khi tham chiếu đã chọn có nói về bề mặt (`fill`, `texture`, `medium`) hay layout |
 | 4 | `representation_rules` | 5 | `representation_rules` (trừ `typography`) | `concept_id` duy nhất; `facts` là mã có thật |
 | 5 | `typography` | 6 | `representation_rules.typography` | `font` có trong danh sách font của rendering |
 | 6 | `motion_language` | 7 | `motion_language` | mọi beat có `pace`; `pace` thuộc enum |
@@ -114,7 +114,8 @@ Mỗi phần là một đơn vị `kind = visual_concept`, `unit_key` là tên p
    Khi chốt, hệ thống ghép tài liệu và ghi `visual_concept_versions` với `status: locked`. Từ v2 trở đi có hộp xác nhận nêu các phần đã đổi so với bản trước.
 9. **Thư viện tham chiếu:**
    - Thêm, sửa, xoá mô tả.
-   - Sửa hoặc xoá một mô tả đang được video nào đó chọn thì hộp xác nhận liệt kê các video đó. Hash nguồn `refs` đổi nên các phần đọc tham chiếu thành `stale`. Bản chốt giữ nguyên vì nó chép văn bản.
+   - Sửa hoặc xoá một mô tả đang được video nào đó chọn thì hộp xác nhận liệt kê các video đó. Hash nguồn `refs` (tên, tóm tắt, cách vẽ, layout) đổi nên các phần đọc tham chiếu thành `stale`. Chỉ phần 1 (`creative_direction`) và phần 3 (`visual_language`) đọc tham chiếu; các phần 2, 4, 5, 6, 7, 8 không. Bản chốt giữ nguyên vì nó chép văn bản.
+   - Ánh xạ sang phần 3: `drawing.shape` → `shape_rules`; `drawing.outline` → `line_rules`; `drawing.light` và `drawing.shading` → `lighting_rules`; `drawing.depth` và `drawing.perspective` → `depth_rules`; `drawing.fill`, `drawing.texture`, `drawing.medium` → `surface_rules`; cả nhóm `layout` → `layout_rules`. `composition_rules` do AI tự đặt theo chủ đề và cảnh, không lấy từ tham chiếu.
    - Tick chọn ở bước 8: `PUT /visual-concept/refs`.
 
 ## Dữ liệu (`visual-db`)
@@ -123,7 +124,7 @@ Mỗi phần là một đơn vị `kind = visual_concept`, `unit_key` là tên p
 | `review_units` | `(project_id, kind, unit_key)` | `status` (pending, approved, running), `content JSONB`, `creator_fields TEXT[]` (đường dẫn trường), `input_hashes JSONB`, `redo_count`, `created_at`, `updated_at`. `kind`: `visual_concept`, `visual_review` (`unit_key = main`, `content` = findings và quyết định, có dấu vân tay để quyết định cho mục máy kiểm tự hết hiệu lực khi nội dung đổi) |
 | `visual_concept_versions` | `(project_id, version)` | `script_version`, `document JSONB`, `note`, `locked_at` |
 | `project_visual` | `project_id` | `concept_model` (`''` = mặc định ở llm-service), `created_at`, `updated_at` |
-| `reference_styles` | `id` (`R01`…) | `seq BIGSERIAL` (mã không dùng lại), `name`, `description`, `tags TEXT[]`, `created_at`, `updated_at` |
+| `reference_styles` | `id` (`R01`…) | `seq BIGSERIAL` (mã không dùng lại), `name`, `description` (= `summary`), `detail JSONB` (`source`, `drawing`, `layout`), `tags TEXT[]`, `created_at`, `updated_at` |
 | `project_reference_picks` | `(project_id, ref_id)` | khoá ngoại tới `reference_styles`, `ON DELETE CASCADE` |
 
 Schema tạo bằng `CREATE TABLE IF NOT EXISTS` lúc khởi động, như authoring. Purge xoá các dòng của dự án trong 4 bảng; `reference_styles` giữ nguyên.
@@ -133,12 +134,12 @@ Schema tạo bằng `CREATE TABLE IF NOT EXISTS` lúc khởi động, như autho
 | Lớp | Tệp |
 |---|---|
 | domain | `visual_concept.go` (8 phần, schema, kiểm từng phần, ghép tài liệu, `accuracy_notes`), `concept_checks.go` (tương phản WCAG, phủ thuật ngữ, phủ giả thuyết và ngộ nhận), `review_unit.go`, `findings.go` (đọc reply rà soát, gộp vòng sau), `reference_style.go`, `input.go` (input từ authoring, hash từng nguồn) |
-| application | `concept_desk.go` (trạng thái màn, sửa, duyệt, chốt), `concept_writer.go` (AI viết một phần hoặc lần lượt), `concept_reviewer.go`, `reference_library.go`, `purge.go` |
+| application | `concept_desk.go` (trạng thái màn, sửa, duyệt, chốt), `concept_writer.go` (AI viết một phần hoặc lần lượt), `concept_reviewer.go`, `purge.go`; cổng đọc `ReferenceReader` (thư viện và mô tả đã chọn) cài ở adapter postgres |
 | ports | `AuthoringInputPort`, `LLMPort` (Chat), `PromptLibraryPort` (CR-113), `FontCatalogPort`, các kho |
 | adapters | `http` (router, middleware `X-External-AI`), `postgres`, `authoring` (client HTTP), `llm` (client), `rabbitmq` (purge) |
 | cmd | `cmd/visual-service/main.go` |
 
-Danh sách font lấy từ rendering hoặc từ một cấu hình dùng chung. Tôi chưa kiểm rendering có route liệt kê font chưa; nếu chưa có thì phải hỏi Creator trước khi chọn cách.
+Danh sách font lấy từ rendering qua `GET {RENDERING_URL}/v1/fonts` (Creator đã chốt; route do CR-112d làm), đọc mỗi lần mở màn, không cache và không có danh sách dự phòng trong code. Rendering không trả lời thì phần 5 báo lỗi có tên rendering và không duyệt, không viết bằng AI, không chốt được cho tới khi kiểm được font; bảy phần còn lại không bị ảnh hưởng.
 
 ### authoring-service
 `GET /internal/v1/authoring/{id}/script-versions/latest`: trả nguyên bản kịch bản chốt mới nhất (mọi phần kèm hash). `404` khi chưa chốt. Có test Go.
@@ -178,9 +179,11 @@ Ghi trong `docs/contracts/visual-concept-v1.md` và một dòng trong README h�
 Thêm `visual-db` và `visual-service`, có healthcheck và biến môi trường `AUTHORING_SERVICE_URL`, `LLM_SERVICE_URL`, `RABBITMQ_URL`. api-gateway thêm `VISUAL_SERVICE_URL`.
 
 ## Prompt
-Hai nhóm vai, seed nằm trong visual-service và đẩy lên llm-service theo CR-113:
+Hai nhóm vai (cộng một prompt lưu trữ, xem dưới), seed nằm trong visual-service và đẩy lên llm-service theo CR-113:
 - `visual_concept_<key>`: 8 vai, mỗi phần một vai;
 - `visual_concept_review`: một vai.
+
+Prompt thứ 10, `reference_style_youtube` (tên "Đọc link YouTube thành mô tả tham chiếu", biến `{{url}}`), là prompt để Creator chép sang AI ngoài và tạo một dòng thư viện tham chiếu. visual-service chỉ đẩy nó lên thư viện prompt cùng owner `visual`, không bao giờ ghép hay gọi nó; thư viện tham chiếu (CR-112c) lấy bằng `GET /v1/prompts/reference_style_youtube`. Creator đã duyệt nguyên văn.
 
 **Nguyên văn từng prompt sẽ đưa Creator duyệt trước khi ghi vào seed.**
 

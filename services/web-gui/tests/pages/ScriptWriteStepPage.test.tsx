@@ -117,7 +117,7 @@ describe("ScriptWriteStepPage", () => {
   it("shows the overview, its checks and one card per beat with its lines", async () => {
     await ready();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Viết kịch bản");
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 6/21");
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 6/23");
     expect(screen.getByTestId("rail-step-6")).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("script-counts")).toHaveTextContent("6 câu · 3/3 beat có lời");
     expect(screen.getByTestId("script-total")).toHaveTextContent("0:18 · mục tiêu 4–5 phút");

@@ -14,9 +14,9 @@ import { stepLabel } from "../../src/utils/pipelineLabels";
 
 describe("flowTitle", () => {
   it("names a step as the step rail does", () => {
-    expect(flowTitle(4)).toBe("Bước 9 — Storyboard");
-    expect(flowTitle(FLOW_LABELS.length)).toBe("Bước 21 — Publish");
-    expect(flowTitle(12)).toBe("Bước 20 — Kết quả");
+    expect(flowTitle(4)).toBe("Bước 11 — Storyboard");
+    expect(flowTitle(FLOW_LABELS.length)).toBe("Bước 23 — Publish");
+    expect(flowTitle(12)).toBe("Bước 22 — Kết quả");
   });
 
   it("gives a screen title the bare name, since the line above it carries the number", () => {
@@ -43,9 +43,9 @@ describe("saga step labels under the flow titles", () => {
 });
 
 describe("phases of the flow", () => {
-  it("shows the 21 steps of the mockup in the four phases, numbered in order", () => {
+  it("shows the 23 steps of the mockup in the four phases, numbered in order", () => {
     expect(FLOW_VIEW_PHASES.map((p) => p.name)).toEqual(["Tiền kỳ · Nội dung", "Tiền kỳ · Hình ảnh", "Sản xuất", "Hậu kỳ"]);
-    expect(FLOW_VIEW.map((v) => v.n)).toEqual(Array.from({ length: 21 }, (_, i) => i + 1));
+    expect(FLOW_VIEW.map((v) => v.n)).toEqual(Array.from({ length: 23 }, (_, i) => i + 1));
     expect(FLOW_VIEW.map((v) => v.phase)).toEqual([...FLOW_VIEW.map((v) => v.phase)].sort((a, b) => a - b));
     expect(FLOW_VIEW.filter((v) => v.phase === 0)).toHaveLength(7);
   });
@@ -53,7 +53,7 @@ describe("phases of the flow", () => {
   it("puts every running step under exactly one step of the view, in order", () => {
     const shown = FLOW_VIEW.flatMap((v) => [...v.server]);
     expect(shown).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
-    expect(FLOW_VIEW.filter((v) => v.server.length === 0).map((v) => v.n)).toEqual([3, 4, 5, 7, 8, 10, 11, 12, 18]);
+    expect(FLOW_VIEW.filter((v) => v.server.length === 0).map((v) => v.n)).toEqual([3, 4, 5, 7, 8, 9, 10, 12, 13, 14, 20]);
   });
 
   it("finds the phase of a step, and none for a step outside the flow", () => {
@@ -68,7 +68,7 @@ describe("phases of the flow", () => {
   });
 
   it("marks the steps the Creator approves", () => {
-    expect(FLOW_VIEW.filter((v) => v.gate).map((v) => v.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16]);
+    expect(FLOW_VIEW.filter((v) => v.gate).map((v) => v.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 18]);
   });
 });
 

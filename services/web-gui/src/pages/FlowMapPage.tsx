@@ -39,7 +39,7 @@ function StepBody({ view }: { view: FlowViewStep }) {
 }
 
 /**
- * The whole 21-step flow on one page (ADR-0042): a card per phase, each step
+ * The whole 23-step flow on one page (ADR-0042): a card per phase, each step
  * with its number, name, what it holds, and whether the Creator approves it
  * (◆) or a machine runs it. A step the app has opens its preview; a step with
  * a screen of its own opens that screen for the video last worked on; one not

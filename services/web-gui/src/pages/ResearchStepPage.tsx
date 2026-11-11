@@ -61,7 +61,7 @@ function stripOf(state: ResearchState): StepStripProps {
 }
 
 /**
- * Step 3 of the 21-step flow (optional): research and fact-check. The Creator
+ * Step 3 of the 23-step flow (optional): research and fact-check. The Creator
  * gets the questions, takes a prompt to an outside research tool, pastes the
  * answer back, and the server checks every quote against its page. The step is
  * done when the fact table is approved or the step is skipped; nothing after it
