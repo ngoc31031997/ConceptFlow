@@ -541,7 +541,9 @@ export type PromptRole =
   | "remotion_adjust"
   | "thumbnail_design"
   // Luật style hình minh hoạ mà AI vẽ hình phải theo; không render cho AI ngoài.
-  | "illustration_style";
+  | "illustration_style"
+  // Prompt Creator copies to an outside AI to describe a YouTube video's style for the reference library.
+  | "reference_style_youtube";
 
 /**
  * Một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại
@@ -3423,4 +3425,97 @@ export function confirmHandoff(projectId: string, beat: string): Promise<ScriptL
 /** Freezes the script and its handoff as the next version. */
 export function lockScript(projectId: string, note: string): Promise<ScriptLockState> {
   return lockCall(projectId, "/lock", { note });
+}
+
+/** Where a reference style was read from; every field may be empty. */
+export interface ReferenceSource {
+  url: string;
+  title: string;
+  /** "video", "image", "site", "other" or "". */
+  kind: string;
+}
+
+/** How a reference style is drawn; every field may be empty. */
+export interface ReferenceDrawing {
+  medium: string;
+  shape: string;
+  outline: string;
+  fill: string;
+  shading: string;
+  light: string;
+  depth: string;
+  perspective: string;
+  texture: string;
+}
+
+/** How a reference style lays out the frame; every field may be empty. */
+export interface ReferenceLayout {
+  structure: string;
+  layering: string;
+  persistent_elements: string;
+}
+
+/** What the Creator writes when adding or editing a description; only name and summary are required. */
+export interface ReferenceStyleInput {
+  name: string;
+  summary: string;
+  tags: string[];
+  source: ReferenceSource;
+  drawing: ReferenceDrawing;
+  layout: ReferenceLayout;
+}
+
+/** A structured description of a visual style in the shared reference library. */
+export interface ReferenceStyle extends ReferenceStyleInput {
+  /** R01, R02…; a deleted id is never reused. */
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Every description, in the order they were added. */
+export async function listReferenceStyles(): Promise<ReferenceStyle[]> {
+  const result = await apiFetch<{ styles: ReferenceStyle[] }>("/v1/reference-styles");
+  return result.styles;
+}
+
+export function createReferenceStyle(input: ReferenceStyleInput): Promise<ReferenceStyle> {
+  return apiFetch<ReferenceStyle>("/v1/reference-styles", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateReferenceStyle(id: string, input: ReferenceStyleInput): Promise<ReferenceStyle> {
+  return apiFetch<ReferenceStyle>(`/v1/reference-styles/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteReferenceStyle(id: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/reference-styles/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/** The ids of the videos that picked a description, so an edit or delete can name them. */
+export async function getReferenceStyleUsage(id: string): Promise<string[]> {
+  const result = await apiFetch<{ projects: { project_id: string }[] }>(
+    `/v1/reference-styles/${encodeURIComponent(id)}/usage`,
+  );
+  return result.projects.map((p) => p.project_id);
+}
+
+/**
+ * Has the server check a pasted description (JSON text) and return it cleaned,
+ * without storing it. Rejects with the server's reason naming the wrong field.
+ */
+export async function importReferenceStyle(pastedJson: string): Promise<ReferenceStyleInput> {
+  const result = await apiFetch<{ style: ReferenceStyleInput }>("/v1/reference-styles/import", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: pastedJson,
+  });
+  return result.style;
 }

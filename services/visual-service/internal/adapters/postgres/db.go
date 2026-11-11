@@ -62,6 +62,9 @@ CREATE TABLE IF NOT EXISTS reference_styles (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- description holds the summary; detail holds the structured source, drawing
+-- and layout fields of the description.
+ALTER TABLE reference_styles ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}';
 -- Which descriptions a video's visual concept reads.
 CREATE TABLE IF NOT EXISTS project_reference_picks (
     project_id TEXT NOT NULL,

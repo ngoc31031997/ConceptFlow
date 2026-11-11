@@ -1,0 +1,157 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1.5px solid var(--muted);
+  vertical-align: top;
+}
+
+.table th {
+  font: 700 11px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  border-bottom: var(--border-w) solid var(--border-color);
+}
+
+.id {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.description {
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag {
+  font: 700 10.5px/1.5 var(--font-mono);
+  padding: 0 5px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--info-soft);
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: flex-end;
+}
+
+.impact {
+  padding: 10px 12px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--info-soft);
+  font-size: 13.5px;
+}
+
+.impact ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.clickRow {
+  cursor: pointer;
+}
+
+.clickRow:hover {
+  background: var(--muted);
+}
+
+.pasteBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.pasteBox {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+}
+
+.group {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-sm);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+}
+
+.group legend {
+  font: 700 12px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 6px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.detailHead {
+  margin: var(--space-sm) 0 4px;
+  font: 700 13px var(--font-display);
+}
+
+.detail {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 4px 12px;
+  font-size: 13.5px;
+}
+
+.detailRow dt {
+  font-weight: 700;
+}
+
+.detailRow dd {
+  margin: 0;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}

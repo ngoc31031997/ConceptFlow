@@ -38,6 +38,7 @@ func main() {
 
 	deleteProject := application.NewDeleteProjectUseCase(postgres.NewProjectDataRepository(pool))
 	router := httpadapter.NewRouter(deleteProject)
+	router.WithReferenceLibrary(application.NewReferenceLibraryUseCase(postgres.NewReferenceStyleRepository(pool)))
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {

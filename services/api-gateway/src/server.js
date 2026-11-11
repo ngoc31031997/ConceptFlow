@@ -17,6 +17,7 @@ const { promptsRouter } = require('./routes/prompts');
 const { llmCallsRouter } = require('./routes/llmCalls');
 const { illustrationsRouter } = require('./routes/illustrations');
 const { visualLanguagesRouter } = require('./routes/visualLanguages');
+const { referenceStylesRouter } = require('./routes/referenceStyles');
 const { authRouter } = require('./routes/auth');
 const { progressRouter } = require('./routes/progress');
 const { healthRouter } = require('./routes/health');
@@ -52,6 +53,8 @@ function main() {
   // The call log and its statistics are llm-service's own.
   const llmClient = createHttpClient(config.llmServiceUrl);
   const publisherClient = createHttpClient(config.publisherUrl);
+  // The visual pre-production steps and the reference library are visual-service's.
+  const visualClient = createHttpClient(config.visualServiceUrl);
 
   // 3. Connect to RabbitMQ (amqpClient), declare exclusive queue bound to progress.fanout.
   const progress = progressHandler();
@@ -77,6 +80,7 @@ function main() {
   app.use(llmCallsRouter(llmClient));
   app.use(illustrationsRouter(authoringClient, authoringAiClient));
   app.use(visualLanguagesRouter(authoringClient, authoringAiClient, config.sharedDir));
+  app.use(referenceStylesRouter(visualClient));
   app.use(authRouter(publisherClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());

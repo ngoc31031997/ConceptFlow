@@ -161,6 +161,11 @@ export function AppShell({ currentStep, viewStep, title, subtitle, wide, headerA
           <NavLink to="/settings/visual-languages" className={navCls}>Ngôn ngữ hình</NavLink>
           {/* The illustration library the Remotion Engineer draws from. */}
           <NavLink to="/settings/illustrations" className={navCls}>Thư viện hình</NavLink>
+          {/* Text descriptions of a visual style the Ngôn ngữ hình ảnh step lets a video pick. */}
+          <NavLink to="/settings/reference-styles" className={navCls} data-testid="nav-reference-styles">
+            Thư viện tham chiếu
+            <small className={styles.sideSub}>mô tả phong cách cho AI</small>
+          </NavLink>
           <ComingLink label="Thư viện nhân vật" />
           <ComingLink label="Từ điển phát âm" />
         </nav>

@@ -19,7 +19,8 @@ type deleteProjectUseCase interface {
 
 // Router builds visual-service's routes.
 type Router struct {
-	deleteProject deleteProjectUseCase
+	deleteProject    deleteProjectUseCase
+	referenceLibrary referenceLibraryUseCase
 }
 
 // NewRouter returns the router.
@@ -32,6 +33,7 @@ func (rt *Router) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/health", rt.handleHealth)
 	r.Delete("/internal/v1/visual/{project_id}", rt.handleDeleteProject)
+	rt.mountReferenceLibrary(r)
 	return r
 }
 
