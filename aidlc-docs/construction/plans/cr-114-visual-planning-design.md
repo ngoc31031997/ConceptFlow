@@ -22,7 +22,7 @@ Khuôn: bước 8 (CR-112b), đã có trên main.
 - `narration_min_s`: máy tính, AI và Creator không sửa. Chưa có file giọng thì lấy theo số chữ của các câu trong unit nhân với tốc độ đọc của **chính dự án** = tổng số chữ của kịch bản chốt ÷ thời lượng trong creative brief. Không ghi cứng tốc độ đọc trong code. Khi bước Giọng có file thật cho các câu đó (sau này), dùng độ dài file thật.
 - `planned_s`: AI đề xuất, Creator sửa được; phải ≥ `narration_min_s`. Để trống nghĩa là bằng mức tối thiểu.
 - `extra_reason`: bắt buộc khi `planned_s` > `narration_min_s` (vì sao cần giữ hình lâu hơn lời: để khán giả kịp nhìn, chuyển cảnh, nhịp lắng…).
-- Máy kiểm: `planned_s` < mức tối thiểu là lỗi (chặn duyệt); tổng `planned_s` theo beat lệch nhiều so với thời lượng beat-sheet là cảnh báo (không chặn), hiện cả hai số.
+- Máy kiểm: `planned_s` < mức tối thiểu là lỗi (chặn duyệt); mỗi beat luôn hiện tổng `planned_s` cạnh thời lượng beat-sheet và độ lệch, không có ngưỡng; chỉ cảnh báo (không chặn) khi tổng `planned_s` cả video vượt thời lượng creative brief.
 
 ## Khác so với artifact (theo dữ liệu thật trong code)
 - Kịch bản **không có cảnh `SC-xxx`**. Mỗi câu thoại có ID cố định `<beat>.<n>` (ví dụ `b2.3`, `ScriptLine` trong authoring). `script_refs` là danh sách ID câu: `["b2.1","b2.2","b2.3"]`. Mockup ghi `SC-002 #s1` sẽ đổi thành `b2.1–b2.3`.
