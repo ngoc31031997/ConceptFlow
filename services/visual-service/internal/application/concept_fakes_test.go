@@ -26,14 +26,14 @@ func (f *fakeAuthoring) LatestScriptVersion(context.Context, string) (domain.Scr
 type fakeStore struct {
 	units    map[string]domain.ReviewUnit
 	model    string
-	library  []domain.ReferenceStyle
+	library  []domain.PickedReference
 	picks    []string
 	versions []VersionRecord
 }
 
 func newStore() *fakeStore {
 	return &fakeStore{units: map[string]domain.ReviewUnit{},
-		library: []domain.ReferenceStyle{{ID: "R01", Name: "Sáng", Summary: "nền tối", Drawing: domain.RefDrawing{Shape: "tròn", Fill: "phẳng"}, Layout: domain.RefLayout{Layering: "ba lớp"}}, {ID: "R02", Name: "Sơ đồ", Summary: "nét mảnh"}}}
+		library: []domain.PickedReference{{ID: "R01", Name: "Sáng", Summary: "nền tối", Drawing: domain.RefDrawing{Shape: "tròn", Fill: "phẳng"}, Layout: domain.RefLayout{Layering: "ba lớp"}}, {ID: "R02", Name: "Sơ đồ", Summary: "nét mảnh"}}}
 }
 
 func (s *fakeStore) ListUnits(_ context.Context, p, kind string) ([]domain.ReviewUnit, error) {
@@ -54,8 +54,8 @@ func (s *fakeStore) SetConceptModel(_ context.Context, _ string, m string) error
 	s.model = m
 	return nil
 }
-func (s *fakeStore) PickedReferences(context.Context, string) ([]domain.ReferenceStyle, error) {
-	var out []domain.ReferenceStyle
+func (s *fakeStore) PickedReferences(context.Context, string) ([]domain.PickedReference, error) {
+	var out []domain.PickedReference
 	for _, r := range s.library {
 		for _, id := range s.picks {
 			if r.ID == id {
@@ -65,7 +65,7 @@ func (s *fakeStore) PickedReferences(context.Context, string) ([]domain.Referenc
 	}
 	return out, nil
 }
-func (s *fakeStore) ReferenceLibrary(context.Context) ([]domain.ReferenceStyle, error) {
+func (s *fakeStore) ReferenceLibrary(context.Context) ([]domain.PickedReference, error) {
 	return s.library, nil
 }
 func (s *fakeStore) SetPicks(_ context.Context, _ string, ids []string) error {

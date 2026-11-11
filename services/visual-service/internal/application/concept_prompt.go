@@ -119,7 +119,7 @@ func glossaryText(in domain.ConceptInput) string {
 	return strings.Join(lines, "\n")
 }
 
-func refsText(refs []domain.ReferenceStyle) string {
+func refsText(refs []domain.PickedReference) string {
 	if len(refs) == 0 {
 		return "(Creator chưa chọn mô tả tham chiếu nào.)"
 	}

@@ -19,8 +19,9 @@ type deleteProjectUseCase interface {
 
 // Router builds visual-service's routes.
 type Router struct {
-	deleteProject deleteProjectUseCase
-	concept       conceptDesk
+	deleteProject    deleteProjectUseCase
+	concept          conceptDesk
+	referenceLibrary referenceLibraryUseCase
 }
 
 // NewRouter returns the router.
@@ -36,6 +37,7 @@ func (rt *Router) Handler() http.Handler {
 	if rt.concept != nil {
 		rt.mountConcept(r)
 	}
+	rt.mountReferenceLibrary(r)
 	return r
 }
 

@@ -21,6 +21,7 @@ import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 import { JournalPage } from "./pages/JournalPage";
 import { FlowMapPage } from "./pages/FlowMapPage";
 import { AiModelSettingsPage } from "./pages/AiModelSettingsPage";
+import { ReferenceLibraryPage } from "./pages/ReferenceLibraryPage";
 import { StepPreviewPage } from "./pages/StepPreviewPage";
 import { ComingStepPage } from "./pages/ComingStepPage";
 import { LockStepPage } from "./pages/LockStepPage";
@@ -90,6 +91,7 @@ export function App() {
             <Route path="/settings/visual-languages" element={<VisualLanguagePage />} />
             {/* The illustration library, folders of reviewed drawings. */}
             <Route path="/settings/illustrations" element={<IllustrationLibraryPage />} />
+            <Route path="/settings/reference-styles" element={<ReferenceLibraryPage />} />
 
             {/* Bước 4 (chạy thử + duyệt dàn ý) và bước 5 (sản xuất)
                 là hai màn riêng. Mỗi trang tự đẩy sang trang kia khi trạng

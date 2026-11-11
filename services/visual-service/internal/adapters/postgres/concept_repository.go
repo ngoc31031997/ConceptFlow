@@ -106,11 +106,11 @@ func (r *ConceptRepository) SetConceptModel(ctx context.Context, projectID, mode
 // source, drawing and layout fields and is null for a description without them.
 const refColumns = `s.id, s.name, s.description, s.tags, s.detail`
 
-func scanRefs(rows pgx.Rows) ([]domain.ReferenceStyle, error) {
+func scanRefs(rows pgx.Rows) ([]domain.PickedReference, error) {
 	defer rows.Close()
-	out := []domain.ReferenceStyle{}
+	out := []domain.PickedReference{}
 	for rows.Next() {
-		var s domain.ReferenceStyle
+		var s domain.PickedReference
 		var detail []byte
 		if err := rows.Scan(&s.ID, &s.Name, &s.Summary, &s.Tags, &detail); err != nil {
 			return nil, fmt.Errorf("scan reference: %w", err)
@@ -135,7 +135,7 @@ func scanRefs(rows pgx.Rows) ([]domain.ReferenceStyle, error) {
 }
 
 // PickedReferences returns the descriptions the video picked, in library order.
-func (r *ConceptRepository) PickedReferences(ctx context.Context, projectID string) ([]domain.ReferenceStyle, error) {
+func (r *ConceptRepository) PickedReferences(ctx context.Context, projectID string) ([]domain.PickedReference, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT `+refColumns+` FROM project_reference_picks p
 		JOIN reference_styles s ON s.id = p.ref_id WHERE p.project_id = $1 ORDER BY s.seq`, projectID)
@@ -146,7 +146,7 @@ func (r *ConceptRepository) PickedReferences(ctx context.Context, projectID stri
 }
 
 // ReferenceLibrary returns every description of the shared library.
-func (r *ConceptRepository) ReferenceLibrary(ctx context.Context) ([]domain.ReferenceStyle, error) {
+func (r *ConceptRepository) ReferenceLibrary(ctx context.Context) ([]domain.PickedReference, error) {
 	rows, err := r.pool.Query(ctx, `SELECT `+refColumns+` FROM reference_styles s ORDER BY s.seq`)
 	if err != nil {
 		return nil, fmt.Errorf("list references: %w", err)

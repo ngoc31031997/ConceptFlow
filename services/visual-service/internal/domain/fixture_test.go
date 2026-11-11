@@ -51,7 +51,7 @@ func scriptVersion(t *testing.T, edit func(map[string]any)) ScriptVersion {
 	return ScriptVersion{ProjectID: "test-cr112b-p", Version: 2, Parts: parts}
 }
 
-func conceptInput(t *testing.T, refs ...ReferenceStyle) ConceptInput {
+func conceptInput(t *testing.T, refs ...PickedReference) ConceptInput {
 	t.Helper()
 	in, err := NewConceptInput(scriptVersion(t, nil), refs)
 	if err != nil {

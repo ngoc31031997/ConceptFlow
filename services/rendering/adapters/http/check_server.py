@@ -9,7 +9,9 @@ render.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 import time
 from typing import Literal
 
@@ -27,6 +29,23 @@ from domain.kits import UnknownKitError
 from domain.layout_rules import SubtitleBand
 
 logger = logging.getLogger(__name__)
+
+# The list of fonts the rendering image installs; the Remotion project imports the same file.
+FONTS_FILE = Path(__file__).resolve().parents[2] / "remotion_project" / "src" / "conceptflow-mini" / "fonts.json"
+
+
+def load_fonts(path: Path | None = None) -> dict:
+    """Read and validate the font list; raises ValueError naming the reason."""
+    path = path or FONTS_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"font list {path.name} cannot be read: {exc}") from exc
+    fonts, default = data.get("fonts") if isinstance(data, dict) else None, data.get("default") if isinstance(data, dict) else None
+    if (not isinstance(fonts, list) or not fonts or not all(isinstance(f, str) and f for f in fonts)
+            or not isinstance(default, str) or default not in fonts):
+        raise ValueError(f"font list {path.name} is malformed: need a non-empty \"fonts\" list of names and a \"default\" among them")
+    return {"fonts": fonts, "default": default}
 
 
 class IllustrationBody(BaseModel):
@@ -169,6 +188,14 @@ def create_check_app(
     @app.get("/v1/kits")
     async def list_kits():
         return {"kits": [{"key": k, "version": v} for k, v in sorted((kits or {}).items())]}
+
+    @app.get("/v1/fonts")
+    async def list_fonts():
+        try:
+            return load_fonts()
+        except ValueError as exc:
+            logger.error("font list unavailable: %s", exc)
+            return JSONResponse({"error": str(exc)}, status_code=500)
 
     still_gate = asyncio.Semaphore(1)
 

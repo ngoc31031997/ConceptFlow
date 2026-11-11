@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var r01 = ReferenceStyle{ID: "R01", Name: "Sáng xuyên lớp", Summary: "nền tối ấm",
+var r01 = PickedReference{ID: "R01", Name: "Sáng xuyên lớp", Summary: "nền tối ấm",
 	Drawing: RefDrawing{Shape: "tròn mềm", Fill: "phẳng", Light: "sau lớp mỏng"}, Layout: RefLayout{Layering: "ba lớp"}}
 
 func TestValidPartsPassEveryCheck(t *testing.T) {
@@ -163,7 +163,7 @@ func TestNewConceptInput_HashesEachSource(t *testing.T) {
 	a := conceptInput(t, r01)
 	b, err := NewConceptInput(scriptVersion(t, func(m map[string]any) {
 		m["script:b2"] = map[string]any{"lines": []Line{{ID: "b2.1", Text: "khác"}}}
-	}), []ReferenceStyle{r01})
+	}), []PickedReference{r01})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestAccuracyNotesAndDocument(t *testing.T) {
 	}
 	at := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
 	review := ReviewState{Findings: []Finding{{ID: "f1", Group: "accuracy", Text: "t", State: FindingAccepted, Why: "ok"}}}
-	doc, err := BuildDocument("test-cr112b-p", 2, 3, at, p, []ReferenceStyle{r01}, review)
+	doc, err := BuildDocument("test-cr112b-p", 2, 3, at, p, []PickedReference{r01}, review)
 	if err != nil {
 		t.Fatal(err)
 	}

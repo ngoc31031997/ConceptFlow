@@ -110,7 +110,7 @@ func thingNote(term, draw string, mustNot []string) string {
 }
 
 // BuildDocument assembles the locked document from complete parts.
-func BuildDocument(projectID string, version, scriptVersion int, lockedAt time.Time, p Parts, refs []ReferenceStyle, review ReviewState) (Document, error) {
+func BuildDocument(projectID string, version, scriptVersion int, lockedAt time.Time, p Parts, refs []PickedReference, review ReviewState) (Document, error) {
 	if !p.Complete() {
 		return Document{}, fmt.Errorf("%w: chưa đủ 8 phần", ErrLockNotReady)
 	}

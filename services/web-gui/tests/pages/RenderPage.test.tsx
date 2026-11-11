@@ -125,7 +125,7 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
     expect(screen.getByTestId("production-background-music")).toBeInTheDocument();
     // Cấu hình đứng trước hành động dùng nó (docs/ux-ui-design-rules.md §1).
     const settings = screen.getByTestId("production-settings");
-    const retry = screen.getByRole("alert");
+    const retry = screen.getByTestId("error-banner-retry-button").closest('[role="alert"]') as HTMLElement;
     expect(settings.compareDocumentPosition(retry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

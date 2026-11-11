@@ -42,6 +42,7 @@ func main() {
 
 	deleteProject := application.NewDeleteProjectUseCase(postgres.NewProjectDataRepository(pool))
 	router := httpadapter.NewRouter(deleteProject)
+	router.WithReferenceLibrary(application.NewReferenceLibraryUseCase(postgres.NewReferenceStyleRepository(pool)))
 
 	llmClient := llm.NewClient(cfg.LLMServiceURL, time.Duration(cfg.LLMTimeoutSeconds)*time.Second)
 	conceptRepo := postgres.NewConceptRepository(pool)

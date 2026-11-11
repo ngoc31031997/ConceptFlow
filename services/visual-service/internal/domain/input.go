@@ -125,7 +125,7 @@ type ConceptInput struct {
 	Lines           map[string][]Line
 	Handoff         map[string]Handoff
 	Glossary        []GlossaryTerm
-	Refs            []ReferenceStyle
+	Refs            []PickedReference
 	Hashes          map[string]string
 }
 
@@ -160,7 +160,7 @@ func (in ConceptInput) RefIDs() []string {
 // NewConceptInput reads a locked script version and the picked descriptions.
 // A part missing from the version, or one that cannot be read, is an error:
 // authoring-service always freezes every part.
-func NewConceptInput(v ScriptVersion, refs []ReferenceStyle) (ConceptInput, error) {
+func NewConceptInput(v ScriptVersion, refs []PickedReference) (ConceptInput, error) {
 	parts := map[string]ScriptVersionPart{}
 	for _, p := range v.Parts {
 		parts[p.Key] = p
@@ -220,7 +220,7 @@ func NewConceptInput(v ScriptVersion, refs []ReferenceStyle) (ConceptInput, erro
 		return ConceptInput{}, err
 	}
 	in.Glossary = g.Terms
-	in.Refs = append([]ReferenceStyle{}, refs...)
+	in.Refs = append([]PickedReference{}, refs...)
 	sort.Slice(in.Refs, func(i, j int) bool { return in.Refs[i].ID < in.Refs[j].ID })
 
 	shaOf := func(keys ...string) string {
@@ -253,12 +253,12 @@ func NewConceptInput(v ScriptVersion, refs []ReferenceStyle) (ConceptInput, erro
 // RefsHash is the hash of what the AI reads of the picked descriptions (name,
 // summary, drawing, layout), so editing a picked description makes the parts
 // that read references stale.
-func RefsHash(refs []ReferenceStyle) string {
-	sorted := append([]ReferenceStyle{}, refs...)
+func RefsHash(refs []PickedReference) string {
+	sorted := append([]PickedReference{}, refs...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
 	var sb strings.Builder
 	for _, r := range sorted {
-		raw, _ := json.Marshal(DocumentReferences([]ReferenceStyle{r}))
+		raw, _ := json.Marshal(DocumentReferences([]PickedReference{r}))
 		fmt.Fprintf(&sb, "%s\n", raw)
 	}
 	return hashText(sb.String())

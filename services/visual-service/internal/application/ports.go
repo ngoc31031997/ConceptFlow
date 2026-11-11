@@ -94,9 +94,9 @@ type VersionRecord struct {
 // is the library's own.
 type ReferenceReader interface {
 	// PickedReferences returns the descriptions the video picked, in library order.
-	PickedReferences(ctx context.Context, projectID string) ([]domain.ReferenceStyle, error)
+	PickedReferences(ctx context.Context, projectID string) ([]domain.PickedReference, error)
 	// ReferenceLibrary returns every description of the library.
-	ReferenceLibrary(ctx context.Context) ([]domain.ReferenceStyle, error)
+	ReferenceLibrary(ctx context.Context) ([]domain.PickedReference, error)
 }
 
 // ConceptStorePort keeps step 8's data in visual-db.

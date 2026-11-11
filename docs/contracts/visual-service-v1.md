@@ -12,6 +12,45 @@ visual-service giữ các bước tiền kỳ hình ảnh (bước 8–14) và D
 
 Orchestrator gọi route xoá ở cuối saga xoá dự án, sau khi mọi service giữ file (`PurgeTargets`) đã báo xong và dòng dự án đã xoá. Giống cách xoá authoring: cố gắng một lần, lỗi thì ghi log, không chặn saga. visual-service không giữ file nên không phải một `PurgeTarget`.
 
+## HTTP công khai (qua api-gateway)
+
+### Thư viện tham chiếu
+
+Mô tả phong cách dạng chữ có trường, dùng chung cho mọi video. api-gateway chuyển nguyên request và response (`VISUAL_SERVICE_URL`).
+
+| Phương thức | Đường dẫn | Thân gửi | Trả về |
+|---|---|---|---|
+| GET | `/v1/reference-styles` | | `200 {"styles":[ReferenceStyle]}`, theo thứ tự thêm (`seq`) |
+| POST | `/v1/reference-styles` | `ReferenceStyleInput` | `201 ReferenceStyle` |
+| POST | `/v1/reference-styles/import` | JSON đã dán, khuôn của `ReferenceStyleInput` (không cần `id`) | `200 {"style":ReferenceStyleInput}` đã chuẩn hoá; **không ghi DB** |
+| PUT | `/v1/reference-styles/{id}` | `ReferenceStyleInput` | `200 ReferenceStyle` |
+| DELETE | `/v1/reference-styles/{id}` | | `204`; các lượt chọn của video bị xoá theo |
+| GET | `/v1/reference-styles/{id}/usage` | | `200 {"projects":[{"project_id"}]}`: video đang chọn mô tả, để hộp xác nhận sửa hoặc xoá nêu tên |
+
+Khuôn (`ReferenceStyle` = `ReferenceStyleInput` + `id`, `created_at`, `updated_at`):
+
+```json
+{ "id": "R01", "name": "", "summary": "", "tags": [],
+  "source": { "url": "", "title": "", "kind": "" },
+  "drawing": { "medium": "", "shape": "", "outline": "", "fill": "", "shading": "", "light": "", "depth": "", "perspective": "", "texture": "" },
+  "layout": { "structure": "", "layering": "", "persistent_elements": "" },
+  "created_at": "", "updated_at": "" }
+```
+
+`id` là `R` + số từ `reference_styles_seq`, đệm hai chữ số (`R01`, `R12`, `R105`); mã đã xoá không dùng lại.
+
+Luật (đếm theo ký tự, sau khi cắt khoảng trắng hai đầu):
+- Chỉ `name` (1–80) và `summary` (1–1000) bắt buộc; mọi trường khác để trống được (chuỗi rỗng, mảng rỗng).
+- `tags`: bỏ ô trống và nhãn trùng (không phân biệt hoa thường), tối đa 8 nhãn, mỗi nhãn tối đa 24.
+- `source.url` nếu có phải là địa chỉ http hoặc https hợp lệ; `source.kind` là `video`, `image`, `site`, `other` hoặc rỗng; `source.title` tối đa 300.
+- Mỗi trường chữ của `drawing` và `layout`: tối đa 300.
+
+`/import` nhận thân `{"error":"…"}` (AI ngoài báo không xem được link) và trả `400` đúng lý do đó.
+
+Lưu trữ: cột `description` giữ `summary`; cột `detail JSONB` giữ `source`, `drawing`, `layout`.
+
+Lỗi `{"error":"…"}`: `400` khi sai luật (thông báo nêu trường sai, ví dụ `drawing.shape: dài quá 300 ký tự`) hoặc thân không phải JSON, `404` khi không có mô tả `{id}` (PUT, DELETE, usage), `500` khi lỗi DB. api-gateway trả `502 {"error":"upstream_unavailable","service":"visual-service"}` khi không gọi được visual-service.
+
 ## visual-service gọi đi
 
 | Bên nhận | Đường dẫn | Hợp đồng |

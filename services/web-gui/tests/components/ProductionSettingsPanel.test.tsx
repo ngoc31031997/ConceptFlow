@@ -18,6 +18,10 @@ const PROJECT: Project = {
 describe("ProductionSettingsPanel", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.spyOn(client, "listVideoFonts").mockResolvedValue({
+      fonts: ["Be Vietnam Pro", "Montserrat", "Cormorant Garamond"],
+      default: "Be Vietnam Pro",
+    });
     vi.spyOn(client, "getMusicInfo").mockResolvedValue({ exists: false, background_music_path: null } as never);
   });
   afterEach(() => vi.restoreAllMocks());

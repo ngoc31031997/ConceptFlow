@@ -265,7 +265,7 @@ type BeatView struct {
 
 // RefView is one description of the library with whether the video picked it.
 type RefView struct {
-	domain.ReferenceStyle
+	domain.PickedReference
 	Picked bool `json:"picked"`
 }
 
@@ -334,7 +334,7 @@ func (d *ConceptDesk) state(ctx context.Context, projectID string, data *deskDat
 	}
 	st.Refs = []RefView{}
 	for _, r := range library {
-		st.Refs = append(st.Refs, RefView{ReferenceStyle: r, Picked: picked[r.ID]})
+		st.Refs = append(st.Refs, RefView{PickedReference: r, Picked: picked[r.ID]})
 	}
 
 	allApprovedFresh := true
