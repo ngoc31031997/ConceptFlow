@@ -19,6 +19,12 @@ func TestLatestScriptVersion(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
+		if status == http.StatusNotFound {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte(`{"error":"chưa chốt phiên bản kịch bản nào"}`))
+			return
+		}
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(`{"project_id":"test-cr112b-a","version":3,"parts":[{"key":"brief","sha":"s","content":{}}]}`))
 	}))
@@ -31,6 +37,9 @@ func TestLatestScriptVersion(t *testing.T) {
 	status = http.StatusNotFound
 	if _, err := c.LatestScriptVersion(context.Background(), "test-cr112b-a"); !errors.Is(err, domain.ErrScriptNotLocked) {
 		t.Errorf("404: %v", err)
+	}
+	if _, err := c.LatestScriptVersion(context.Background(), "test-cr112b-unknown"); !errors.Is(err, application.ErrAuthoringFailed) || errors.Is(err, domain.ErrScriptNotLocked) {
+		t.Errorf("404 of a route authoring does not have: %v", err)
 	}
 	status = http.StatusInternalServerError
 	if _, err := c.LatestScriptVersion(context.Background(), "test-cr112b-a"); !errors.Is(err, application.ErrAuthoringFailed) {
