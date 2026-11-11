@@ -5,6 +5,7 @@ import {
   answerVisualPlanQuestion,
   applyVisualPlanFinding,
   approveAllVisualPlan,
+  autoFixVisualPlan,
   approveVisualPlanUnit,
   editVisualPlanUnit,
   generateVisualPlan,
@@ -53,6 +54,7 @@ export interface VisualPlanControls {
   approve: (unitId: string) => Promise<boolean>;
   unapprove: (unitId: string) => Promise<boolean>;
   approveAll: () => Promise<boolean>;
+  autoFix: () => Promise<boolean>;
   setModel: (model: string) => Promise<boolean>;
   applyFix: (findingId: string) => Promise<boolean>;
   accept: (findingId: string, why: string) => Promise<boolean>;
@@ -169,6 +171,7 @@ export function useVisualPlan(projectId: string): VisualPlanControls {
     approve: (unitId) => act(() => approveVisualPlanUnit(projectId, unitId)),
     unapprove: (unitId) => act(() => unapproveVisualPlanUnit(projectId, unitId)),
     approveAll: () => act(() => approveAllVisualPlan(projectId)),
+    autoFix: () => act(() => autoFixVisualPlan(projectId)),
     setModel: (model) => act(() => setVisualPlanModel(projectId, model)),
     applyFix: (findingId) => act(() => applyVisualPlanFinding(projectId, findingId)),
     accept: (findingId, why) => act(() => acceptVisualPlanFinding(projectId, findingId, why)),

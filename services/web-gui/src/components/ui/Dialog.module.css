@@ -37,6 +37,12 @@
 .xl {
   max-width: 1200px;
 }
+/* Almost the whole screen: for forms with many fields that should not scroll. */
+.full {
+  max-width: 1600px;
+  height: calc(100vh - 32px);
+  max-height: none;
+}
 
 .header {
   display: flex;

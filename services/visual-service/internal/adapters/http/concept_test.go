@@ -62,6 +62,10 @@ func (f *fakeDesk) ApproveAll(context.Context, string) (*application.ConceptStat
 func (f *fakeDesk) Review(_ context.Context, _ string, note string) (*application.ConceptState, error) {
 	return f.ret("review:" + note)
 }
+func (f *fakeDesk) MarkFindingRewritten(_ context.Context, _, id, _ string) (*application.ConceptState, error) {
+	return f.ret("rewritten:" + id)
+}
+
 func (f *fakeDesk) ApplyFinding(_ context.Context, _ string, id string) (*application.ConceptState, error) {
 	return f.ret("apply:" + id)
 }
@@ -108,6 +112,7 @@ func TestConceptRoutes(t *testing.T) {
 		{"POST", base + "/generate", `{"note":"n","rewrite_all":true}`, "generate:n:true"},
 		{"POST", base + "/generate", ``, "generate::false"},
 		{"POST", base + "/units/typography/generate", `{"note":"x"}`, "unit:typography:x"},
+		{"POST", base + "/units/typography/generate", `{"note":"x","finding_id":"f1"}`, "rewritten:f1"},
 		{"PUT", base + "/units/typography", `{"fields":{"font":"A","captions":"c"}}`, "edit:typography:2"},
 		{"POST", base + "/units/typography/approve", ``, "approve:typography"},
 		{"POST", base + "/units/typography/unapprove", ``, "unapprove:typography"},

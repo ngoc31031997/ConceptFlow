@@ -219,7 +219,7 @@ export function PartEditDialog({
       onClose={onClose}
       title={title}
       hasInput
-      size="xl"
+      size="full"
       testId={testId}
       footer={
         <>

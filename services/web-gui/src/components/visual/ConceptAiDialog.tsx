@@ -14,6 +14,8 @@ interface ConceptAiDialogProps {
   onSystem: (note: string) => void;
   /** Runs the task through an AI outside the system or DeepSeek, with the note. */
   external: ExternalRedo;
+  /** The note the field starts with when the dialog opens. */
+  initialNote?: string;
   testId: string;
 }
 
@@ -30,18 +32,21 @@ export function ConceptAiDialog({
   impact,
   onSystem,
   external,
+  initialNote = "",
   testId,
 }: ConceptAiDialogProps) {
   const [note, setNote] = useState("");
   const [outside, setOutside] = useState(false);
   const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setNote(initialNote);
+    } else {
       setNote("");
       setOutside(false);
       setUnreadable(null);
     }
-  }, [open]);
+  }, [open, initialNote]);
 
   return (
     <>

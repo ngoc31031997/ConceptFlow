@@ -56,16 +56,16 @@ func TestMergeReview_KeepsIDsFixesWhatIsGoneAndKeepsAcceptance(t *testing.T) {
 }
 
 func TestApplyFix(t *testing.T) {
-	out, err := ApplyFix([]byte(`{"captions":"cũ","examples":["a"]}`), "captions", "mới")
+	out, err := ApplyFix([]byte(`{"captions":"cũ","examples":["a"]}`), "captions", "mới", "")
 	if err != nil || !sameJSONT(out, `{"captions":"mới","examples":["a"]}`) {
 		t.Errorf("%s %v", out, err)
 	}
-	out, _ = ApplyFix([]byte(`{"examples":["a"]}`), "examples", "b")
+	out, _ = ApplyFix([]byte(`{"examples":["a"]}`), "examples", "b", "")
 	if !sameJSONT(out, `{"examples":["a","b"]}`) {
 		t.Errorf("%s", out)
 	}
 	for _, field := range []string{"labels", "missing"} {
-		if _, err := ApplyFix([]byte(`{"labels":{"max_words":3}}`), field, "x"); !errors.Is(err, ErrFindingNotApplicable) {
+		if _, err := ApplyFix([]byte(`{"labels":{"max_words":3}}`), field, "x", ""); !errors.Is(err, ErrFindingNotApplicable) {
 			t.Errorf("%s: %v", field, err)
 		}
 	}
@@ -141,5 +141,35 @@ func TestReferenceYouTubePromptIsStoredOnlyAndTakesOneVariable(t *testing.T) {
 	}
 	if strings.Contains(yt.TemplateText, "\"error\": \"lý do\"") == false {
 		t.Error("the error reply is part of the approved wording")
+	}
+}
+
+func TestParseReviewReplyAcceptsNotesAsString(t *testing.T) {
+	r, err := ParseReviewReply([]byte(`{"findings":[],"notes":"một nhận xét"}`), ReviewState{})
+	if err != nil || len(r.Notes) != 1 || r.Notes[0] != "một nhận xét" {
+		t.Fatalf("notes string: %v %v", r.Notes, err)
+	}
+}
+
+func TestApplyFixReplacesAnExistingLine(t *testing.T) {
+	out, err := ApplyFix([]byte(`{"principles":["a","b","c"]}`), "principles", "B mới", "b")
+	if err != nil || string(out) != `{"principles":["a","B mới","c"]}` {
+		t.Fatalf("replace line: %s %v", out, err)
+	}
+	if _, err := ApplyFix([]byte(`{"principles":["a"]}`), "principles", "x", "không có"); !errors.Is(err, ErrFindingNotApplicable) {
+		t.Fatalf("a line that is not there must not be added elsewhere: %v", err)
+	}
+}
+
+func TestCanApplyFixOnlyWhenTheFieldTakesALine(t *testing.T) {
+	text := []byte(`{"captions":"cũ","objects":[{"id":"a"}]}`)
+	if !CanApplyFix(text, Finding{Field: "captions", Fix: "mới"}) {
+		t.Fatal("a text field takes a line")
+	}
+	if CanApplyFix(text, Finding{Field: "objects", Fix: "mới"}) {
+		t.Fatal("a list of objects cannot take a line")
+	}
+	if CanApplyFix(text, Finding{Field: "captions", Fix: ""}) {
+		t.Fatal("no fix, nothing to apply")
 	}
 }

@@ -100,6 +100,7 @@ function baseState(over: Partial<VisualPlanState> = {}): VisualPlanState {
     locked_version: 0,
     next_version: 1,
     draft: [],
+    auto_fixes: [],
     model: "",
     default_model: "ollama",
     models: [{ id: "ollama", label: "Ollama", local: true }],
@@ -352,23 +353,49 @@ describe("VisualPlanStepPage", () => {
     expect(screen.getByTestId("plan-finding-state-f3")).toHaveTextContent("Đã sửa");
     fireEvent.click(screen.getByTestId("plan-finding-apply-f1"));
     await waitFor(() => expect(apply).toHaveBeenCalledWith("p1", "f1"));
-    fireEvent.click(screen.getByTestId("plan-finding-accept-f2"));
-    const dialog = await screen.findByTestId("plan-accept-dialog");
-    expect(within(dialog).getByTestId("plan-accept-save")).toBeDisabled();
-    fireEvent.change(within(dialog).getByTestId("plan-accept-why"), { target: { value: "Cố ý" } });
-    fireEvent.click(within(dialog).getByTestId("plan-accept-save"));
-    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "f2", "Cố ý"));
+    fireEvent.click(screen.getByTestId("plan-finding-accept-quick-f2"));
+    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "f2", ""));
   });
 
-  it("accepts a failing machine check with a reason", async () => {
+  it("accepts a failing machine check without a reason", async () => {
     const accept = vi.spyOn(apiClient, "acceptVisualPlanFinding").mockResolvedValue(baseState());
     renderPage();
     fireEvent.click(await screen.findByTestId("plan-tab-review"));
-    fireEvent.click(screen.getByTestId("plan-accept-m-plan-risk"));
-    const dialog = await screen.findByTestId("plan-accept-dialog");
-    fireEvent.change(within(dialog).getByTestId("plan-accept-why"), { target: { value: "Đã nói trong lời" } });
-    fireEvent.click(within(dialog).getByTestId("plan-accept-save"));
-    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "m-plan-risk", "Đã nói trong lời"));
+    fireEvent.click(screen.getByTestId("plan-accept-quick-m-plan-risk"));
+    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "m-plan-risk", ""));
+  });
+
+  it("auto-fixes the obvious failures on request and lists what it changed", async () => {
+    state = baseState({
+      beats: baseState().beats.map((b) => ({
+        ...b,
+        units: b.units.map((u) =>
+          u.unit_id === "VP-003" ? { ...u, problems: ["Thời lượng dự kiến 5.0s ngắn hơn lời thoại (tối thiểu 5.1s)"] } : u,
+        ),
+      })),
+    });
+    const fix = vi
+      .spyOn(apiClient, "autoFixVisualPlan")
+      .mockResolvedValue(baseState({ auto_fixes: ["VP-003: Đã nâng thời lượng 5.00s → 5.10s (mức tối thiểu theo lời thoại)"] }));
+    renderPage();
+    const button = await screen.findByTestId("plan-auto-fix");
+    expect(button).toHaveTextContent("· 1");
+    fireEvent.click(button);
+    await waitFor(() => expect(fix).toHaveBeenCalledWith("p1"));
+    expect(await screen.findByTestId("plan-auto-fix-list")).toHaveTextContent("VP-003: Đã nâng thời lượng");
+  });
+
+  it("shows an approved unit on one line, opens it and folds it again", async () => {
+    renderPage();
+    const card = await screen.findByTestId("plan-unit-VP-001");
+    expect(within(card).getByTestId("plan-unit-VP-001-open")).toBeInTheDocument();
+    expect(within(card).queryByTestId("plan-unit-VP-001-unapprove")).not.toBeInTheDocument();
+    fireEvent.click(within(card).getByTestId("plan-unit-VP-001-open"));
+    expect(await screen.findByTestId("plan-unit-VP-001-unapprove")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("plan-unit-VP-001-fold"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("plan-unit-VP-001-unapprove")).not.toBeInTheDocument(),
+    );
   });
 
   it("opens a finding's unit on the plan tab", async () => {

@@ -288,6 +288,51 @@ func (d *PlanDesk) ApproveAll(ctx context.Context, projectID string) (*PlanState
 	return d.State(ctx, projectID)
 }
 
+// AutoFix repairs, on the Creator's request, the units the checks refuse for a
+// time below the narration minimum or a risk note on a fact outside the unit's
+// lines. Stale beats are left alone. The answer lists each change.
+func (d *PlanDesk) AutoFix(ctx context.Context, projectID string) (*PlanState, error) {
+	data, err := d.load(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	did := []string{}
+	for _, b := range data.in.Script.Beats {
+		plan := data.plans[b.Key]
+		if len(plan.Units) == 0 || len(data.staleSources(b.Key)) > 0 {
+			continue
+		}
+		units := append([]domain.PlanUnit{}, plan.Units...)
+		changed := false
+		for i, u := range units {
+			if len(data.unitProblems(b.Key, u)) == 0 {
+				continue
+			}
+			fixed, notes := domain.AutoFixUnit(u, data.in.PlanContextFor(b.Key), unitCreatorFields(data.rows[b.Key], u.UnitID))
+			if len(notes) == 0 {
+				continue
+			}
+			units[i], changed = fixed, true
+			for _, n := range notes {
+				did = append(did, u.UnitID+": "+n)
+			}
+		}
+		if !changed {
+			continue
+		}
+		plan.Units = units
+		if err := d.saveBeat(ctx, data, projectID, b.Key, plan, data.rows[b.Key].CreatorFields); err != nil {
+			return nil, err
+		}
+	}
+	st, err := d.State(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	st.AutoFixes = did
+	return st, nil
+}
+
 // saveReview stores the review of the whole plan.
 func (d *PlanDesk) saveReview(ctx context.Context, data *planData, r domain.ReviewState) error {
 	raw, err := json.Marshal(r)
@@ -329,7 +374,7 @@ func (d *PlanDesk) ApplyFinding(ctx context.Context, projectID, findingID string
 	if err != nil {
 		return nil, err
 	}
-	fixed, err := domain.ApplyFix(cur, f.Field, f.Fix)
+	fixed, err := domain.ApplyFix(cur, f.Field, f.Fix, f.Replaces)
 	if err != nil {
 		return nil, err
 	}

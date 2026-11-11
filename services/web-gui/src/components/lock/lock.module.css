@@ -63,6 +63,7 @@
 }
 .findingActions {
   grid-column: 2;
+  align-self: start;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;

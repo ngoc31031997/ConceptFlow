@@ -192,6 +192,7 @@ export function VisualConceptStepPage() {
                     concept={concept}
                     readOnly={readOnly}
                     forceOpen={opened === u.key}
+                    onFold={() => setOpened(null)}
                   />
                 ))}
               </>

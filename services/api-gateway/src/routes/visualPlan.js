@@ -29,6 +29,7 @@ function visualPlanRouter(visualClient, visualAiClient) {
   router.post(`${base}/units/:unit/approve`, plain);
   router.post(`${base}/units/:unit/unapprove`, plain);
   router.post(`${base}/approve-all`, plain);
+  router.post(`${base}/auto-fix`, plain);
   router.post(`${base}/findings/:finding/apply`, plain);
   router.post(`${base}/findings/:finding/accept`, plain);
   router.post(`${base}/lock`, plain);

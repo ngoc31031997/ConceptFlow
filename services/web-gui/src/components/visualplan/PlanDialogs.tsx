@@ -15,7 +15,7 @@ interface FormDialogProps {
   /** Runs the change; a throw is shown in the dialog and keeps it open. */
   onConfirm: () => Promise<void>;
   testId: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "full";
   children: React.ReactNode;
 }
 
@@ -161,14 +161,14 @@ export function PlanEditDialog({ open, onClose, unit, onSave }: EditDialogProps)
       confirmLabel="Lưu"
       confirmDisabled={!plannedValid || (longer && reason.trim() === "")}
       onConfirm={save}
-      size="lg"
+      size="full"
       testId="plan-edit-dialog"
     >
       <FormField label="Mục tiêu truyền đạt">
-        <TextArea value={goal} onChange={(e) => setGoal(e.target.value)} rows={2} data-testid="plan-edit-goal" />
+        <TextArea value={goal} onChange={(e) => setGoal(e.target.value)} rows={3} data-testid="plan-edit-goal" />
       </FormField>
       <FormField label="Tóm tắt lời thoại">
-        <TextArea value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} data-testid="plan-edit-summary" />
+        <TextArea value={summary} onChange={(e) => setSummary(e.target.value)} rows={3} data-testid="plan-edit-summary" />
       </FormField>
       <FormField label="Phương pháp hiển thị">
         <Select value={method} onChange={(e) => setMethod(e.target.value as PlanMethod)} data-testid="plan-edit-method">
@@ -180,10 +180,10 @@ export function PlanEditDialog({ open, onClose, unit, onSave }: EditDialogProps)
         </Select>
       </FormField>
       <FormField label="Mô tả cách hiển thị">
-        <TextArea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} data-testid="plan-edit-description" />
+        <TextArea value={description} onChange={(e) => setDescription(e.target.value)} rows={8} data-testid="plan-edit-description" />
       </FormField>
       <FormField label="Quy tắc ngôn ngữ hình ảnh áp dụng (mỗi dòng một mã)">
-        <TextArea value={refs} onChange={(e) => setRefs(e.target.value)} rows={2} data-testid="plan-edit-refs" />
+        <TextArea value={refs} onChange={(e) => setRefs(e.target.value)} rows={8} data-testid="plan-edit-refs" />
       </FormField>
       <FormField label="Quan hệ với lời">
         <Select

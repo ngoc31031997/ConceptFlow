@@ -82,6 +82,14 @@ export function beatOfLine(lineId: string): string {
   return lineId.split(".")[0];
 }
 
+/** Units the checks refuse only for a time below the narration minimum or a risk note off their lines. */
+export function autoFixable(state: VisualPlanState): VisualPlanUnit[] {
+  return state.beats
+    .filter((b) => !b.stale)
+    .flatMap((b) => b.units)
+    .filter((u) => u.problems.some((p) => p.includes("ngắn hơn lời thoại") || p.includes("không có trong lời thoại của unit")));
+}
+
 /** A unit can be approved now: it is written, has no problem and its beat is not stale. */
 export function approvable(state: VisualPlanState): VisualPlanUnit[] {
   return state.beats

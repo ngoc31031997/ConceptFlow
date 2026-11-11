@@ -11,7 +11,7 @@ import type { VisualPlanControls } from "../../hooks/useVisualPlan";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, Dropdown, FormField, TextArea } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
-import { approvable } from "./planModel";
+import { approvable, autoFixable } from "./planModel";
 
 /** The request that has the AI plan one beat, described and not sent, so the extension can make it later. */
 async function describeBeat(projectId: string, beat: VisualPlanBeat): Promise<ExternalRequest> {
@@ -48,6 +48,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
   const empty = state.beats.filter((b) => !b.written);
   const notApproved = state.beats.filter((b) => b.units.length === 0 || b.units.some((u) => u.status !== "approved"));
   const ready = approvable(state);
+  const fixable = autoFixable(state);
   const locked = state.locked_version > 0;
   const modelOptions = [
     { value: "", label: `Theo mặc định của bước (${state.default_model || "chưa đặt"})` },
@@ -143,6 +144,11 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
             </Button>
           )}
           <span className={researchStyles.grow} />
+          {fixable.length > 0 && (
+            <Button variant="view" onClick={() => void plan.autoFix()} disabled={disabled} data-testid="plan-auto-fix">
+              Tự sửa lỗi hiển nhiên · {fixable.length}
+            </Button>
+          )}
           <Button
             variant="primary"
             onClick={() => void plan.approveAll()}
@@ -152,6 +158,13 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
             Duyệt tất cả còn lại{ready.length > 0 ? ` · ${ready.length}` : ""}
           </Button>
         </div>
+        {state.auto_fixes.length > 0 && (
+          <ul className={researchStyles.hint} data-testid="plan-auto-fix-list">
+            {state.auto_fixes.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
         {queueNote && (
           <p
             className={queueNote.tone === "ok" ? researchStyles.hint : researchStyles.error}

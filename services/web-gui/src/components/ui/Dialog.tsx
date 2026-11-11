@@ -27,7 +27,7 @@ export interface DialogProps {
   /** Takes focus on open. Default: the first control in the body, else the main action. */
   initialFocusRef?: RefObject<HTMLElement>;
   role?: "dialog" | "alertdialog";
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "full";
   titleId?: string;
   describedBy?: string;
   testId?: string;

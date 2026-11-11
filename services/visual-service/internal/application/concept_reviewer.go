@@ -107,7 +107,7 @@ func (d *ConceptDesk) ApplyFinding(ctx context.Context, projectID, findingID str
 	if err != nil {
 		return nil, err
 	}
-	fixed, err := domain.ApplyFix(u.Content, f.Field, f.Fix)
+	fixed, err := domain.ApplyFix(u.Content, f.Field, f.Fix, f.Replaces)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +123,27 @@ func (d *ConceptDesk) ApplyFinding(ctx context.Context, projectID, findingID str
 	data.review.Findings[i].State = domain.FindingApplied
 	if err := d.saveReview(ctx, data, data.review); err != nil {
 		return nil, err
+	}
+	return d.State(ctx, projectID)
+}
+
+// MarkFindingRewritten records that the AI rewrote the part a finding names, so
+// the finding reads as applied; the next review decides whether it is really gone.
+// A finding that is not open, or names another part, is left as it is.
+func (d *ConceptDesk) MarkFindingRewritten(ctx context.Context, projectID, findingID, unitKey string) (*ConceptState, error) {
+	data, err := d.load(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	i := data.review.Find(findingID)
+	if i < 0 {
+		return nil, domain.ErrUnknownFinding
+	}
+	if f := data.review.Findings[i]; f.State == domain.FindingOpen && f.UnitKey == unitKey {
+		data.review.Findings[i].State = domain.FindingApplied
+		if err := d.saveReview(ctx, data, data.review); err != nil {
+			return nil, err
+		}
 	}
 	return d.State(ctx, projectID)
 }

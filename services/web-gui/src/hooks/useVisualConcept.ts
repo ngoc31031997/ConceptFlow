@@ -39,7 +39,7 @@ export interface VisualConceptControls {
   /** Stops the AI run in flight; the server drops the call when the connection closes. */
   stop: () => void;
   generateAll: (note: string, rewriteAll: boolean) => Promise<boolean>;
-  generateUnit: (key: VisualConceptUnitKey, note: string) => Promise<boolean>;
+  generateUnit: (key: VisualConceptUnitKey, note: string, findingId?: string) => Promise<boolean>;
   review: (note: string) => Promise<boolean>;
   /** Saves a hand edit; throws so the form can show why it failed. */
   edit: (key: VisualConceptUnitKey, fields: Record<string, unknown>) => Promise<void>;
@@ -153,8 +153,8 @@ export function useVisualConcept(projectId: string): VisualConceptControls {
     stop: () => abort.current?.abort(),
     generateAll: (note, rewriteAll) =>
       runAi("all", (op) => generateVisualConcept(projectId, note, rewriteAll, op)),
-    generateUnit: (key, note) =>
-      runAi(key, (op) => generateVisualConceptUnit(projectId, key, note, op)),
+    generateUnit: (key, note, findingId) =>
+      runAi(key, (op) => generateVisualConceptUnit(projectId, key, note, op, findingId)),
     review: (note) => runAi("review", (op) => reviewVisualConcept(projectId, note, op)),
     edit: async (key, fields) => {
       loadSeq.current += 1;

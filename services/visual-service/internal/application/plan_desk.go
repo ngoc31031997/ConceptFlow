@@ -125,7 +125,9 @@ func (data *planData) locate(id string) (string, int, bool) {
 
 // unitProblems lists what fails in a unit and what else keeps it from approval.
 func (data *planData) unitProblems(beatKey string, u domain.PlanUnit) []string {
-	return append(domain.CheckPlanUnit(u, data.in.PlanContextFor(beatKey)), domain.ApprovalBlockers(u)...)
+	// Never nil: the screen reads it as a list and a unit with no problem sends [].
+	problems := append([]string{}, domain.CheckPlanUnit(u, data.in.PlanContextFor(beatKey))...)
+	return append(problems, domain.ApprovalBlockers(u)...)
 }
 
 // --- the screen ---------------------------------------------------------------
@@ -203,6 +205,8 @@ type PlanState struct {
 	Model        string        `json:"model"`
 	DefaultModel string        `json:"default_model"`
 	Models       []ModelOption `json:"models"`
+	// AutoFixes lists what the last auto-fix changed; empty on every other call.
+	AutoFixes []string `json:"auto_fixes"`
 }
 
 // State returns the screen.
@@ -217,6 +221,7 @@ func (d *PlanDesk) State(ctx context.Context, projectID string) (*PlanState, err
 func (d *PlanDesk) state(ctx context.Context, projectID string, data *planData) (*PlanState, error) {
 	in := data.in
 	st := &PlanState{
+		AutoFixes: []string{},
 		Input: PlanInputSummary{ScriptVersion: in.Script.ScriptVersion, ConceptVersion: in.ConceptVersion,
 			FactsCount: len(in.Script.Facts), TermsCount: len(in.Script.Glossary), RuleRefsCount: len(in.RuleRefs), SecondsPerWord: in.SecondsPerWord},
 		Coverage: domain.ComputeCoverage(in, data.plans), Timing: domain.ComputeTiming(in, data.plans),

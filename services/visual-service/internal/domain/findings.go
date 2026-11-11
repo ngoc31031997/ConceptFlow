@@ -36,8 +36,11 @@ type Finding struct {
 	Text    string `json:"text"`
 	Detail  string `json:"detail"`
 	Fix     string `json:"fix"`
-	State   string `json:"state"`
-	Why     string `json:"why"`
+	// Replaces is the exact existing line of a list field that Fix rewrites; empty
+	// when Fix is a new line or replaces a whole text field.
+	Replaces string `json:"replaces"`
+	State    string `json:"state"`
+	Why      string `json:"why"`
 }
 
 // CheckDecision is the Creator's acceptance of a failing machine check, valid
@@ -74,7 +77,7 @@ func ParseReviewState(raw []byte) (ReviewState, error) {
 		r.Findings = []Finding{}
 	}
 	if r.Notes == nil {
-		r.Notes = []string{}
+		r.Notes = NoteList{}
 	}
 	return r, nil
 }
@@ -114,19 +117,43 @@ func (r ReviewState) OpenCount() int {
 
 // ReviewReplyItem is one finding as the AI writes it.
 type ReviewReplyItem struct {
-	Group   string `json:"group"`
-	UnitKey string `json:"unit_key"`
-	Field   string `json:"field"`
-	Text    string `json:"text"`
-	Detail  string `json:"detail"`
-	Fix     string `json:"fix"`
-	SameAs  string `json:"same_as"`
+	Group    string `json:"group"`
+	UnitKey  string `json:"unit_key"`
+	Field    string `json:"field"`
+	Text     string `json:"text"`
+	Detail   string `json:"detail"`
+	Fix      string `json:"fix"`
+	Replaces string `json:"replaces"`
+	SameAs   string `json:"same_as"`
 }
 
 // ReviewReply is the AI's whole answer to a review.
 type ReviewReply struct {
 	Findings []ReviewReplyItem `json:"findings"`
-	Notes    []string          `json:"notes"`
+	Notes    NoteList          `json:"notes"`
+}
+
+// NoteList is the AI's remarks on a review. The prompt asks for a list, but a
+// model sometimes writes one remark as a plain string; both are read.
+type NoteList []string
+
+// UnmarshalJSON reads a list of strings, a single string or null.
+func (n *NoteList) UnmarshalJSON(b []byte) error {
+	var list []string
+	if err := json.Unmarshal(b, &list); err == nil {
+		*n = list
+		return nil
+	}
+	var one string
+	if err := json.Unmarshal(b, &one); err != nil {
+		return err
+	}
+	if strings.TrimSpace(one) == "" {
+		*n = nil
+		return nil
+	}
+	*n = []string{one}
+	return nil
 }
 
 // ParseReviewReply reads the AI's review. A group, part or field that does not
@@ -176,7 +203,7 @@ func parseReviewReply(raw []byte, prev ReviewState, place func(ReviewReplyItem) 
 		}
 	}
 	if r.Notes == nil {
-		r.Notes = []string{}
+		r.Notes = NoteList{}
 	}
 	return r, nil
 }
@@ -197,7 +224,7 @@ func MergeReview(prev ReviewState, reply ReviewReply) ReviewState {
 		f, ok := again[old.ID]
 		switch {
 		case ok:
-			upd := Finding{ID: old.ID, Group: f.Group, UnitKey: f.UnitKey, Field: f.Field, Text: f.Text, Detail: f.Detail, Fix: f.Fix, State: FindingOpen}
+			upd := Finding{ID: old.ID, Group: f.Group, UnitKey: f.UnitKey, Field: f.Field, Text: f.Text, Detail: f.Detail, Fix: f.Fix, Replaces: f.Replaces, State: FindingOpen}
 			if old.State == FindingAccepted {
 				upd.State, upd.Why = FindingAccepted, old.Why
 			}
@@ -215,22 +242,32 @@ func MergeReview(prev ReviewState, reply ReviewReply) ReviewState {
 		}
 		out.Findings = append(out.Findings, Finding{
 			ID: fmt.Sprintf("f%d", out.NextSeq), Group: f.Group, UnitKey: f.UnitKey, Field: f.Field,
-			Text: f.Text, Detail: f.Detail, Fix: f.Fix, State: FindingOpen,
+			Text: f.Text, Detail: f.Detail, Fix: f.Fix, Replaces: f.Replaces, State: FindingOpen,
 		})
 		out.NextSeq++
 	}
 	if out.Findings == nil {
 		out.Findings = []Finding{}
 	}
-	out.Notes = reply.Notes
+	out.Notes = []string(reply.Notes)
 	out.Rounds++
 	return out
 }
 
+// CanApplyFix reports whether ApplyFix would write f's fix into content as it is
+// now, so the Creator is offered a direct apply only when it works.
+func CanApplyFix(content []byte, f Finding) bool {
+	if f.Field == "" || strings.TrimSpace(f.Fix) == "" {
+		return false
+	}
+	_, err := ApplyFix(content, f.Field, f.Fix, f.Replaces)
+	return err == nil
+}
+
 // ApplyFix writes fix into field of a part's JSON content: a text field takes
-// it, a list of texts gets it as a new line. Any other field is not something
-// one line can fix.
-func ApplyFix(content []byte, field, fix string) ([]byte, error) {
+// it; a list of texts gets it as a new line, or, when replaces names an existing
+// line, in place of that line. Any other field is not something one line can fix.
+func ApplyFix(content []byte, field, fix, replaces string) ([]byte, error) {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(content, &m); err != nil {
 		return nil, err
@@ -245,7 +282,22 @@ func ApplyFix(content []byte, field, fix string) ([]byte, error) {
 	case json.Unmarshal(cur, &s) == nil:
 		m[field], _ = json.Marshal(fix)
 	case json.Unmarshal(cur, &list) == nil:
-		m[field], _ = json.Marshal(append(list, fix))
+		if strings.TrimSpace(replaces) == "" {
+			m[field], _ = json.Marshal(append(list, fix))
+			break
+		}
+		at := -1
+		for i, line := range list {
+			if strings.TrimSpace(line) == strings.TrimSpace(replaces) {
+				at = i
+				break
+			}
+		}
+		if at < 0 {
+			return nil, ErrFindingNotApplicable
+		}
+		list[at] = fix
+		m[field], _ = json.Marshal(list)
 	default:
 		return nil, ErrFindingNotApplicable
 	}

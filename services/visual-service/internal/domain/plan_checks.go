@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -136,6 +137,42 @@ func (p *problems) checkDuration(u PlanUnit, pc PlanContext) {
 	case planned > min+durationEpsilon && strings.TrimSpace(u.Duration.ExtraReason) == "":
 		p.addf("Giữ hình %.1fs, dài hơn lời thoại %.1fs, cần ghi lý do", planned, min)
 	}
+}
+
+// AutoFixUnit repairs the two failures that need no judgement: a planned time
+// shorter than the narration needs is raised to that minimum, and a risk note
+// about a fact the unit's own lines do not carry is dropped. A field the Creator
+// wrote (creatorFields) is left as it is. It returns the unit and what it changed.
+func AutoFixUnit(u PlanUnit, pc PlanContext, creatorFields []string) (PlanUnit, []string) {
+	var did []string
+	mine := map[string]bool{}
+	for _, f := range creatorFields {
+		mine[f] = true
+	}
+	if pc.SecondsPerWord > 0 && !mine["duration"] {
+		min := pc.UnitNarrationMin(u)
+		if u.Duration.PlannedS > 0 && u.Duration.PlannedS < min-durationEpsilon {
+			raised := math.Ceil(min*100) / 100
+			did = append(did, fmt.Sprintf("Đã nâng thời lượng %.2fs → %.2fs (mức tối thiểu theo lời thoại)", u.Duration.PlannedS, raised))
+			u.Duration.PlannedS = raised
+		}
+	}
+	if !mine["risk_notes"] {
+		facts := map[string]bool{}
+		for _, f := range FactRefs(u, pc.Lines) {
+			facts[f] = true
+		}
+		kept := []RiskNote{}
+		for _, r := range u.RiskNotes {
+			if facts[r.FactID] {
+				kept = append(kept, r)
+				continue
+			}
+			did = append(did, fmt.Sprintf("Đã bỏ ghi chú rủi ro %s vì %s không nằm trong lời thoại của unit", r.FactID, r.FactID))
+		}
+		u.RiskNotes = kept
+	}
+	return u, did
 }
 
 // ApprovalBlockers lists what keeps a unit from being approved besides its

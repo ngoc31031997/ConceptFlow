@@ -7,6 +7,7 @@ import { Button, CopyBox } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
 import { PlanAnswerDialog, PlanEditDialog, PlanMergeDialog, PlanSplitDialog } from "./PlanDialogs";
 import { METHOD_LABELS, RELATIONSHIP_LABELS, hasOpenQuestion, refsLabel, seconds } from "./planModel";
+import foldStyles from "../visual/visual.module.css";
 import styles from "./plan.module.css";
 
 interface PlanUnitCardProps {
@@ -30,6 +31,8 @@ export function PlanUnitCard({ projectId, beat, unit, next, plan, readOnly }: Pl
   const [merging, setMerging] = useState(false);
   const [redoing, setRedoing] = useState(false);
   const [answering, setAnswering] = useState<string | null>(null);
+  // An approved unit folds to one line; the Creator opens it to read or change it.
+  const [expanded, setExpanded] = useState(false);
   const approved = unit.status === "approved";
   const disabled = readOnly || plan.busy || plan.running !== null;
   const testId = `plan-unit-${unit.unit_id}`;
@@ -41,6 +44,21 @@ export function PlanUnitCard({ projectId, beat, unit, next, plan, readOnly }: Pl
     : unit.problems.length > 0
       ? unit.problems.join("; ")
       : "";
+
+  if (approved && !expanded) {
+    return (
+      <article className={styles.unit} id={testId} data-testid={testId}>
+        <div className={foldStyles.folded}>
+          <span className={styles.uid}>{unit.unit_id}</span>
+          <span className={foldStyles.summary}>{unit.communication_goal}</span>
+          <UnitStatusChip state="approved" testId={`${testId}-status`} />
+          <Button variant="view" onClick={() => setExpanded(true)} data-testid={`${testId}-open`}>
+            Mở
+          </Button>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className={`${styles.unit} ${warn && !approved ? styles.unitWarn : ""}`} id={testId} data-testid={testId}>
@@ -184,9 +202,14 @@ export function PlanUnitCard({ projectId, beat, unit, next, plan, readOnly }: Pl
           </Button>
         )}
         {approved ? (
-          <Button variant="ghost" onClick={() => void plan.unapprove(unit.unit_id)} disabled={disabled} data-testid={`${testId}-unapprove`}>
-            Bỏ duyệt
-          </Button>
+          <>
+            <Button variant="ghost" onClick={() => setExpanded(false)} data-testid={`${testId}-fold`}>
+              Thu gọn
+            </Button>
+            <Button variant="ghost" onClick={() => void plan.unapprove(unit.unit_id)} disabled={disabled} data-testid={`${testId}-unapprove`}>
+              Bỏ duyệt
+            </Button>
+          </>
         ) : (
           <>
             <Button variant="run" onClick={() => setRedoing(true)} disabled={disabled} data-testid={`${testId}-redo`}>
@@ -194,7 +217,10 @@ export function PlanUnitCard({ projectId, beat, unit, next, plan, readOnly }: Pl
             </Button>
             <Button
               variant="primary"
-              onClick={() => void plan.approve(unit.unit_id)}
+              onClick={() => {
+                setExpanded(false);
+                void plan.approve(unit.unit_id);
+              }}
               disabled={disabled || approveBlock !== "" || hasOpenQuestion(unit)}
               title={approveBlock || (open.length > 0 ? "Còn câu hỏi chưa trả lời" : undefined)}
               data-testid={`${testId}-approve`}

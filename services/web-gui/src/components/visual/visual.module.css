@@ -73,7 +73,7 @@
   border: 2px solid var(--line);
   border-radius: 3px;
   overflow: hidden;
-  min-width: 520px;
+  min-width: min(520px, 100%);
 }
 .timeline div {
   border-right: 1.5px solid var(--line);

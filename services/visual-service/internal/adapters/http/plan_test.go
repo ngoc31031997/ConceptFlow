@@ -81,6 +81,9 @@ func (f *fakePlan) Approve(_ context.Context, _ string, id string) (*application
 func (f *fakePlan) Unapprove(_ context.Context, _ string, id string) (*application.PlanState, error) {
 	return f.ret("unapprove:" + id)
 }
+func (f *fakePlan) AutoFix(context.Context, string) (*application.PlanState, error) {
+	return f.ret("auto-fix")
+}
 func (f *fakePlan) ApproveAll(context.Context, string) (*application.PlanState, error) {
 	return f.ret("approve-all")
 }
@@ -120,6 +123,7 @@ func TestPlanRoutesReachTheDesk(t *testing.T) {
 		{"POST", base + "/units/VP-001/approve", "", "approve:VP-001"},
 		{"POST", base + "/units/VP-001/unapprove", "", "unapprove:VP-001"},
 		{"POST", base + "/approve-all", "", "approve-all"},
+		{"POST", base + "/auto-fix", "", "auto-fix"},
 		{"POST", base + "/findings/f1/apply", "", "apply:f1"},
 		{"POST", base + "/findings/f1/accept", `{"why":"ổn"}`, "accept:f1:ổn"},
 		{"POST", base + "/lock", `{"note":"v1"}`, "lock:v1"},

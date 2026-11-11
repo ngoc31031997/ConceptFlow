@@ -93,6 +93,7 @@ Kết quả rà soát lưu ở `review_units` `kind = visual_plan_review`, `unit
 | POST | `…/units/{vp}/merge` | `{"with":"VP-002"}` gộp unit liền sau vào unit này (cùng beat). Khác đi `400` |
 | POST | `…/units/{vp}/approve` · `/unapprove` | Duyệt cần: beat không stale (`409 beat_stale`), unit hết `problems`, mọi câu hỏi đã trả lời (`409`) |
 | POST | `…/approve-all` | Duyệt mọi unit đạt trong beat không stale |
+| POST | `…/auto-fix` | Nâng thời lượng dự kiến thấp hơn mức tối thiểu của lời thoại lên đúng mức đó và bỏ ghi chú rủi ro gắn vào dữ kiện không nằm trong câu của unit (bỏ qua trường Creator đã sửa tay và beat stale); trả state với `auto_fixes` liệt kê từng thay đổi, các lời gọi khác trả `auto_fixes: []` |
 | POST | `…/findings/{fid}/apply` | Ghi `fix` của vấn đề vào `field` của unit; chỉ trường văn bản hoặc danh sách văn bản cấp ngoài; unit về `pending` |
 | POST | `…/findings/{fid}/accept` | `{"why":"…"}` chấp nhận vấn đề, hoặc máy kiểm `m-plan-*` đang không đạt |
 | POST | `…/lock` | `{"note":"…"}` chốt phiên bản. `409` kèm `blockers` khi chưa đủ điều kiện; `409` khi không đổi gì so với bản chốt |

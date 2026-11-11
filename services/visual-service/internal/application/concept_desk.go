@@ -235,6 +235,8 @@ type FindingView struct {
 	GroupLabel string `json:"group_label"`
 	UnitNumber int    `json:"unit_number"`
 	UnitTitle  string `json:"unit_title"`
+	// Direct is true when the finding's fix can be written into its field as it is.
+	Direct bool `json:"direct"`
 }
 
 // ReviewView is the review of the whole concept.
@@ -385,8 +387,12 @@ func (d *ConceptDesk) state(ctx context.Context, projectID string, data *deskDat
 	openIn := map[string]bool{}
 	for _, f := range data.review.Findings {
 		spec, _ := domain.UnitSpecOf(f.UnitKey)
+		direct := false
+		if u, ok := data.units[f.UnitKey]; ok && f.State == domain.FindingOpen {
+			direct = domain.CanApplyFix(u.Content, f)
+		}
 		st.Review.Findings = append(st.Review.Findings, FindingView{Finding: f, GroupLabel: domain.FindingGroupLabels[f.Group],
-			UnitNumber: domain.UnitNumber(f.UnitKey), UnitTitle: spec.Title})
+			UnitNumber: domain.UnitNumber(f.UnitKey), UnitTitle: spec.Title, Direct: direct})
 		if f.State == domain.FindingOpen {
 			openIn[f.Group] = true
 		}
@@ -413,6 +419,9 @@ func (d *ConceptDesk) state(ctx context.Context, projectID string, data *deskDat
 			return nil, err
 		}
 		st.Draft = changedParts(latest.Document, data)
+		if st.Draft == nil {
+			st.Draft = []string{}
+		}
 	}
 
 	unitOK := func(key string) bool {

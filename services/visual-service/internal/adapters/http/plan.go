@@ -25,6 +25,7 @@ type planDesk interface {
 	Approve(ctx context.Context, projectID, unitID string) (*application.PlanState, error)
 	Unapprove(ctx context.Context, projectID, unitID string) (*application.PlanState, error)
 	ApproveAll(ctx context.Context, projectID string) (*application.PlanState, error)
+	AutoFix(ctx context.Context, projectID string) (*application.PlanState, error)
 	ApplyFinding(ctx context.Context, projectID, findingID string) (*application.PlanState, error)
 	AcceptFinding(ctx context.Context, projectID, findingID, why string) (*application.PlanState, error)
 	Lock(ctx context.Context, projectID, note string) (*application.PlanState, error)
@@ -57,6 +58,7 @@ func (rt *Router) mountPlan(r chi.Router) {
 			return rt.plan.Unapprove(ctx, p, u)
 		}))
 		r.Post("/approve-all", rt.planApproveAll)
+		r.Post("/auto-fix", rt.planAutoFix)
 		r.Post("/findings/{finding}/apply", rt.planApply)
 		r.Post("/findings/{finding}/accept", rt.planAccept)
 		r.Post("/lock", rt.planLock)
@@ -168,6 +170,11 @@ func (rt *Router) planUnitAction(fn func(ctx context.Context, projectID, unitID 
 
 func (rt *Router) planApproveAll(w http.ResponseWriter, r *http.Request) {
 	st, err := rt.plan.ApproveAll(r.Context(), pid(r))
+	writeConcept(w, st, err)
+}
+
+func (rt *Router) planAutoFix(w http.ResponseWriter, r *http.Request) {
+	st, err := rt.plan.AutoFix(r.Context(), pid(r))
 	writeConcept(w, st, err)
 }
 

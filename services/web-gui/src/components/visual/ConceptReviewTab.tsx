@@ -1,14 +1,16 @@
 import { useState } from "react";
 import {
+  generateVisualConceptUnit,
   getVisualConceptVersion,
   reviewVisualConcept,
+  type VisualConceptFinding,
   type VisualConceptState,
   type VisualConceptUnitKey,
 } from "../../api/client";
 import { visualErrorText, type VisualConceptControls } from "../../hooks/useVisualConcept";
 import lockStyles from "../lock/lock.module.css";
 import researchStyles from "../research/research.module.css";
-import { Button, Card, CopyBox, Dialog, FormField, TextArea, TextInput } from "../ui";
+import { Button, Card, CopyBox, Dialog, FormField, TextInput } from "../ui";
 import { ConceptAiDialog } from "./ConceptAiDialog";
 import styles from "./visual.module.css";
 
@@ -16,6 +18,12 @@ const STATE_LABEL: Record<string, string> = {
   fixed: "✓ Đã sửa (AI không báo lại)",
   applied: "✓ Đã áp dụng gợi ý · phần về chờ duyệt",
 };
+
+/** The note an AI rewrite of the part starts with: the problem and the reviewer's advice. */
+function fixNote(f: VisualConceptFinding): string {
+  const advice = f.fix ? ` Gợi ý: ${f.fix}` : "";
+  return `Sửa vấn đề này: ${f.text} ${f.detail}${advice}`.replace(/\s+/g, " ").trim();
+}
 
 interface ConceptReviewTabProps {
   projectId: string;
@@ -39,8 +47,7 @@ export function ConceptReviewTab({
   onOpenUnit,
 }: ConceptReviewTabProps) {
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [accepting, setAccepting] = useState<{ id: string; text: string } | null>(null);
-  const [why, setWhy] = useState("");
+  const [applying, setApplying] = useState<VisualConceptFinding | null>(null);
   const [lockOpen, setLockOpen] = useState(false);
   const [lockNote, setLockNote] = useState("");
   const [viewing, setViewing] = useState<{ version: number; text: string } | null>(null);
@@ -99,11 +106,11 @@ export function ConceptReviewTab({
                   <div className={lockStyles.findingActions}>
                     <Button
                       variant="ghost"
-                      onClick={() => setAccepting({ id: c.id, text: c.label })}
+                      onClick={() => void concept.accept(c.id, "")}
                       disabled={disabled}
-                      data-testid={`concept-accept-${c.id}`}
+                      data-testid={`concept-accept-quick-${c.id}`}
                     >
-                      Chấp nhận, ghi lý do
+                      Chấp nhận
                     </Button>
                   </div>
                 )}
@@ -131,23 +138,21 @@ export function ConceptReviewTab({
                       >
                         Mở phần {f.unit_number}
                       </Button>
-                      {f.fix && f.field && (
-                        <Button
-                          variant="primary"
-                          onClick={() => void concept.applyFix(f.id)}
-                          disabled={disabled}
-                          data-testid={`concept-finding-apply-${f.id}`}
-                        >
-                          Áp dụng gợi ý
-                        </Button>
-                      )}
+                      <Button
+                        variant="primary"
+                        onClick={() => (f.direct ? void concept.applyFix(f.id) : setApplying(f))}
+                        disabled={disabled}
+                        data-testid={`concept-finding-apply-${f.id}`}
+                      >
+                        {f.direct ? "Áp dụng gợi ý" : "Nhờ AI sửa"}
+                      </Button>
                       <Button
                         variant="ghost"
-                        onClick={() => setAccepting({ id: f.id, text: f.text })}
+                        onClick={() => void concept.accept(f.id, "")}
                         disabled={disabled}
-                        data-testid={`concept-finding-accept-${f.id}`}
+                        data-testid={`concept-finding-accept-quick-${f.id}`}
                       >
-                        Chấp nhận, ghi lý do
+                        Chấp nhận
                       </Button>
                     </div>
                   </>
@@ -240,6 +245,30 @@ export function ConceptReviewTab({
       </Card>
 
       <ConceptAiDialog
+        open={applying !== null}
+        onClose={() => setApplying(null)}
+        title={`Nhờ AI sửa · phần ${applying?.unit_number ?? ""} · ${applying?.unit_title ?? ""}`}
+        impact={
+          <p className={researchStyles.hint}>
+            AI viết lại phần này theo vấn đề đã nêu. Các phần khác giữ nguyên; trường bạn đã sửa tay
+            giữ nguyên trừ khi ghi chú yêu cầu đổi. Phần này về “chờ duyệt”.
+          </p>
+        }
+        initialNote={applying ? fixNote(applying) : ""}
+        onSystem={(note) => {
+          if (applying) void concept.generateUnit(applying.unit_key, note, applying.id);
+        }}
+        external={{
+          run: (note, external) =>
+            applying
+              ? generateVisualConceptUnit(projectId, applying.unit_key, note, { external }, applying.id)
+              : Promise.reject(new Error("no finding picked")),
+          onDone: concept.reload,
+        }}
+        testId="concept-apply-dialog"
+      />
+
+      <ConceptAiDialog
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
         title={state.review.reviewed ? "Rà soát lại bộ quy tắc" : "Rà soát bộ quy tắc"}
@@ -257,50 +286,6 @@ export function ConceptReviewTab({
         testId="concept-review-dialog"
       />
 
-      <Dialog
-        open={accepting !== null}
-        onClose={() => {
-          setAccepting(null);
-          setWhy("");
-        }}
-        title="Chấp nhận vấn đề, ghi lý do"
-        hasInput
-        testId="concept-accept-dialog"
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setAccepting(null);
-                setWhy("");
-              }}
-            >
-              Huỷ
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                const id = accepting?.id ?? "";
-                setAccepting(null);
-                void concept.accept(id, why.trim()).then(() => setWhy(""));
-              }}
-              data-testid="concept-accept-save"
-            >
-              Chấp nhận
-            </Button>
-          </>
-        }
-      >
-        <p>{accepting?.text}</p>
-        <FormField label="Lý do">
-          <TextArea
-            value={why}
-            onChange={(e) => setWhy(e.target.value)}
-            rows={3}
-            data-testid="concept-accept-why"
-          />
-        </FormField>
-      </Dialog>
 
       <Dialog
         open={lockOpen}

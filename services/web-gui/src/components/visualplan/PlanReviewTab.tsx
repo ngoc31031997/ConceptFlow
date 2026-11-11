@@ -4,7 +4,7 @@ import { visualErrorText } from "../../hooks/useVisualConcept";
 import type { VisualPlanControls } from "../../hooks/useVisualPlan";
 import lockStyles from "../lock/lock.module.css";
 import researchStyles from "../research/research.module.css";
-import { Button, Card, CopyBox, Dialog, FormField, TextArea, TextInput } from "../ui";
+import { Button, Card, CopyBox, Dialog, FormField, TextInput } from "../ui";
 import { ConceptAiDialog } from "../visual/ConceptAiDialog";
 import visualStyles from "../visual/visual.module.css";
 import { planCriteria, seconds } from "./planModel";
@@ -38,8 +38,6 @@ interface PlanReviewTabProps {
  */
 export function PlanReviewTab({ projectId, state, plan, readOnly, onOpenUnit, onGoUncovered }: PlanReviewTabProps) {
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [accepting, setAccepting] = useState<{ id: string; text: string } | null>(null);
-  const [why, setWhy] = useState("");
   const [lockOpen, setLockOpen] = useState(false);
   const [lockNote, setLockNote] = useState("");
   const [viewing, setViewing] = useState<{ version: number; text: string } | null>(null);
@@ -109,11 +107,11 @@ export function PlanReviewTab({ projectId, state, plan, readOnly, onOpenUnit, on
                   <div className={lockStyles.findingActions}>
                     <Button
                       variant="ghost"
-                      onClick={() => setAccepting({ id: c.id, text: c.label })}
+                      onClick={() => void plan.accept(c.id, "")}
                       disabled={disabled}
-                      data-testid={`plan-accept-${c.id}`}
+                      data-testid={`plan-accept-quick-${c.id}`}
                     >
-                      Chấp nhận, ghi lý do
+                      Chấp nhận
                     </Button>
                   </div>
                 )}
@@ -145,11 +143,11 @@ export function PlanReviewTab({ projectId, state, plan, readOnly, onOpenUnit, on
                       )}
                       <Button
                         variant="ghost"
-                        onClick={() => setAccepting({ id: f.id, text: f.text })}
+                        onClick={() => void plan.accept(f.id, "")}
                         disabled={disabled}
-                        data-testid={`plan-finding-accept-${f.id}`}
+                        data-testid={`plan-finding-accept-quick-${f.id}`}
                       >
-                        Chấp nhận, ghi lý do
+                        Chấp nhận
                       </Button>
                     </div>
                   </>
@@ -259,46 +257,6 @@ export function PlanReviewTab({ projectId, state, plan, readOnly, onOpenUnit, on
         testId="plan-review-dialog"
       />
 
-      <Dialog
-        open={accepting !== null}
-        onClose={() => {
-          setAccepting(null);
-          setWhy("");
-        }}
-        title="Chấp nhận vấn đề, ghi lý do"
-        hasInput
-        testId="plan-accept-dialog"
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setAccepting(null);
-                setWhy("");
-              }}
-            >
-              Huỷ
-            </Button>
-            <Button
-              variant="primary"
-              disabled={why.trim() === ""}
-              onClick={() => {
-                const id = accepting?.id ?? "";
-                setAccepting(null);
-                void plan.accept(id, why.trim()).then(() => setWhy(""));
-              }}
-              data-testid="plan-accept-save"
-            >
-              Chấp nhận
-            </Button>
-          </>
-        }
-      >
-        <p>{accepting?.text}</p>
-        <FormField label="Lý do">
-          <TextArea value={why} onChange={(e) => setWhy(e.target.value)} rows={3} data-testid="plan-accept-why" />
-        </FormField>
-      </Dialog>
 
       <Dialog
         open={lockOpen}

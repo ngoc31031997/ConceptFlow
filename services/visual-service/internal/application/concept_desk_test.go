@@ -158,6 +158,26 @@ func approveEverything(t *testing.T, r *rig) *ConceptState {
 	return mustState(t)(r.desk.ApproveAll(ctx, project))
 }
 
+func TestMarkFindingRewritten(t *testing.T) {
+	r := newRig(t)
+	r.queueAll()
+	mustState(t)(r.desk.Generate(ctx, project, "", false))
+	approveEverything(t, r)
+	r.llm.replies[domain.PromptRoleReview] = []string{`{"findings":[{"group":"feasibility","unit_key":"feasibility","field":"","text":"nặng","detail":"d","fix":"","same_as":""}],"notes":[]}`}
+	mustState(t)(r.desk.Review(ctx, project, ""))
+	st := mustState(t)(r.desk.MarkFindingRewritten(ctx, project, "f1", domain.UnitTypography))
+	if st.Review.Findings[0].State != domain.FindingOpen {
+		t.Error("a rewrite of another part does not mark the finding")
+	}
+	st = mustState(t)(r.desk.MarkFindingRewritten(ctx, project, "f1", domain.UnitFeasibility))
+	if st.Review.Findings[0].State != domain.FindingApplied {
+		t.Errorf("a rewrite of its part marks the finding applied: %s", st.Review.Findings[0].State)
+	}
+	if _, err := r.desk.MarkFindingRewritten(ctx, project, "f9", domain.UnitFeasibility); !errors.Is(err, domain.ErrUnknownFinding) {
+		t.Errorf("unknown finding: %v", err)
+	}
+}
+
 func TestLock_ConditionsThenV1ThenV2(t *testing.T) {
 	r := newRig(t)
 	r.queueAll()
@@ -197,6 +217,9 @@ func TestLock_ConditionsThenV1ThenV2(t *testing.T) {
 	}
 	if _, err := r.desk.Lock(ctx, project, ""); !errors.Is(err, domain.ErrNothingToLock) {
 		t.Errorf("nothing changed: %v", err)
+	}
+	if st = mustState(t)(r.desk.State(ctx, project)); st.Draft == nil {
+		t.Error("with nothing changed the draft is an empty list, not null")
 	}
 	doc, err := r.desk.LatestDocument(ctx, project, "")
 	if err != nil || !strings.Contains(string(doc), `"document_id":"visual-concept-v1"`) || !strings.Contains(string(doc), `"accuracy_notes":[{"fact":"F01"`) {

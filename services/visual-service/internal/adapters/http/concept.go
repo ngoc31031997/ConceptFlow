@@ -28,6 +28,7 @@ type conceptDesk interface {
 	Review(ctx context.Context, projectID, note string) (*application.ConceptState, error)
 	ApplyFinding(ctx context.Context, projectID, findingID string) (*application.ConceptState, error)
 	AcceptFinding(ctx context.Context, projectID, findingID, why string) (*application.ConceptState, error)
+	MarkFindingRewritten(ctx context.Context, projectID, findingID, unitKey string) (*application.ConceptState, error)
 	Lock(ctx context.Context, projectID, note string) (*application.ConceptState, error)
 	Version(ctx context.Context, projectID string, version int) (application.VersionRecord, error)
 	LatestDocument(ctx context.Context, projectID, step string) (json.RawMessage, error)
@@ -157,6 +158,8 @@ func (rt *Router) conceptModel(w http.ResponseWriter, r *http.Request) {
 type noteBody struct {
 	Note       string `json:"note"`
 	RewriteAll bool   `json:"rewrite_all"`
+	// FindingID is the review finding this rewrite of one part answers.
+	FindingID string `json:"finding_id"`
 }
 
 func (rt *Router) conceptGenerate(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +178,11 @@ func (rt *Router) conceptGenerateUnit(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	st, err := rt.concept.GenerateUnit(r.Context(), pid(r), chi.URLParam(r, "key"), in.Note)
+	key := chi.URLParam(r, "key")
+	st, err := rt.concept.GenerateUnit(r.Context(), pid(r), key, in.Note)
+	if err == nil && in.FindingID != "" {
+		st, err = rt.concept.MarkFindingRewritten(r.Context(), pid(r), in.FindingID, key)
+	}
 	writeConcept(w, st, err)
 }
 

@@ -176,6 +176,7 @@ function baseState(over: Partial<VisualConceptState> = {}): VisualConceptState {
           text: "Chú thích mơ hồ",
           detail: "d",
           fix: "Chỉ cho số liệu",
+          direct: true,
           state: "open",
           why: "",
         },
@@ -190,6 +191,7 @@ function baseState(over: Partial<VisualConceptState> = {}): VisualConceptState {
           text: "Glow nặng",
           detail: "",
           fix: "",
+          direct: false,
           state: "fixed",
           why: "",
         },
@@ -367,15 +369,52 @@ describe("VisualConceptStepPage", () => {
     fireEvent.click(screen.getByTestId("concept-finding-apply-f1"));
     await waitFor(() => expect(apply).toHaveBeenCalledWith("p1", "f1"));
 
-    fireEvent.click(screen.getByTestId("concept-accept-m-terms"));
-    fireEvent.change(await screen.findByTestId("concept-accept-why"), {
-      target: { value: "thuật ngữ chỉ nói" },
-    });
-    fireEvent.click(screen.getByTestId("concept-accept-save"));
-    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "m-terms", "thuật ngữ chỉ nói"));
+    fireEvent.click(screen.getByTestId("concept-accept-quick-m-terms"));
+    await waitFor(() => expect(accept).toHaveBeenCalledWith("p1", "m-terms", ""));
 
     fireEvent.click(screen.getByTestId("concept-finding-open-f1"));
     await waitFor(() => expect(screen.getByTestId("concept-unit-typography")).toBeInTheDocument());
+  });
+
+  it("folds an approved part again after it was opened from a finding", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    state = baseState({
+      units: baseState().units.map((u) =>
+        u.key === "typography" ? { ...u, status: "approved", written: true } : u,
+      ),
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("concept-tab-review"));
+    fireEvent.click(screen.getByTestId("concept-finding-open-f1"));
+    fireEvent.click(await screen.findByTestId("concept-unit-typography-fold"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("concept-unit-typography-fold")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("opens the AI dialog to fix a finding that cannot be written directly", async () => {
+    const generate = vi.spyOn(apiClient, "generateVisualConceptUnit").mockResolvedValue(baseState());
+    state = baseState({
+      review: {
+        ...baseState().review,
+        findings: baseState().review.findings.map((f) =>
+          f.id === "f1" ? { ...f, fix: "", direct: false } : f,
+        ),
+      },
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("concept-tab-review"));
+    fireEvent.click(screen.getByTestId("concept-finding-apply-f1"));
+    fireEvent.click(await screen.findByTestId("concept-apply-dialog-send"));
+    await waitFor(() =>
+      expect(generate).toHaveBeenCalledWith(
+        "p1",
+        "typography",
+        expect.stringContaining("Chú thích mơ hồ"),
+        expect.anything(),
+        "f1",
+      ),
+    );
   });
 
   it("locks v2 with the changes listed, and opens the next step once locked", async () => {

@@ -29,6 +29,7 @@ describe('visual plan routing', () => {
     ['post', `${base}/units/VP-001/approve`],
     ['post', `${base}/units/VP-001/unapprove`],
     ['post', `${base}/approve-all`],
+    ['post', `${base}/auto-fix`],
     ['post', `${base}/findings/f1/apply`],
     ['post', `${base}/findings/m-plan-risk/accept`],
     ['post', `${base}/lock`],

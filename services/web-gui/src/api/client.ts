@@ -3511,6 +3511,8 @@ export interface VisualConceptFinding {
   text: string;
   detail: string;
   fix: string;
+  /** The fix can be written into its field as it is; otherwise the AI rewrites the part. */
+  direct: boolean;
   state: "open" | "fixed" | "applied" | "accepted";
   why: string;
 }
@@ -3599,8 +3601,8 @@ export function generateVisualConcept(projectId: string, note: string, rewriteAl
 }
 
 /** The AI writes or rewrites one part, with the Creator's note; can run through an AI outside the system. */
-export function generateVisualConceptUnit(projectId: string, key: VisualConceptUnitKey, note: string, call?: AiCall): Promise<VisualConceptState> {
-  return sendVisualConcept(projectId, "POST", `/units/${key}/generate`, { note }, call);
+export function generateVisualConceptUnit(projectId: string, key: VisualConceptUnitKey, note: string, call?: AiCall, findingId?: string): Promise<VisualConceptState> {
+  return sendVisualConcept(projectId, "POST", `/units/${key}/generate`, findingId ? { note, finding_id: findingId } : { note }, call);
 }
 
 /** Saves the Creator's fields of one part; they become the Creator's and the part goes back to review. */
@@ -3900,6 +3902,8 @@ export interface VisualPlanState {
   model: string;
   default_model: string;
   models: { id: string; label: string; local: boolean }[];
+  /** What the last auto-fix changed; empty on every other answer. */
+  auto_fixes: string[];
 }
 
 const visualPlanPath = (projectId: string) => `/v1/projects/${projectId}/visual-plan`;
@@ -3964,6 +3968,11 @@ export function approveVisualPlanUnit(projectId: string, unitId: string): Promis
 
 export function unapproveVisualPlanUnit(projectId: string, unitId: string): Promise<VisualPlanState> {
   return sendVisualPlan(projectId, "POST", `/units/${unitId}/unapprove`);
+}
+
+/** Repairs the units refused for a time below the narration minimum or a risk note off their lines. */
+export function autoFixVisualPlan(projectId: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", "/auto-fix");
 }
 
 export function approveAllVisualPlan(projectId: string): Promise<VisualPlanState> {

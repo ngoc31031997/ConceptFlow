@@ -18,6 +18,8 @@ interface ConceptUnitCardProps {
   readOnly: boolean;
   /** Opened from outside (a finding's "Mở phần"). */
   forceOpen: boolean;
+  /** The part was folded again, so it is no longer held open from outside. */
+  onFold: () => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function ConceptUnitCard({
   concept,
   readOnly,
   forceOpen,
+  onFold,
 }: ConceptUnitCardProps) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -71,7 +74,11 @@ export function ConceptUnitCard({
           )}
           <span className={researchStyles.grow} />
           {approved && (
-            <Button variant="ghost" onClick={() => setOpen(false)} data-testid={`${testId}-fold`}>
+            <Button variant="ghost" onClick={() => {
+                setOpen(false);
+                onFold();
+              }}
+              data-testid={`${testId}-fold`}>
               Thu gọn
             </Button>
           )}
@@ -132,7 +139,11 @@ export function ConceptUnitCard({
               </Button>
               <Button
                 variant="primary"
-                onClick={() => void concept.approve(unit.key)}
+                onClick={() => {
+                  setOpen(false);
+                  onFold();
+                  void concept.approve(unit.key);
+                }}
                 disabled={disabled || !unit.written || unit.problems.length > 0}
                 data-testid={`${testId}-approve`}
               >

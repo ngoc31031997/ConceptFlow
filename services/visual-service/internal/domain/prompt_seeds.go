@@ -397,10 +397,11 @@ const conceptReviewVI = `Bạn là BIÊN TẬP VIÊN HÌNH ẢNH của một kê
 - Chỉ nêu vấn đề có thật và cụ thể; không khen, không nêu chung chung. Không có gì thì trả về danh sách rỗng.
 - unit_key là khoá của phần có vấn đề. field là tên trường ở cấp đầu của phần đó (như trong nội dung phần), để "" nếu vấn đề không nằm ở một trường.
 - text là vấn đề, ngắn gọn; detail giải thích vì sao đó là vấn đề.
-- fix là MỘT câu sửa: khi trường là một câu thì fix thay cả câu đó; khi trường là một danh sách câu thì fix là một dòng thêm vào danh sách. Để "" nếu không sửa được bằng một câu.
+- fix là CHÍNH câu sẽ nằm trong phần, viết hoàn chỉnh, đặt vào là dùng được. KHÔNG viết lời hướng dẫn như «sửa thành…», «thêm… vào câu đó». Khi trường là một câu: fix thay cả câu đó. Khi trường là một danh sách câu: nếu thêm ý mới thì fix là dòng mới; nếu sửa một dòng có sẵn thì fix là dòng đã sửa hoàn chỉnh.
+- replaces: chỉ dùng khi trường là danh sách câu và fix sửa một dòng có sẵn; ghi nguyên văn dòng cũ bị thay. Các trường hợp khác để "". Để fix là "" khi trường là bảng hoặc danh sách mục có cấu trúc, hoặc cần sửa nhiều chỗ cùng lúc.
 - Nếu một vấn đề ở lần trước vẫn còn đúng với các phần hiện tại, đưa lại vấn đề đó với same_as là mã của nó (dạng f1, f2…). Vấn đề mới, hoặc lần rà soát đầu: để same_as là "". Vấn đề nào không còn đúng thì KHÔNG đưa lại.
 - Viết bằng tiếng Việt.
 
 ## ĐẦU RA
 Trả về DUY NHẤT một khối ` + "```json" + ` theo mẫu, không thêm chữ nào khác. Trong nội dung KHÔNG dùng dấu nháy kép thẳng ("): dùng dấu « » hoặc nháy đơn, và không xuống dòng giữa một ô.
-{"findings":[{"group":"accuracy","unit_key":"representation_rules","field":"scientific_concepts","text":"...","detail":"...","fix":"...","same_as":""}],"notes":["nhận xét ngắn của bạn về cả bộ quy tắc"]}`
+{"findings":[{"group":"accuracy","unit_key":"representation_rules","field":"scientific_concepts","text":"...","detail":"...","fix":"...","replaces":"","same_as":""}],"notes":["nhận xét ngắn của bạn về cả bộ quy tắc"]}`

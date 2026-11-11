@@ -2,14 +2,15 @@
 
 A model often wraps the object in a ```json fence or adds a note after it, and
 a note can hold a stray `}`. The object is read from the first `{` and stops where
-it closes, so whatever follows is ignored.
+it closes, so whatever follows is ignored. A raw newline or tab inside a string,
+which models write although JSON forbids it, is accepted as the text it is.
 """
 
 from __future__ import annotations
 
 import json
 
-_DECODER = json.JSONDecoder()
+_DECODER = json.JSONDecoder(strict=False)
 
 
 def first_json_object(text: str) -> tuple[dict | None, str]:

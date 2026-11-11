@@ -242,6 +242,13 @@ func TestPlanDesk_StateShowsCoverageTimingAndBlockers(t *testing.T) {
 	if st.Timing.PlannedS != 120 || st.Timing.OverBrief {
 		t.Errorf("timing wrong: %+v", st.Timing)
 	}
+	for _, b := range st.Beats {
+		for _, u := range b.Units {
+			if u.Problems == nil {
+				t.Errorf("unit %s has null problems; the screen needs a list", u.UnitID)
+			}
+		}
+	}
 	b1 := st.Beats[0]
 	if b1.Timing == nil || b1.Timing.BeatSheetS != 60 || b1.Timing.DeltaS != 30 || b1.Stale {
 		t.Errorf("beat timing wrong: %+v", b1.Timing)
@@ -280,6 +287,30 @@ func TestPlanDesk_ApproveRefusesUnitsThatFailTheirChecks(t *testing.T) {
 	st := f.approveAll()
 	if f.unit(st, "VP-001").Status != domain.UnitPending || f.unit(st, "VP-002").Status != domain.UnitApproved {
 		t.Errorf("approve-all takes only the units that pass: %v / %v", f.unit(st, "VP-001").Status, f.unit(st, "VP-002").Status)
+	}
+}
+
+func TestPlanDesk_AutoFixRaisesTheTimeAndDropsRiskNotesOffTheUnitsLines(t *testing.T) {
+	f := newPlanFixture(t)
+	short := okUnit("VP-001", "b1.1")
+	short.Duration = domain.PlannedDuration{PlannedS: 0.5}
+	stray := okUnit("VP-002", "b1.2", "b1.3")
+	stray.RiskNotes = []domain.RiskNote{{FactID: "F02", Note: "đúng"}, {FactID: "F99", Note: "sai chỗ"}}
+	f.seedBeat("b1", short, stray)
+	before := f.must(f.desk.State(context.Background(), project))
+	if len(before.AutoFixes) != 0 {
+		t.Fatalf("a plain state lists no auto-fix: %v", before.AutoFixes)
+	}
+	st := f.must(f.desk.AutoFix(context.Background(), project))
+	if len(st.AutoFixes) != 2 || !strings.Contains(strings.Join(st.AutoFixes, "|"), "VP-001: Đã nâng thời lượng") ||
+		!strings.Contains(strings.Join(st.AutoFixes, "|"), "VP-002: Đã bỏ ghi chú rủi ro F99") {
+		t.Fatalf("each change is listed: %v", st.AutoFixes)
+	}
+	if f.unit(st, "VP-001").Duration.PlannedS < f.unit(st, "VP-001").NarrationMinS-0.01 || len(f.unit(st, "VP-002").RiskNotes) != 1 {
+		t.Errorf("units not repaired: %+v / %+v", f.unit(st, "VP-001").Duration, f.unit(st, "VP-002").RiskNotes)
+	}
+	if again := f.must(f.desk.AutoFix(context.Background(), project)); len(again.AutoFixes) != 0 {
+		t.Errorf("a second run has nothing to change: %v", again.AutoFixes)
 	}
 }
 
