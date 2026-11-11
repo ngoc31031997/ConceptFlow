@@ -115,3 +115,33 @@ type ConceptStorePort interface {
 	// InsertVersion adds a version; a taken number is domain.ErrVersionExists.
 	InsertVersion(ctx context.Context, v VersionRecord) error
 }
+
+// PlanVersionRecord is one locked version of a video's visual plan.
+type PlanVersionRecord struct {
+	ProjectID      string          `json:"-"`
+	Version        int             `json:"version"`
+	ScriptVersion  int             `json:"script_version"`
+	ConceptVersion int             `json:"concept_version"`
+	Document       json.RawMessage `json:"document,omitempty"`
+	Note           string          `json:"note"`
+	LockedAt       time.Time       `json:"locked_at"`
+}
+
+// PlanStorePort keeps step 9's data in visual-db and reads the locked visual
+// concept of step 8.
+type PlanStorePort interface {
+	ListUnits(ctx context.Context, projectID, kind string) ([]domain.ReviewUnit, error)
+	SaveUnit(ctx context.Context, u domain.ReviewUnit) error
+	// ReserveUnitNumbers hands out n consecutive unit numbers of the video and
+	// returns the first. A number is never handed out twice.
+	ReserveUnitNumbers(ctx context.Context, projectID string, n int) (int, error)
+	// LatestConceptVersion returns the latest locked visual concept with its
+	// document, or domain.ErrNoVersion.
+	LatestConceptVersion(ctx context.Context, projectID string) (VersionRecord, error)
+	// PlanVersions lists the locked plan versions without documents, oldest first.
+	PlanVersions(ctx context.Context, projectID string) ([]PlanVersionRecord, error)
+	// PlanVersion returns one locked plan version, or domain.ErrNoVersion.
+	PlanVersion(ctx context.Context, projectID string, version int) (PlanVersionRecord, error)
+	// InsertPlanVersion adds a version; a taken number is domain.ErrVersionExists.
+	InsertPlanVersion(ctx context.Context, v PlanVersionRecord) error
+}

@@ -42,6 +42,25 @@ CREATE TABLE IF NOT EXISTS visual_concept_versions (
     locked_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (project_id, version)
 );
+-- The locked versions of a video's visual plan: an immutable document the later
+-- visual steps read, with the script and visual-concept versions it was written
+-- from.
+CREATE TABLE IF NOT EXISTS visual_plan_versions (
+    project_id      TEXT NOT NULL,
+    version         INTEGER NOT NULL,
+    script_version  INTEGER NOT NULL,
+    concept_version INTEGER NOT NULL,
+    document        JSONB NOT NULL,
+    note            TEXT NOT NULL DEFAULT '',
+    locked_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, version)
+);
+-- The next number of a video's visual-plan unit (VP-001, VP-002...); a number
+-- is handed out once and never reused.
+CREATE TABLE IF NOT EXISTS visual_plan_seq (
+    project_id TEXT PRIMARY KEY,
+    next       INTEGER NOT NULL
+);
 -- Per-video settings of the visual steps. concept_model '' = the default model
 -- of the step, kept with the prompt library in llm-service.
 CREATE TABLE IF NOT EXISTS project_visual (

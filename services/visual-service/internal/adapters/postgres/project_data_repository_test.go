@@ -38,6 +38,8 @@ func TestDeleteProjectData_RemovesOnlyThatProjectAndKeepsTheLibrary(t *testing.T
 		for _, q := range []string{
 			`INSERT INTO review_units (project_id, kind, unit_key) VALUES ($1, 'visual_concept', 'color_system')`,
 			`INSERT INTO visual_concept_versions (project_id, version, script_version, document) VALUES ($1, 1, 1, '{}')`,
+			`INSERT INTO visual_plan_versions (project_id, version, script_version, concept_version, document) VALUES ($1, 1, 1, 1, '{}')`,
+			`INSERT INTO visual_plan_seq (project_id, next) VALUES ($1, 2)`,
 			`INSERT INTO project_visual (project_id) VALUES ($1)`,
 			`INSERT INTO project_reference_picks (project_id, ref_id) VALUES ($1, '` + ref + `')`,
 		} {

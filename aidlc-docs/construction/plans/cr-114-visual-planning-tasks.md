@@ -61,7 +61,7 @@ Ba phần, mỗi phần một nhánh và một worktree riêng, tạo từ `main
 ### Dữ liệu (`adapters/postgres`)
 - [ ] Bảng `visual_plan_versions(project_id, version, script_version, concept_version, document JSONB, note, locked_at)`, chỉ thêm dòng, trùng phiên bản trả 409.
 - [ ] Bảng `visual_plan_seq(project_id, next)` cấp mã VP trong giao dịch.
-- [ ] `project_visual.plan_model` (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`).
+- Model riêng của video (`project_visual.plan_model`, `PUT …/visual-plan/model`) không làm ở CR-114a: chưa có AI để chạy và bước `visual_plan` chưa có ở llm-service. Chuyển sang CR-114b.
 - [ ] `review_units` dùng `kind` `visual_plan` (`unit_key = b{k}`) và `visual_plan_review` (`unit_key = main`).
 - [ ] Purge xoá thêm hai bảng mới. Test purge.
 
@@ -70,6 +70,7 @@ Ba phần, mỗi phần một nhánh và một worktree riêng, tạo từ `main
   - Trạng thái toàn màn: input tóm tắt, beat, unit, độ phủ, máy kiểm, rà soát, điều kiện chốt và lý do chưa chốt được, phiên bản.
   - Các thao tác: sửa tay (ghi `creator_fields`, unit về `pending`), tách, gộp, trả lời câu hỏi, duyệt, bỏ duyệt, duyệt tất cả, chốt v1 và v2.
   - Chưa chốt bước 8 thì trả `409 concept_not_locked`. Chưa chốt kịch bản thì trả `409 script_not_locked`.
+  - Máy kiểm cứng (lỗi của unit, chặn Duyệt, không chấp nhận được): schema, enum, câu có thật và liền nhau, ref concept, risk note khớp dữ kiện, thời lượng. Máy kiểm mềm của cả kế hoạch (chặn chốt, chấp nhận kèm lý do được): `m-plan-risk`, `m-plan-avoid`. Chi tiết: `docs/contracts/visual-plan-v1.md`.
 - [ ] **Rà soát:**
   - Áp dụng gợi ý: ghi `fix` vào trường, unit về `pending`.
   - Chấp nhận kèm lý do.
@@ -79,7 +80,7 @@ Ba phần, mỗi phần một nhánh và một worktree riêng, tạo từ `main
 - [ ] `ConceptDesk.LatestDocument` không đổi.
 
 ### HTTP (`adapters/http/plan.go`)
-- [ ] Mọi route trong bảng "Hợp đồng HTTP công khai" của thiết kế, **trừ** `generate`, `beats/{k}/generate` và `review` (thuộc CR-114b).
+- [ ] Mọi route trong bảng "Hợp đồng HTTP công khai" của thiết kế, **trừ** `generate`, `beats/{k}/generate`, `review` và `model` (thuộc CR-114b).
 - [ ] Route nội bộ `GET /internal/v1/visual/{id}/plan`.
 - [ ] api-gateway proxy `/v1/projects/:id/visual-plan…` sang visual-service.
 
@@ -119,7 +120,7 @@ Ba phần, mỗi phần một nhánh và một worktree riêng, tạo từ `main
   - `POST /generate`: viết lần lượt các beat còn trống theo thứ tự.
 - [ ] **`plan_reviewer.go`:** `POST /review`, một lượt, prompt `visual_plan_review`, gộp findings bằng code của CR-114a.
 - [ ] `X-External-AI` cho `beats/{k}/generate` và `review`, dùng lại `external_ai.go`.
-- [ ] Model: `project_visual.plan_model`; để trống thì dùng model mặc định của bước `visual_plan` (thêm `"visual_plan"` vào `STEPS` trong `services/llm-service/app/modelcatalog.py`, sửa test).
+- [ ] Model: cột `project_visual.plan_model` (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`), `PUT /v1/projects/{id}/visual-plan/model` (gateway proxy kèm), và `model`, `default_model`, `models` trong trạng thái màn; để trống thì dùng model mặc định của bước `visual_plan` (thêm `"visual_plan"` vào `STEPS` trong `services/llm-service/app/modelcatalog.py`, sửa test).
 - [ ] api-gateway: timeout dài cho các route AI mới.
 
 ### Test

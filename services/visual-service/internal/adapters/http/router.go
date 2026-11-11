@@ -21,6 +21,7 @@ type deleteProjectUseCase interface {
 type Router struct {
 	deleteProject    deleteProjectUseCase
 	concept          conceptDesk
+	plan             planDesk
 	referenceLibrary referenceLibraryUseCase
 }
 
@@ -36,6 +37,9 @@ func (rt *Router) Handler() http.Handler {
 	r.Delete("/internal/v1/visual/{project_id}", rt.handleDeleteProject)
 	if rt.concept != nil {
 		rt.mountConcept(r)
+	}
+	if rt.plan != nil {
+		rt.mountPlan(r)
 	}
 	rt.mountReferenceLibrary(r)
 	return r

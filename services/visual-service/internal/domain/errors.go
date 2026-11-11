@@ -36,4 +36,18 @@ var (
 	ErrUnreadableReply = errors.New("câu trả lời của AI không dùng được")
 	// ErrUnknownStep: no later step reads the locked visual concept by this name.
 	ErrUnknownStep = errors.New("chưa có bước nào đọc ngôn ngữ hình ảnh theo tên này")
+	// ErrConceptNotLocked: step 9 reads the locked visual concept, and there is none yet.
+	ErrConceptNotLocked = errors.New("Chốt Ngôn ngữ hình ảnh ở bước 8 trước")
+	// ErrUnknownPlanUnit: the id names no unit of the visual plan.
+	ErrUnknownPlanUnit = errors.New("không có đơn vị hình này trong kế hoạch")
+	// ErrUnknownQuestion: the unit has no open question with the id.
+	ErrUnknownQuestion = errors.New("đơn vị hình không có câu hỏi này")
+	// ErrBeatStale: the script or the visual concept changed since the beat was planned.
+	ErrBeatStale = errors.New("kịch bản hoặc ngôn ngữ hình ảnh đã đổi từ lúc lập kế hoạch beat này")
+	// ErrNotSplittable: the unit cannot be cut at the line given.
+	ErrNotSplittable = errors.New("không tách được unit tại câu này")
+	// ErrNotMergeable: the two units are not neighbours of the same beat.
+	ErrNotMergeable = errors.New("chỉ gộp được hai unit liền nhau trong cùng một beat")
+	// ErrNoNarrationPace: the speaking pace of the video cannot be worked out.
+	ErrNoNarrationPace = errors.New("không tính được mức tối thiểu của lời thoại: creative brief chưa có thời lượng hoặc kịch bản chưa có chữ")
 )

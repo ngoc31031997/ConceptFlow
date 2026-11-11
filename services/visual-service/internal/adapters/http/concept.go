@@ -99,11 +99,16 @@ func writeConceptError(w http.ResponseWriter, err error) {
 		status = http.StatusOK
 	case errors.Is(err, domain.ErrScriptNotLocked):
 		status, code = http.StatusConflict, "script_not_locked"
-	case errors.Is(err, domain.ErrUnknownUnit), errors.Is(err, domain.ErrUnknownFinding), errors.Is(err, domain.ErrNoVersion):
+	case errors.Is(err, domain.ErrConceptNotLocked):
+		status, code = http.StatusConflict, "concept_not_locked"
+	case errors.Is(err, domain.ErrBeatStale):
+		status, code = http.StatusConflict, "beat_stale"
+	case errors.Is(err, domain.ErrUnknownUnit), errors.Is(err, domain.ErrUnknownFinding), errors.Is(err, domain.ErrNoVersion),
+		errors.Is(err, domain.ErrUnknownPlanUnit), errors.Is(err, domain.ErrUnknownQuestion):
 		status = http.StatusNotFound
 	case errors.Is(err, domain.ErrInvalidEdit), errors.Is(err, domain.ErrFindingNotApplicable), errors.Is(err, domain.ErrUnknownReference),
 		errors.Is(err, application.ErrUnknownModel), errors.Is(err, domain.ErrUnknownStep), errors.Is(err, application.ErrNoProjectID),
-		errors.Is(err, application.ErrExternalAISingleTurn):
+		errors.Is(err, application.ErrExternalAISingleTurn), errors.Is(err, domain.ErrNotSplittable), errors.Is(err, domain.ErrNotMergeable):
 		status = http.StatusBadRequest
 	case errors.Is(err, domain.ErrUnitRunning), errors.Is(err, domain.ErrUnitInvalid), errors.Is(err, domain.ErrUnitNotWritten),
 		errors.Is(err, domain.ErrLockNotReady), errors.Is(err, domain.ErrNothingToLock), errors.Is(err, domain.ErrVersionExists):

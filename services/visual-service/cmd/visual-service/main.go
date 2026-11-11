@@ -53,6 +53,7 @@ func main() {
 		llmClient, llmClient, rendering.NewClient(cfg.RenderingURL, 10*time.Second), cfg.MaxOutputTokens,
 	)
 	router.WithConcept(conceptDesk)
+	router.WithPlan(application.NewPlanDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewPlanRepository(pool)))
 	go pushSystemPrompts(ctx, logger, llmClient)
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler(), ReadHeaderTimeout: 10 * time.Second}
