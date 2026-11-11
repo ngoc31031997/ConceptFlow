@@ -251,6 +251,18 @@ export function startRenderSaga(input: RenderInput): Promise<SagaStartedResponse
   });
 }
 
+export interface VideoFontList {
+  fonts: string[];
+  default: string;
+}
+
+/** Fonts the rendering service can draw inside a video, and the one it falls back to. */
+export async function listVideoFonts(): Promise<VideoFontList> {
+  const list = await apiFetch<VideoFontList>("/v1/fonts");
+  if (!Array.isArray(list?.fonts)) throw new ApiError("The font list answer is malformed");
+  return list;
+}
+
 export function listVoices(): Promise<Voice[]> {
   return apiFetch<Voice[]>("/v1/voices");
 }

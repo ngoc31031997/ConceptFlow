@@ -186,3 +186,23 @@ async def test_a_preview_without_a_pinned_kit_is_refused_before_it_runs():
     c = client(Fake(CheckOutcome(True)))
     r = await c.post("/v1/illustrations/preview", json={"name": "Bus"})
     assert r.status_code == 422
+
+
+# --- fonts -------------------------------------------------------------------------
+
+async def test_the_fonts_endpoint_lists_the_installed_fonts_and_the_default():
+    c = client(Fake(CheckOutcome(True)))
+    r = await c.get("/v1/fonts")
+    assert r.status_code == 200
+    assert r.json() == {"fonts": ["Be Vietnam Pro", "Montserrat", "Cormorant Garamond"], "default": "Be Vietnam Pro"}
+
+
+@pytest.mark.parametrize("content", [None, "{not json", "[]", '{"fonts": [], "default": "A"}',
+                                     '{"fonts": ["A"], "default": "B"}', '{"fonts": [1], "default": 1}'])
+async def test_the_fonts_endpoint_fails_loudly_when_the_list_is_missing_or_malformed(tmp_path, monkeypatch, content):
+    path = tmp_path / "fonts.json"
+    if content is not None:
+        path.write_text(content)
+    monkeypatch.setattr("adapters.http.check_server.FONTS_FILE", path)
+    r = await client(Fake(CheckOutcome(True))).get("/v1/fonts")
+    assert r.status_code == 500 and "fonts.json" in r.json()["error"]

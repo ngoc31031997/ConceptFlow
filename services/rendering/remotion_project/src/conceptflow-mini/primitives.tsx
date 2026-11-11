@@ -15,6 +15,7 @@
  * Everything else — colours, shapes, layout, motion — is the storyboard's,
  * drawn by the generated script in plain JSX/SVG/CSS.
  */
+import fontList from './fonts.json';
 import React, {useState} from 'react';
 import {AbsoluteFill, continueRender, delayRender, getInputProps, useVideoConfig} from 'remotion';
 
@@ -54,8 +55,9 @@ export function useFrameBox(): FrameBox {
   return frameFor(width, height);
 }
 
-const INSTALLED_FONTS = ['Be Vietnam Pro', 'Montserrat', 'Cormorant Garamond'];
-const DEFAULT_FONT = 'Be Vietnam Pro';
+// The fonts the rendering image installs; fonts.json is also served by GET /v1/fonts.
+const INSTALLED_FONTS: string[] = fontList.fonts;
+const DEFAULT_FONT: string = fontList.default;
 const DEFAULT_INK = '#F2F7FF';
 
 function chosenFont(): string {

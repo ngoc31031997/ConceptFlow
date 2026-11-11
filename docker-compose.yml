@@ -540,6 +540,7 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8000
       AUTHORING_SERVICE_URL: http://authoring-service:8000
       LLM_SERVICE_URL: http://llm-service:8000
+      RENDERING_URL: http://rendering:8000
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
       WEB_GUI_ORIGIN: http://localhost:3000
