@@ -14,7 +14,7 @@ import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useVisualConcept } from "../hooks/useVisualConcept";
-import { VIEW_VISUAL_CONCEPT, comingRoute, lockRoute, readOnlyReason } from "../utils/flow";
+import { VIEW_VISUAL_CONCEPT, lockRoute, readOnlyReason, visualPlanRoute } from "../utils/flow";
 
 const SUBTITLE =
   "Đặt quy tắc hình chung cho cả video trước khi quyết định cách minh hoạ từng đoạn.";
@@ -37,7 +37,7 @@ function stripOf(s: VisualConceptState, running: boolean): StepStripProps {
     return {
       tone: "ok",
       label: `Đã chốt v${s.locked_version}`,
-      message: "Tiếp theo: phương án hình ảnh cho từng beat.",
+      message: "Tiếp theo: kế hoạch hình cho từng beat.",
     };
   }
   if (s.locked_version > 0) {
@@ -218,13 +218,13 @@ export function VisualConceptStepPage() {
         allowWhenLocked
         hint={
           state && state.locked_version > 0
-            ? `Đã chốt v${state.locked_version}. Sang Phương án hình ảnh.`
-            : "Chốt ngôn ngữ hình ảnh để sang Phương án hình ảnh."
+            ? `Đã chốt v${state.locked_version}. Sang Kế hoạch hình.`
+            : "Chốt ngôn ngữ hình ảnh để sang Kế hoạch hình."
         }
         onBack={() => navigate(lockRoute(projectId))}
-        onNext={() => navigate(comingRoute(VIEW_VISUAL_CONCEPT + 1, projectId))}
+        onNext={() => navigate(visualPlanRoute(projectId))}
         nextDisabled={!state || state.locked_version === 0}
-        nextLabel="Sang Phương án hình ảnh"
+        nextLabel="Sang Kế hoạch hình"
         nextTestId="concept-next"
       />
     </div>

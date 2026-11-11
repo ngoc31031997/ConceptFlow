@@ -80,7 +80,7 @@ describe("StepRail — second-layer vertical menu", () => {
   it("shows the steps the app does not have yet as “sắp có”, and opens a page saying so", async () => {
     renderRail(rendering);
     await waitForStepRail();
-    for (const step of [9, 10, 12, 13, 14, 20]) {
+    for (const step of [10, 12, 13, 14, 20]) {
       const item = screen.getByTestId(`rail-step-${step}`);
       expect(item).toHaveAttribute("data-status", "coming");
       expect(item).toHaveTextContent("sắp có");
@@ -92,8 +92,8 @@ describe("StepRail — second-layer vertical menu", () => {
     renderRailWithRoutes(rendering);
     await waitFor(() => expect(screen.getByTestId("rail-step-19")).toHaveAttribute("data-status", "running"));
 
-    fireEvent.click(screen.getByTestId("rail-step-9"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/9");
+    fireEvent.click(screen.getByTestId("rail-step-10"));
+    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/10");
   });
 
   it("opens the research screen from the step menu and shows where the project stands on it", async () => {
@@ -147,9 +147,9 @@ describe("StepRail — second-layer vertical menu", () => {
     renderRail(rendering, 10);
     await waitFor(() => expect(screen.getByTestId("rail-phase-count-3")).toHaveTextContent("4/4"));
     expect(screen.getByTestId("rail-phase-count-1")).toHaveTextContent("7/7");
-    expect(screen.getByTestId("rail-phase-count-2")).toHaveTextContent("2/7");
+    expect(screen.getByTestId("rail-phase-count-2")).toHaveTextContent("3/7");
     expect(screen.getByTestId("rail-phase-count-4")).toHaveTextContent("0/5");
-    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("10/23 bước xong");
+    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("11/23 bước xong");
   });
 
   it("marks the built steps where the Creator approves with ◆", async () => {

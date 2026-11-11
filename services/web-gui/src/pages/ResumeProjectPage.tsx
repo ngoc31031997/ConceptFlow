@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { getAuthoringState, getBeats, getProject, getResearch, getScript, getScriptLock, getStory } from "../api/client";
+import { getAuthoringState, getBeats, getProject, getResearch, getScript, getScriptLock, getStory, getVisualConcept } from "../api/client";
 import { ProjectDraftDispatchContext, defaultSubtitleStyle } from "../context/ProjectDraftContext";
 import type { ProjectDraft } from "../context/ProjectDraftContext";
 import { projectPath } from "../utils/pipelineLabels";
-import { FLOW_CODE, FLOW_CONFIG, FLOW_STORY, authoringRoute, beatsRoute, lockRoute, scriptRoute, visualConceptRoute } from "../utils/flow";
+import { FLOW_CODE, FLOW_CONFIG, FLOW_STORY, authoringRoute, beatsRoute, lockRoute, scriptRoute, visualConceptRoute, visualPlanRoute } from "../utils/flow";
 import type { Project } from "../types";
 import type { AuthoringState } from "../api/client";
 import glass from "../styles/glass.module.css";
@@ -93,7 +93,9 @@ async function screenAfterBeats(projectId: string): Promise<string> {
   const scriptDone = await getScript(projectId).then((c) => c.status === "approved", () => false);
   if (!scriptDone) return scriptRoute(projectId);
   const locked = await getScriptLock(projectId).then((l) => l.lockedVersion > 0, () => false);
-  return locked ? visualConceptRoute(projectId) : lockRoute(projectId);
+  if (!locked) return lockRoute(projectId);
+  const conceptLocked = await getVisualConcept(projectId).then((v) => v.locked_version > 0, () => false);
+  return conceptLocked ? visualPlanRoute(projectId) : visualConceptRoute(projectId);
 }
 
 /**

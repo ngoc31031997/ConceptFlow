@@ -3756,3 +3756,233 @@ export async function importReferenceStyle(pastedJson: string): Promise<Referenc
   });
   return result.style;
 }
+
+// --- Step 9 · Kế hoạch hình (visual-service, docs/contracts/visual-plan-v1.md) ---
+
+export type PlanMethod =
+  | "spatial_composition"
+  | "split_perspective_comparison"
+  | "diagram"
+  | "analogy"
+  | "process_sequence"
+  | "scale_comparison"
+  | "data_visual"
+  | "character_action"
+  | "text_emphasis"
+  | "timeline"
+  | "cross_section";
+
+export type PlanRelationship = "direct_illustration" | "contrast" | "complement" | "metaphor";
+
+export interface PlanEssentialInfo {
+  item: string;
+  priority: "must" | "nice";
+}
+
+export interface PlanRiskNote {
+  fact_id: string;
+  note: string;
+}
+
+export interface PlanOpenQuestion {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+/** One visual unit of step 9 as the screen shows it. */
+export interface VisualPlanUnit {
+  unit_id: string;
+  script_refs: string[];
+  narration_summary: string;
+  communication_goal: string;
+  essential_visual_info: PlanEssentialInfo[];
+  on_screen_text: string[];
+  visual_approach: { method: PlanMethod; description: string; concept_rule_refs: string[] };
+  narration_relationship: PlanRelationship;
+  risk_notes: PlanRiskNote[];
+  open_questions: PlanOpenQuestion[];
+  duration: { planned_s: number; extra_reason: string };
+  status: "pending" | "approved";
+  beat_key: string;
+  number: number;
+  lines: { id: string; text: string; facts: string[] }[];
+  fact_refs: string[];
+  /** The least the narration needs; computed, nobody edits it. */
+  narration_min_s: number;
+  effective_planned_s: number;
+  problems: string[];
+  creator_fields: string[];
+}
+
+export interface VisualPlanBeatTiming {
+  narration_min_s: number;
+  planned_s: number;
+  beat_sheet_s: number;
+  delta_s: number;
+}
+
+export interface VisualPlanBeat {
+  key: string;
+  number: number;
+  fn: string;
+  title: string;
+  dur: number;
+  lines_count: number;
+  written: boolean;
+  stale: boolean;
+  stale_sources: string[];
+  timing: VisualPlanBeatTiming | null;
+  units: VisualPlanUnit[];
+}
+
+export interface VisualPlanCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  accepted: boolean;
+  why: string;
+}
+
+export interface VisualPlanFinding {
+  id: string;
+  group: "accuracy" | "consistency" | "clarity" | "feasibility";
+  group_label: string;
+  /** The unit id (`VP-002`). */
+  unit_key: string;
+  field: string;
+  text: string;
+  detail: string;
+  fix: string;
+  state: "open" | "fixed" | "applied" | "accepted";
+  why: string;
+}
+
+export interface VisualPlanVersion {
+  version: number;
+  script_version: number;
+  concept_version: number;
+  note: string;
+  locked_at: string;
+  document?: Record<string, unknown>;
+}
+
+/** The whole screen of step 9. */
+export interface VisualPlanState {
+  input: {
+    script_version: number;
+    concept_version: number;
+    facts_count: number;
+    terms_count: number;
+    rule_refs_count: number;
+    seconds_per_word: number;
+  };
+  beats: VisualPlanBeat[];
+  units_total: number;
+  units_approved: number;
+  coverage: { lines_total: number; lines_covered: number; uncovered: string[]; duplicated: string[] };
+  timing: { beats: Record<string, VisualPlanBeatTiming>; planned_s: number; brief_s: number; over_brief: boolean };
+  checks: VisualPlanCheck[];
+  review: {
+    reviewed: boolean;
+    rounds: number;
+    findings: VisualPlanFinding[];
+    notes: string[];
+    open_count: number;
+  };
+  blockers: string[];
+  can_lock: boolean;
+  versions: VisualPlanVersion[];
+  locked_version: number;
+  next_version: number;
+  draft: string[];
+  model: string;
+  default_model: string;
+  models: { id: string; label: string; local: boolean }[];
+}
+
+const visualPlanPath = (projectId: string) => `/v1/projects/${projectId}/visual-plan`;
+
+/** The screen of step 9; rejects with code `concept_not_locked` or `script_not_locked` while step 8 or 7 is not locked. */
+export function getVisualPlan(projectId: string): Promise<VisualPlanState> {
+  return apiFetch<VisualPlanState>(visualPlanPath(projectId));
+}
+
+function sendVisualPlan(projectId: string, method: string, sub: string, body?: object, call?: AiCall): Promise<VisualPlanState> {
+  const init = operationInit(call);
+  return apiFetch<VisualPlanState>(`${visualPlanPath(projectId)}${sub}`, {
+    method,
+    headers: { ...JSON_HEADERS, ...init.headers },
+    signal: init.signal,
+    body: operationBody(body ?? {}, call),
+  });
+}
+
+/** Sets the model of step 9 for this video; "" is the step default. */
+export function setVisualPlanModel(projectId: string, model: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "PUT", "/model", { model });
+}
+
+/** The AI plans every beat that has no unit yet, one after another. */
+export function generateVisualPlan(projectId: string, note: string, call?: OperationCall): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", "/generate", { note }, call);
+}
+
+/** The AI plans (or replans) one beat. */
+export function generateVisualPlanBeat(projectId: string, beatKey: string, note: string, call?: AiCall): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", `/beats/${beatKey}/generate`, { note }, call);
+}
+
+/** The AI reviews the whole plan. */
+export function reviewVisualPlan(projectId: string, note: string, call?: AiCall): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", "/review", { note }, call);
+}
+
+/** Saves a hand edit of one unit; only the fields listed in the contract. */
+export function editVisualPlanUnit(projectId: string, unitId: string, fields: Record<string, unknown>): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "PUT", `/units/${unitId}`, { fields });
+}
+
+export function answerVisualPlanQuestion(projectId: string, unitId: string, questionId: string, answer: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "PUT", `/units/${unitId}/questions/${questionId}`, { answer });
+}
+
+/** Cuts the unit before the line `atLine`. */
+export function splitVisualPlanUnit(projectId: string, unitId: string, atLine: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", `/units/${unitId}/split`, { at_line: atLine });
+}
+
+/** Merges the unit that follows (`withId`) into this one. */
+export function mergeVisualPlanUnit(projectId: string, unitId: string, withId: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", `/units/${unitId}/merge`, { with: withId });
+}
+
+export function approveVisualPlanUnit(projectId: string, unitId: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", `/units/${unitId}/approve`);
+}
+
+export function unapproveVisualPlanUnit(projectId: string, unitId: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", `/units/${unitId}/unapprove`);
+}
+
+export function approveAllVisualPlan(projectId: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", "/approve-all");
+}
+
+export function applyVisualPlanFinding(projectId: string, findingId: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", `/findings/${findingId}/apply`);
+}
+
+export function acceptVisualPlanFinding(projectId: string, findingId: string, why: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", `/findings/${findingId}/accept`, { why });
+}
+
+export function lockVisualPlan(projectId: string, note: string): Promise<VisualPlanState> {
+  return sendVisualPlan(projectId, "POST", "/lock", { note });
+}
+
+/** One locked version with its document. */
+export function getVisualPlanVersion(projectId: string, version: number): Promise<VisualPlanVersion> {
+  return apiFetch<VisualPlanVersion>(`${visualPlanPath(projectId)}/versions/${version}`);
+}

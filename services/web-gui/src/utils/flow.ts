@@ -93,7 +93,7 @@ export interface FlowViewStep {
    * The step has a screen of its own that no running step stands behind (it
    * is not one of the 13 steps the server derives a project's position from).
    */
-  screen?: "research" | "story" | "beats" | "script" | "lock" | "visual-concept";
+  screen?: "research" | "story" | "beats" | "script" | "lock" | "visual-concept" | "visual-plan";
   /** The step's screen was taken out and comes back in a later version: it shows the "not developed" page. */
   comingSoon?: boolean;
   /** What the step holds, in a few words, for the flow map. */
@@ -109,7 +109,7 @@ export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], screen: "script", note: "Lời thoại theo beat, chuyển tiếp, nghe thử" },
   { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], screen: "lock", note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
   { n: 8, phase: 1, label: "Ngôn ngữ hình ảnh", gate: true, server: [], screen: "visual-concept", note: "Phong cách, bảng màu, cách vẽ khái niệm, chữ, chuyển động, điều không dùng, kiểm khả thi" },
-  { n: 9, phase: 1, label: "Phương án hình ảnh", gate: true, server: [], note: "Cách minh hoạ từng beat theo ngôn ngữ hình ảnh đã chốt" },
+  { n: 9, phase: 1, label: "Kế hoạch hình", gate: true, server: [], screen: "visual-plan", note: "Chia kịch bản thành các đơn vị hình, mỗi đơn vị một mục tiêu truyền đạt, cách hiển thị và thời lượng" },
   { n: 10, phase: 1, label: "Diễn tiến hình ảnh", gate: true, server: [], note: "Hình ảnh đổi thế nào qua hành trình câu chuyện" },
   { n: 11, phase: 1, label: "Storyboard", gate: true, server: [4], comingSoon: true, note: "Cảnh, shot, lời đọc, hình trên màn" },
   { n: 12, phase: 1, label: "Thiết kế tài nguyên", gate: true, server: [], note: "Nhân vật, vật thể, bối cảnh dùng chung cả video" },
@@ -171,6 +171,8 @@ export interface ScreenStanding {
   scriptLocked: boolean;
   /** A version of the visual concept is locked. */
   conceptLocked: boolean;
+  /** A version of the visual plan is locked. */
+  planLocked: boolean;
 }
 
 /**
@@ -198,6 +200,9 @@ export function screenStatus(view: FlowViewStep, flowStep: number, standing: Scr
     case "visual-concept":
       if (!standing.scriptLocked) return "pending";
       return standing.conceptLocked ? "done" : "waiting";
+    case "visual-plan":
+      if (!standing.conceptLocked) return "pending";
+      return standing.planLocked ? "done" : "waiting";
     default:
       if (!standing.beatsApproved) return "pending";
       return standing.scriptApproved ? "done" : "waiting";
@@ -212,6 +217,14 @@ export const VIEW_LOCK = 7;
 
 /** The number, in the 23-step flow, of the visual concept step. */
 export const VIEW_VISUAL_CONCEPT = 8;
+
+/** The number, in the 23-step flow, of the visual plan step. */
+export const VIEW_VISUAL_PLAN = 9;
+
+/** The screen of the visual plan step. */
+export function visualPlanRoute(projectId: string): string {
+  return `/projects/${projectId}/visual-plan`;
+}
 
 /** The screen of the visual concept step. */
 export function visualConceptRoute(projectId: string): string {

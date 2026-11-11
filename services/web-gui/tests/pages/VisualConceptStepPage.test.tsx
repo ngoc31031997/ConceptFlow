@@ -400,6 +400,6 @@ describe("VisualConceptStepPage", () => {
     await waitFor(() => expect(lock).toHaveBeenCalledWith("p1", ""));
     await waitFor(() => expect(screen.getByTestId("concept-locked")).toHaveTextContent("v2"));
     fireEvent.click(screen.getByTestId("concept-next"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/9");
+    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/visual-plan");
   });
 });

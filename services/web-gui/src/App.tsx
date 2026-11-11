@@ -30,6 +30,7 @@ import { ResearchStepPage } from "./pages/ResearchStepPage";
 import { BeatsStepPage } from "./pages/BeatsStepPage";
 import { StoryStepPage } from "./pages/StoryStepPage";
 import { VisualConceptStepPage } from "./pages/VisualConceptStepPage";
+import { VisualPlanStepPage } from "./pages/VisualPlanStepPage";
 import { comingRoute } from "./utils/flow";
 
 /** A wizard address of a step the app does not have yet opens that step's "not developed" page. */
@@ -103,6 +104,7 @@ export function App() {
             <Route path="/projects/:id/script" element={<ScriptWriteStepPage />} />
             <Route path="/projects/:id/lock" element={<LockStepPage />} />
             <Route path="/projects/:id/visual-concept" element={<VisualConceptStepPage />} />
+            <Route path="/projects/:id/visual-plan" element={<VisualPlanStepPage />} />
             <Route path="/projects/:id/coming/:n" element={<ComingStepPage />} />
             <Route path="/create/coming/:n" element={<ComingStepPage />} />
             <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />
