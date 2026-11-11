@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -112,16 +111,6 @@ func TestOnlyDirectionAndVisualLanguageReadReferences(t *testing.T) {
 		if reads != (u.Key == UnitCreativeDirection || u.Key == UnitVisualLanguage) {
 			t.Errorf("%s reads refs = %v", u.Key, reads)
 		}
-	}
-}
-
-func TestReferenceTextIsDecodedFromAStringOrAList(t *testing.T) {
-	var d RefDrawing
-	if err := json.Unmarshal([]byte(`{"shape":"tròn","light":["sau","mềm"],"fill":null}`), &d); err != nil {
-		t.Fatal(err)
-	}
-	if d.Shape != "tròn" || d.Light != "sau; mềm" || d.Fill != "" {
-		t.Errorf("%+v", d)
 	}
 }
 

@@ -3484,14 +3484,8 @@ export interface VisualConceptUnit {
 }
 
 /** A description of the shared reference library, and whether this video picked it. */
-export interface VisualReference {
+export interface VisualReference extends ReferenceStyleInput {
   ref_id: string;
-  name: string;
-  summary: string;
-  tags: string[];
-  /** How the style is drawn and laid out; every field may be empty. */
-  drawing: Record<string, string>;
-  layout: Record<string, string>;
   picked: boolean;
 }
 
@@ -3675,21 +3669,37 @@ export interface ReferenceDrawing {
   texture: string;
 }
 
-/** How a reference style lays out the frame; every field may be empty. */
-export interface ReferenceLayout {
-  structure: string;
-  layering: string;
-  persistent_elements: string;
+/** Colour as relations between background, subject and accents; every field may be empty. */
+export interface ReferenceColorRules {
+  background: string;
+  subject: string;
+  accents: string;
+  note: string;
 }
 
-/** What the Creator writes when adding or editing a description; only name and summary are required. */
+/** How a reference style organises the frame; every field may be empty. */
+export interface ReferenceComposition {
+  structure: string;
+  optional_devices: string[];
+  layering: string;
+}
+
+/** What the Creator writes when adding or editing a description; only style_name and intent are required. */
 export interface ReferenceStyleInput {
-  name: string;
-  summary: string;
+  style_name: string;
+  intent: string;
   tags: string[];
   source: ReferenceSource;
+  /** Short, checkable rules the style always follows. */
+  core_rules: string[];
   drawing: ReferenceDrawing;
-  layout: ReferenceLayout;
+  color_rules: ReferenceColorRules;
+  composition: ReferenceComposition;
+  /** What breaks the style. */
+  avoid: string[];
+  /** An image-generation prompt with {subject} and {setting} slots. */
+  prompt_template: string;
+  negative_prompt: string;
 }
 
 /** A structured description of a visual style in the shared reference library. */

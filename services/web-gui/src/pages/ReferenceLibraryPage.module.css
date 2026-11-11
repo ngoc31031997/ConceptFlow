@@ -155,3 +155,18 @@
   color: var(--ink-soft);
   overflow-wrap: anywhere;
 }
+
+.detailList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.prompt {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -19,24 +19,34 @@ const EMPTY_DRAWING: apiClient.ReferenceDrawing = {
 };
 const R01: apiClient.ReferenceStyle = {
   id: "R01",
-  name: "Ánh sáng xuyên lớp mỏng",
-  summary: "Nền tối ấm; mép chủ thể phát sáng.",
+  style_name: "Ánh sáng xuyên lớp mỏng",
+  intent: "Nền tối ấm; mép chủ thể phát sáng.",
   tags: ["ánh sáng", "màu"],
   source: { url: "https://example.com/v", title: "Video mẫu", kind: "video" },
   drawing: { ...EMPTY_DRAWING, shape: "tròn mềm", texture: "giấy" },
-  layout: { structure: "một chủ thể giữa", layering: "", persistent_elements: "logo góc" },
+  core_rules: ["no dark outlines", "rim light on every edge"],
+  color_rules: { background: "tối, ít bão hoà", subject: "rực nhất khung", accents: "", note: "" },
+  composition: {
+    structure: "một chủ thể giữa",
+    optional_devices: ["khung phóng to"],
+    layering: "",
+  },
+  avoid: ["pastel"],
+  prompt_template: "{subject} in {setting}, 16:9",
+  negative_prompt: "outline, sketch",
   created_at: "2026-11-01T00:00:00Z",
   updated_at: "2026-11-01T00:00:00Z",
 };
 const R02: apiClient.ReferenceStyle = {
   ...R01,
   id: "R02",
-  name: "Sơ đồ tối giản",
+  style_name: "Sơ đồ tối giản",
   tags: [],
   source: { url: "", title: "", kind: "" },
 };
 const NO_SOURCE = { url: "", title: "", kind: "" };
-const NO_LAYOUT = { structure: "", layering: "", persistent_elements: "" };
+const NO_COLOR = { background: "", subject: "", accents: "", note: "" };
+const NO_COMPOSITION = { structure: "", optional_devices: [], layering: "" };
 
 function renderPage() {
   return render(
@@ -59,8 +69,8 @@ describe("ReferenceLibraryPage", () => {
     renderPage();
     const row = await screen.findByTestId("reference-row-R01");
     expect(within(row).getByText("R01")).toBeInTheDocument();
-    expect(within(row).getByText(R01.name)).toBeInTheDocument();
-    expect(within(row).getByText(R01.summary)).toBeInTheDocument();
+    expect(within(row).getByText(R01.style_name)).toBeInTheDocument();
+    expect(within(row).getByText(R01.intent)).toBeInTheDocument();
     expect(within(row).getByText("ánh sáng")).toBeInTheDocument();
     expect(screen.getByTestId("reference-row-R02")).toBeInTheDocument();
     const link = within(row).getByRole("link", { name: "Video mẫu" });
@@ -68,13 +78,31 @@ describe("ReferenceLibraryPage", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
-  it("opens every drawing and layout field when a row is clicked", async () => {
+  it("opens every field of the description when a row is clicked", async () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("reference-row-R01"));
     const dialog = await screen.findByTestId("reference-detail-dialog");
     expect(within(dialog).getByTestId("reference-detail-drawing")).toHaveTextContent("tròn mềm");
     expect(within(dialog).getByTestId("reference-detail-drawing")).toHaveTextContent("giấy");
-    expect(within(dialog).getByTestId("reference-detail-layout")).toHaveTextContent("logo góc");
+    expect(within(dialog).getByTestId("reference-detail-composition")).toHaveTextContent(
+      "một chủ thể giữa",
+    );
+    expect(within(dialog).getByTestId("reference-detail-devices")).toHaveTextContent(
+      "khung phóng to",
+    );
+    expect(within(dialog).getByTestId("reference-detail-core-rules")).toHaveTextContent(
+      "rim light on every edge",
+    );
+    expect(within(dialog).getByTestId("reference-detail-color")).toHaveTextContent(
+      "rực nhất khung",
+    );
+    expect(within(dialog).getByTestId("reference-detail-avoid")).toHaveTextContent("pastel");
+    expect(within(dialog).getByTestId("reference-detail-prompt-template")).toHaveTextContent(
+      "{subject} in {setting}, 16:9",
+    );
+    expect(within(dialog).getByTestId("reference-detail-negative-prompt")).toHaveTextContent(
+      "outline, sketch",
+    );
     expect(within(dialog).getAllByText("Cách vẽ").length).toBeGreaterThan(0);
   });
 
@@ -88,19 +116,24 @@ describe("ReferenceLibraryPage", () => {
   it("the edit form carries every field of the description", async () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("reference-edit-R01"));
-    expect(await screen.findByTestId("reference-summary-input")).toHaveValue(R01.summary);
+    expect(await screen.findByTestId("reference-intent-input")).toHaveValue(R01.intent);
     expect(screen.getByTestId("reference-source-url-input")).toHaveValue("https://example.com/v");
     expect(screen.getByTestId("reference-source-kind-select")).toHaveValue("video");
     expect(screen.getByTestId("reference-drawing-shape-input")).toHaveValue("tròn mềm");
-    expect(screen.getByTestId("reference-layout-persistent_elements-input")).toHaveValue(
-      "logo góc",
+    expect(screen.getByTestId("reference-composition-devices-input")).toHaveValue("khung phóng to");
+    expect(screen.getByTestId("reference-core-rules-input")).toHaveValue(
+      "no dark outlines\nrim light on every edge",
+    );
+    expect(screen.getByTestId("reference-avoid-input")).toHaveValue("pastel");
+    expect(screen.getByTestId("reference-prompt-template-input")).toHaveValue(
+      "{subject} in {setting}, 16:9",
     );
     expect(screen.getByText("Cách vẽ")).toBeInTheDocument();
-    expect(screen.getByText("Layout")).toBeInTheDocument();
+    expect(screen.getByText("Bố cục")).toBeInTheDocument();
   });
 
   it("fills the form from pasted JSON for review without saving", async () => {
-    const imported = { ...R02, name: "Đã dán", tags: ["x"] };
+    const imported = { ...R02, style_name: "Đã dán", tags: ["x"] };
     const importFn = vi.spyOn(apiClient, "importReferenceStyle").mockResolvedValue(imported);
     const create = vi.spyOn(apiClient, "createReferenceStyle");
     renderPage();
@@ -155,7 +188,7 @@ describe("ReferenceLibraryPage", () => {
     expect(within(dialog).getByText("Thêm mô tả tham chiếu")).toBeInTheDocument();
     expect(screen.getByTestId("reference-edit-save")).toBeDisabled();
     fireEvent.change(screen.getByTestId("reference-name-input"), { target: { value: "Giấy cắt" } });
-    fireEvent.change(screen.getByTestId("reference-summary-input"), {
+    fireEvent.change(screen.getByTestId("reference-intent-input"), {
       target: { value: "Nhiều lớp giấy" },
     });
     fireEvent.change(screen.getByTestId("reference-tags-input"), {
@@ -164,12 +197,17 @@ describe("ReferenceLibraryPage", () => {
     fireEvent.click(screen.getByTestId("reference-edit-save"));
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({
-        name: "Giấy cắt",
-        summary: "Nhiều lớp giấy",
+        style_name: "Giấy cắt",
+        intent: "Nhiều lớp giấy",
         tags: ["chiều sâu", "bối cảnh"],
         source: NO_SOURCE,
+        core_rules: [],
         drawing: EMPTY_DRAWING,
-        layout: NO_LAYOUT,
+        color_rules: NO_COLOR,
+        composition: NO_COMPOSITION,
+        avoid: [],
+        prompt_template: "",
+        negative_prompt: "",
       }),
     );
     expect(await screen.findByTestId("reference-status")).toHaveTextContent("Đã thêm R03.");
@@ -184,7 +222,7 @@ describe("ReferenceLibraryPage", () => {
     await waitFor(() => expect(screen.getByTestId("reference-add-button")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("reference-add-button"));
     fireEvent.change(await screen.findByTestId("reference-name-input"), { target: { value: "n" } });
-    fireEvent.change(screen.getByTestId("reference-summary-input"), { target: { value: "d" } });
+    fireEvent.change(screen.getByTestId("reference-intent-input"), { target: { value: "d" } });
     fireEvent.click(screen.getByTestId("reference-edit-save"));
     expect(await screen.findByTestId("reference-edit-error")).toHaveTextContent("tối đa 8 nhãn");
     expect(screen.getByTestId("reference-edit-dialog")).toBeInTheDocument();
@@ -194,7 +232,7 @@ describe("ReferenceLibraryPage", () => {
     const update = vi.spyOn(apiClient, "updateReferenceStyle").mockResolvedValue(R01);
     renderPage();
     fireEvent.click(await screen.findByTestId("reference-edit-R01"));
-    expect(await screen.findByTestId("reference-name-input")).toHaveValue(R01.name);
+    expect(await screen.findByTestId("reference-name-input")).toHaveValue(R01.style_name);
     expect(screen.getByTestId("reference-tags-input")).toHaveValue("ánh sáng, màu");
     await waitFor(() =>
       expect(screen.getByTestId("reference-edit-save")).toHaveTextContent(/^Lưu$/),
@@ -202,7 +240,7 @@ describe("ReferenceLibraryPage", () => {
     expect(screen.queryByTestId("reference-usage")).toBeNull();
     fireEvent.change(screen.getByTestId("reference-name-input"), { target: { value: "Đổi tên" } });
     fireEvent.click(screen.getByTestId("reference-edit-save"));
-    await waitFor(() => expect(update).toHaveBeenCalledWith("R01", { ...R01, name: "Đổi tên" }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith("R01", { ...R01, style_name: "Đổi tên" }));
   });
 
   it("lists, by topic, the videos that picked a description before saving an edit", async () => {

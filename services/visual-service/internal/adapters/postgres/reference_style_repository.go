@@ -15,15 +15,50 @@ import (
 
 const referenceStyleColumns = "id, name, description, tags, detail, created_at, updated_at"
 
-// referenceDetail is the JSON stored in reference_styles.detail.
+// referenceDetail is the JSON stored in reference_styles.detail: every field
+// of a description except style_name (column name), intent (column
+// description) and tags (column tags).
 type referenceDetail struct {
-	Source  domain.ReferenceSource  `json:"source"`
-	Drawing domain.ReferenceDrawing `json:"drawing"`
-	Layout  domain.ReferenceLayout  `json:"layout"`
+	Source         domain.ReferenceSource      `json:"source"`
+	CoreRules      []string                    `json:"core_rules"`
+	Drawing        domain.ReferenceDrawing     `json:"drawing"`
+	ColorRules     domain.ReferenceColorRules  `json:"color_rules"`
+	Composition    domain.ReferenceComposition `json:"composition"`
+	Avoid          []string                    `json:"avoid"`
+	PromptTemplate string                      `json:"prompt_template"`
+	NegativePrompt string                      `json:"negative_prompt"`
 }
 
 func detailJSON(in domain.ReferenceStyleInput) ([]byte, error) {
-	return json.Marshal(referenceDetail{Source: in.Source, Drawing: in.Drawing, Layout: in.Layout})
+	return json.Marshal(referenceDetail{
+		Source: in.Source, CoreRules: in.CoreRules, Drawing: in.Drawing, ColorRules: in.ColorRules,
+		Composition: in.Composition, Avoid: in.Avoid, PromptTemplate: in.PromptTemplate, NegativePrompt: in.NegativePrompt,
+	})
+}
+
+// applyDetail decodes a detail column into in. List fields come back as
+// empty lists, never null.
+func applyDetail(raw []byte, in *domain.ReferenceStyleInput) error {
+	var d referenceDetail
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &d); err != nil {
+			return err
+		}
+	}
+	in.Source, in.CoreRules, in.Drawing, in.ColorRules = d.Source, nonNil(d.CoreRules), d.Drawing, d.ColorRules
+	in.Composition, in.Avoid, in.PromptTemplate, in.NegativePrompt = d.Composition, nonNil(d.Avoid), d.PromptTemplate, d.NegativePrompt
+	in.Composition.OptionalDevices = nonNil(in.Composition.OptionalDevices)
+	if in.Tags == nil {
+		in.Tags = []string{}
+	}
+	return nil
+}
+
+func nonNil(list []string) []string {
+	if list == nil {
+		return []string{}
+	}
+	return list
 }
 
 // ReferenceStyleRepository implements application.ReferenceStylePort.
@@ -39,16 +74,11 @@ func NewReferenceStyleRepository(pool *pgxpool.Pool) *ReferenceStyleRepository {
 func scanReferenceStyle(row pgx.Row) (domain.ReferenceStyle, error) {
 	var s domain.ReferenceStyle
 	var detail []byte
-	if err := row.Scan(&s.ID, &s.Name, &s.Summary, &s.Tags, &detail, &s.CreatedAt, &s.UpdatedAt); err != nil {
+	if err := row.Scan(&s.ID, &s.StyleName, &s.Intent, &s.Tags, &detail, &s.CreatedAt, &s.UpdatedAt); err != nil {
 		return s, err
 	}
-	var d referenceDetail
-	if err := json.Unmarshal(detail, &d); err != nil {
+	if err := applyDetail(detail, &s.ReferenceStyleInput); err != nil {
 		return s, fmt.Errorf("decode reference style detail: %w", err)
-	}
-	s.Source, s.Drawing, s.Layout = d.Source, d.Drawing, d.Layout
-	if s.Tags == nil {
-		s.Tags = []string{}
 	}
 	return s, nil
 }
@@ -85,7 +115,7 @@ func (r *ReferenceStyleRepository) CreateReferenceStyle(ctx context.Context, in 
 	s, err := scanReferenceStyle(r.pool.QueryRow(ctx,
 		`INSERT INTO reference_styles (id, seq, name, description, tags, detail) VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING `+referenceStyleColumns,
-		domain.ReferenceStyleID(seq), seq, in.Name, in.Summary, in.Tags, detail))
+		domain.ReferenceStyleID(seq), seq, in.StyleName, in.Intent, in.Tags, detail))
 	if err != nil {
 		return domain.ReferenceStyle{}, fmt.Errorf("insert reference style: %w", err)
 	}
@@ -101,7 +131,7 @@ func (r *ReferenceStyleRepository) UpdateReferenceStyle(ctx context.Context, id 
 	s, err := scanReferenceStyle(r.pool.QueryRow(ctx,
 		`UPDATE reference_styles SET name = $2, description = $3, tags = $4, detail = $5, updated_at = now()
 		 WHERE id = $1 RETURNING `+referenceStyleColumns,
-		id, in.Name, in.Summary, in.Tags, detail))
+		id, in.StyleName, in.Intent, in.Tags, detail))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ReferenceStyle{}, application.ErrReferenceStyleNotFound
 	}

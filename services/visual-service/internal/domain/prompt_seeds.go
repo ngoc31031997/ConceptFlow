@@ -319,18 +319,19 @@ const referenceYouTubeVI = `Bạn là art director phân tích cách vẽ và c�
 Đầu vào: một đường link YouTube.
 {{url}}
 
-Hãy xem video qua link đó. Chỉ mô tả CÁCH video được làm, không kể lại nội dung câu chuyện hay kiến thức. Không mô tả màu sắc, nhân vật, chữ, chuyển động hay bố cục của từng cảnh cụ thể: những thứ đó thay đổi theo chủ đề của từng video.
+Hãy xem video qua link đó. Chỉ mô tả CÁCH video được làm, không kể lại nội dung câu chuyện hay kiến thức. Không mô tả chủ thể, bối cảnh hay bảng màu cụ thể của từng cảnh. Màu chỉ được mô tả bằng QUAN HỆ (nền so với chủ thể, điểm nhấn phát sáng), vì bảng màu cụ thể do từng video tự chọn.
 
 Quy tắc:
-- Chỉ ghi điều bạn thấy. Trường nào bạn không thấy hoặc không chắc thì để chuỗi rỗng, không đoán.
+- Chỉ ghi điều bạn thấy. Trường nào bạn không thấy hoặc không chắc thì để chuỗi rỗng (hoặc danh sách rỗng), không đoán.
 - Mỗi trường viết 1–2 câu, cụ thể, đủ để người khác dựng lại cảm giác đó. Không dùng từ chung chung như "đẹp", "hiện đại".
 - Không dùng các từ chỉ mức đơn giản hay chi tiết (đơn giản, tối giản, chi tiết, phức tạp, tinh xảo…). Mức chi tiết do chủ đề và ngữ cảnh của video mới quyết định.
 - Nếu bạn không mở được link hoặc không xem được video, trả đúng {"error": "lý do"} và không viết gì thêm.
 
 Ý nghĩa các trường:
-- name: tên ngắn của phong cách.
-- summary: 1–3 câu tổng quan cảm giác chung.
+- style_name: tên ngắn của phong cách (tiếng Anh).
+- intent: 1–2 câu tiếng Việt, phong cách dùng cho loại video nào và áp dụng cho mọi chủ đề.
 - source: url (link đã cho), title (tiêu đề video), kind ("video").
+- core_rules: 6–10 luật ngắn bằng tiếng Anh, mỗi luật là một điều bắt buộc mà người vẽ có thể kiểm được.
 - drawing:
   - medium: kỹ thuật tổng thể (vector phẳng, giấy cắt nhiều lớp, vẽ tay, trông như dựng 3D...).
   - shape: ngôn ngữ hình khối (hình học hay hữu cơ, góc nhọn hay bo tròn, tỉ lệ cách điệu hay đúng thật).
@@ -341,14 +342,20 @@ Quy tắc:
   - depth: cách tạo chiều sâu (các lớp chồng, làm mờ xa, thu nhỏ theo khoảng cách, sương khí quyển, các lớp trượt lệch nhau).
   - perspective: phối cảnh (phẳng 2D, 2.5D, isometric, một điểm tụ).
   - texture: bề mặt (không có, hạt, giấy, vết cọ, nhiễu; áp lên cả khung hay chỉ chủ thể).
-- layout:
-  - structure: khung hình được tổ chức thế nào (một chủ thể toàn khung, nhiều lớp chồng nhau, chia ngăn, khung nhỏ trong khung lớn, thẻ hoặc bảng nổi, lưới).
-  - layering: khi có nhiều lớp hoặc ô thì chồng nhau ra sao (che nhau, trong suốt xuyên nhau, ngăn bằng bóng đổ hoặc viền, xếp cạnh nhau không chồng).
-  - persistent_elements: thành phần cố định xuyên suốt video (khung viền quanh, thanh tiêu đề, bảng thông tin ở góc, logo, hoặc không có).
-- tags: 1–8 nhãn ngắn.
+- color_rules:
+  - background, subject, accents: quan hệ độ sáng và độ bão hoà giữa nền, chủ thể và điểm nhấn; không ghi mã màu.
+  - note: ghi chú bằng tiếng Việt.
+- composition:
+  - structure: khung hình được tổ chức thế nào (một chủ thể toàn khung, nhiều lớp chồng nhau, chia ngăn, khung nhỏ trong khung lớn, lưới).
+  - optional_devices: các thủ pháp có thể dùng (khung phóng to nối bằng đường mảnh, chia ô, thẻ nhãn...).
+  - layering: khi có nhiều lớp hoặc ô thì chồng nhau ra sao (che nhau, trong suốt xuyên nhau, ngăn bằng độ mờ, độ sáng hoặc viền, xếp cạnh nhau không chồng).
+- avoid: những gì phá phong cách.
+- prompt_template: một câu prompt sinh ảnh bằng tiếng Anh, có chỗ trống {subject} và {setting}, kết thúc bằng tỉ lệ khung.
+- negative_prompt: các từ khoá cần tránh, ngăn bằng dấu phẩy.
+- tags: 1–8 nhãn ngắn (có thể bỏ).
 
 Trả về đúng một đối tượng JSON, không kèm lời giải thích:
-{ "name": "", "summary": "", "source": {"url": "", "title": "", "kind": "video"}, "drawing": {"medium": "", "shape": "", "outline": "", "fill": "", "shading": "", "light": "", "depth": "", "perspective": "", "texture": ""}, "layout": {"structure": "", "layering": "", "persistent_elements": ""}, "tags": []}`
+{ "style_name": "", "intent": "", "source": {"url": "", "title": "", "kind": "video"}, "core_rules": [], "drawing": {"medium": "", "shape": "", "outline": "", "fill": "", "shading": "", "light": "", "depth": "", "perspective": "", "texture": ""}, "color_rules": {"background": "", "subject": "", "accents": "", "note": ""}, "composition": {"structure": "", "optional_devices": [], "layering": ""}, "avoid": [], "prompt_template": "", "negative_prompt": "", "tags": []}`
 
 const conceptReviewVI = `Bạn là BIÊN TẬP VIÊN HÌNH ẢNH của một kênh video phổ biến kiến thức. Việc của bạn: đọc toàn bộ ngôn ngữ hình ảnh (tám phần) cùng đầu vào của nó, rồi chỉ ra những chỗ Creator cần xử lý trước khi duyệt. Bạn không viết lại các phần.
 

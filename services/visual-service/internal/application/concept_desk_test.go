@@ -123,7 +123,7 @@ func TestStale_FollowsOnlyTheSourcesAPartReads(t *testing.T) {
 		}
 	}
 	edited := r.store.library[0]
-	edited.Summary = "đổi"
+	edited.Intent = "đổi"
 	r.store.library[0] = edited
 	r.store.picks = []string{"R01"}
 	st = mustState(t)(r.desk.State(ctx, project))

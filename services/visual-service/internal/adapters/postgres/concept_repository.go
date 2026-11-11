@@ -102,8 +102,8 @@ func (r *ConceptRepository) SetConceptModel(ctx context.Context, projectID, mode
 	return nil
 }
 
-// refColumns are the columns of a reference description; detail holds the
-// source, drawing and layout fields and is null for a description without them.
+// refColumns are the columns of a reference description; detail holds every
+// field but the name, intent and tags.
 const refColumns = `s.id, s.name, s.description, s.tags, s.detail`
 
 func scanRefs(rows pgx.Rows) ([]domain.PickedReference, error) {
@@ -112,22 +112,11 @@ func scanRefs(rows pgx.Rows) ([]domain.PickedReference, error) {
 	for rows.Next() {
 		var s domain.PickedReference
 		var detail []byte
-		if err := rows.Scan(&s.ID, &s.Name, &s.Summary, &s.Tags, &detail); err != nil {
+		if err := rows.Scan(&s.ID, &s.StyleName, &s.Intent, &s.Tags, &detail); err != nil {
 			return nil, fmt.Errorf("scan reference: %w", err)
 		}
-		if len(detail) > 0 {
-			var d struct {
-				Source  domain.RefSource  `json:"source"`
-				Drawing domain.RefDrawing `json:"drawing"`
-				Layout  domain.RefLayout  `json:"layout"`
-			}
-			if err := json.Unmarshal(detail, &d); err != nil {
-				return nil, fmt.Errorf("read detail of reference %s: %w", s.ID, err)
-			}
-			s.Source, s.Drawing, s.Layout = d.Source, d.Drawing, d.Layout
-		}
-		if s.Tags == nil {
-			s.Tags = []string{}
+		if err := applyDetail(detail, &s.ReferenceStyleInput); err != nil {
+			return nil, fmt.Errorf("read detail of reference %s: %w", s.ID, err)
 		}
 		out = append(out, s)
 	}

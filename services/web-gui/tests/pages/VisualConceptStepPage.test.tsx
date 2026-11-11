@@ -13,6 +13,18 @@ import type {
 } from "../../src/api/client";
 import type { Project } from "../../src/types";
 
+const EMPTY_REF_DRAWING: apiClient.ReferenceDrawing = {
+  medium: "",
+  shape: "",
+  outline: "",
+  fill: "",
+  shading: "",
+  light: "",
+  depth: "",
+  perspective: "",
+  texture: "",
+};
+
 function Where() {
   const l = useLocation();
   return <span data-testid="where">{l.pathname}</span>;
@@ -77,20 +89,32 @@ function baseState(over: Partial<VisualConceptState> = {}): VisualConceptState {
     refs: [
       {
         ref_id: "R01",
-        name: "Sáng xuyên lớp",
-        summary: "nền tối ấm",
+        style_name: "Sáng xuyên lớp",
+        intent: "nền tối ấm",
         tags: ["ánh sáng"],
-        drawing: {},
-        layout: {},
+        source: { url: "", title: "", kind: "" },
+        core_rules: [],
+        drawing: EMPTY_REF_DRAWING,
+        color_rules: { background: "", subject: "", accents: "", note: "" },
+        composition: { structure: "", optional_devices: [], layering: "" },
+        avoid: [],
+        prompt_template: "",
+        negative_prompt: "",
         picked: true,
       },
       {
         ref_id: "R02",
-        name: "Sơ đồ",
-        summary: "nét mảnh",
+        style_name: "Sơ đồ",
+        intent: "nét mảnh",
         tags: [],
-        drawing: {},
-        layout: {},
+        source: { url: "", title: "", kind: "" },
+        core_rules: [],
+        drawing: EMPTY_REF_DRAWING,
+        color_rules: { background: "", subject: "", accents: "", note: "" },
+        composition: { structure: "", optional_devices: [], layering: "" },
+        avoid: [],
+        prompt_template: "",
+        negative_prompt: "",
         picked: false,
       },
     ],

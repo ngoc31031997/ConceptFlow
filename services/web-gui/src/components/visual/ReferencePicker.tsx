@@ -68,9 +68,9 @@ export function ReferencePicker({
                     disabled={readOnly || concept.busy || concept.running !== null}
                     data-testid={`concept-ref-${r.ref_id}`}
                   />
-                  {r.ref_id} · {r.name}
+                  {r.ref_id} · {r.style_name}
                 </label>
-                <span className={researchStyles.hint}>{r.summary}</span>
+                <span className={researchStyles.hint}>{r.intent}</span>
                 <span>
                   {r.tags.map((t) => (
                     <span key={t} className={styles.tag}>

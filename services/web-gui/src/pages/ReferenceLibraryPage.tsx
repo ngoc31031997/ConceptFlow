@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { YoutubePromptCopy } from "../components/reference/YoutubePromptCopy";
-import { Button, Card, Dialog, FormField, Select, TextArea, TextInput } from "../components/ui";
+import {
+  Button,
+  Card,
+  CopyBox,
+  Dialog,
+  FormField,
+  Select,
+  TextArea,
+  TextInput,
+} from "../components/ui";
 import {
   createReferenceStyle,
   deleteReferenceStyle,
@@ -10,8 +19,8 @@ import {
   importReferenceStyle,
   listReferenceStyles,
   updateReferenceStyle,
+  type ReferenceColorRules,
   type ReferenceDrawing,
-  type ReferenceLayout,
   type ReferenceStyle,
   type ReferenceStyleInput,
 } from "../api/client";
@@ -19,8 +28,10 @@ import glass from "../styles/glass.module.css";
 import styles from "./ReferenceLibraryPage.module.css";
 
 const NAME_MAX = 80;
-const SUMMARY_MAX = 1000;
+const INTENT_MAX = 1000;
 const FIELD_MAX = 300;
+const PROMPT_MAX = 1000;
+const LIST_MAX = 12;
 const REDO_NOTE =
   "các phần đọc tham chiếu ở bước Ngôn ngữ hình ảnh sẽ cần làm lại; bản đã chốt giữ nguyên.";
 
@@ -42,10 +53,16 @@ const DRAWING_FIELDS: { key: keyof ReferenceDrawing; label: string }[] = [
   { key: "texture", label: "Bề mặt" },
 ];
 
-const LAYOUT_FIELDS: { key: keyof ReferenceLayout; label: string }[] = [
+const COLOR_FIELDS: { key: keyof ReferenceColorRules; label: string }[] = [
+  { key: "background", label: "Nền" },
+  { key: "subject", label: "Chủ thể" },
+  { key: "accents", label: "Điểm nhấn" },
+  { key: "note", label: "Ghi chú" },
+];
+
+const COMPOSITION_FIELDS: { key: "structure" | "layering"; label: string }[] = [
   { key: "structure", label: "Cấu trúc" },
   { key: "layering", label: "Phân lớp" },
-  { key: "persistent_elements", label: "Phần tử cố định" },
 ];
 
 const SOURCE_KINDS = [
@@ -56,16 +73,26 @@ const SOURCE_KINDS = [
   { value: "other", label: "Khác" },
 ];
 
-/** The form state of the add/edit dialog: the input with the tags as the text typed. */
-interface FormState extends Omit<ReferenceStyleInput, "tags"> {
+/**
+ * The form state of the add/edit dialog: the input with the tags as the text
+ * typed (comma-separated) and each list as text with one item per line.
+ */
+interface FormState extends Omit<
+  ReferenceStyleInput,
+  "tags" | "core_rules" | "avoid" | "composition"
+> {
   tags: string;
+  core_rules: string;
+  avoid: string;
+  composition: { structure: string; optional_devices: string; layering: string };
 }
 
 const EMPTY_FORM: FormState = {
-  name: "",
-  summary: "",
+  style_name: "",
+  intent: "",
   tags: "",
   source: { url: "", title: "", kind: "" },
+  core_rules: "",
   drawing: {
     medium: "",
     shape: "",
@@ -77,11 +104,25 @@ const EMPTY_FORM: FormState = {
     perspective: "",
     texture: "",
   },
-  layout: { structure: "", layering: "", persistent_elements: "" },
+  color_rules: { background: "", subject: "", accents: "", note: "" },
+  composition: { structure: "", optional_devices: "", layering: "" },
+  avoid: "",
+  prompt_template: "",
+  negative_prompt: "",
 };
 
 function toForm(style: ReferenceStyleInput | null): FormState {
-  return style ? { ...style, tags: style.tags.join(", ") } : EMPTY_FORM;
+  if (!style) return EMPTY_FORM;
+  return {
+    ...style,
+    tags: style.tags.join(", "),
+    core_rules: style.core_rules.join("\n"),
+    avoid: style.avoid.join("\n"),
+    composition: {
+      ...style.composition,
+      optional_devices: style.composition.optional_devices.join("\n"),
+    },
+  };
 }
 
 /** Splits the comma-separated tag field; the server trims and drops repeats. */
@@ -90,6 +131,27 @@ function parseTags(text: string): string[] {
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
+}
+
+/** Splits a one-item-per-line field; the server trims and drops empty lines. */
+function parseLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+function fromForm(form: FormState): ReferenceStyleInput {
+  return {
+    ...form,
+    tags: parseTags(form.tags),
+    core_rules: parseLines(form.core_rules),
+    avoid: parseLines(form.avoid),
+    composition: {
+      ...form.composition,
+      optional_devices: parseLines(form.composition.optional_devices),
+    },
+  };
 }
 
 function errorText(e: unknown): string {
@@ -207,6 +269,30 @@ function TextField({
   );
 }
 
+/** A labelled multi-line field holding a list, one item per line. */
+function ListField({
+  label,
+  value,
+  onChange,
+  testId,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  testId: string;
+}) {
+  return (
+    <FormField label={`${label} · mỗi dòng một mục, tối đa ${LIST_MAX} mục`}>
+      <TextArea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={4}
+        data-testid={testId}
+      />
+    </FormField>
+  );
+}
+
 /**
  * Adds or edits a description. "Dán JSON" reads a description pasted from an
  * outside AI into the form for review; saving stays a separate step. Editing
@@ -230,14 +316,16 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
     setPasteError(null);
   }, [open, style]);
 
-  const incomplete = form.name.trim() === "" || form.summary.trim() === "";
+  const incomplete = form.style_name.trim() === "" || form.intent.trim() === "";
   const waitingUsage = style !== null && !usageKnown(usage);
   const setSource = (key: "url" | "title" | "kind", value: string) =>
     setForm((f) => ({ ...f, source: { ...f.source, [key]: value } }));
   const setDrawing = (key: keyof ReferenceDrawing, value: string) =>
     setForm((f) => ({ ...f, drawing: { ...f.drawing, [key]: value } }));
-  const setLayout = (key: keyof ReferenceLayout, value: string) =>
-    setForm((f) => ({ ...f, layout: { ...f.layout, [key]: value } }));
+  const setColor = (key: keyof ReferenceColorRules, value: string) =>
+    setForm((f) => ({ ...f, color_rules: { ...f.color_rules, [key]: value } }));
+  const setComposition = (key: keyof FormState["composition"], value: string) =>
+    setForm((f) => ({ ...f, composition: { ...f.composition, [key]: value } }));
 
   const readPasted = async () => {
     setBusy(true);
@@ -256,7 +344,7 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
   const save = async () => {
     setBusy(true);
     setError(null);
-    const input: ReferenceStyleInput = { ...form, tags: parseTags(form.tags) };
+    const input = fromForm(form);
     try {
       if (style) {
         await updateReferenceStyle(style.id, input);
@@ -340,23 +428,23 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
         </div>
       )}
 
-      <FormField label="Tên">
+      <FormField label="Tên phong cách">
         <TextInput
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          value={form.style_name}
+          onChange={(e) => setForm((f) => ({ ...f, style_name: e.target.value }))}
           maxLength={NAME_MAX}
-          placeholder="Ví dụ: Sơ đồ khoa học tối giản"
+          placeholder="Ví dụ: Glowing Flat Vector"
           data-testid="reference-name-input"
         />
       </FormField>
-      <FormField label="Tóm tắt" className={glass.mtSm}>
+      <FormField label="Mục đích" className={glass.mtSm}>
         <TextArea
-          value={form.summary}
-          onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
-          maxLength={SUMMARY_MAX}
-          rows={4}
-          placeholder="Phong cách này trông thế nào, trong vài câu"
-          data-testid="reference-summary-input"
+          value={form.intent}
+          onChange={(e) => setForm((f) => ({ ...f, intent: e.target.value }))}
+          maxLength={INTENT_MAX}
+          rows={3}
+          placeholder="Phong cách dùng cho loại video nào; áp dụng cho mọi chủ đề"
+          data-testid="reference-intent-input"
         />
       </FormField>
       <FormField label="Nhãn · cách nhau bằng dấu phẩy, tối đa 8 nhãn" className={glass.mtSm}>
@@ -400,6 +488,16 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
       </fieldset>
 
       <fieldset className={styles.group}>
+        <legend>Luật cốt lõi</legend>
+        <ListField
+          label="Luật bắt buộc"
+          value={form.core_rules}
+          onChange={(v) => setForm((f) => ({ ...f, core_rules: v }))}
+          testId="reference-core-rules-input"
+        />
+      </fieldset>
+
+      <fieldset className={styles.group}>
         <legend>Cách vẽ</legend>
         <div className={styles.grid}>
           {DRAWING_FIELDS.map((f) => (
@@ -415,18 +513,71 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
       </fieldset>
 
       <fieldset className={styles.group}>
-        <legend>Layout</legend>
+        <legend>Màu · quan hệ giữa nền, chủ thể và điểm nhấn</legend>
         <div className={styles.grid}>
-          {LAYOUT_FIELDS.map((f) => (
+          {COLOR_FIELDS.map((f) => (
             <TextField
               key={f.key}
               label={f.label}
-              value={form.layout[f.key]}
-              onChange={(v) => setLayout(f.key, v)}
-              testId={`reference-layout-${f.key}-input`}
+              value={form.color_rules[f.key]}
+              onChange={(v) => setColor(f.key, v)}
+              testId={`reference-color-${f.key}-input`}
             />
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className={styles.group}>
+        <legend>Bố cục</legend>
+        <div className={styles.grid}>
+          {COMPOSITION_FIELDS.map((f) => (
+            <TextField
+              key={f.key}
+              label={f.label}
+              value={form.composition[f.key]}
+              onChange={(v) => setComposition(f.key, v)}
+              testId={`reference-composition-${f.key}-input`}
+            />
+          ))}
+        </div>
+        <ListField
+          label="Thủ pháp tuỳ chọn"
+          value={form.composition.optional_devices}
+          onChange={(v) => setComposition("optional_devices", v)}
+          testId="reference-composition-devices-input"
+        />
+      </fieldset>
+
+      <fieldset className={styles.group}>
+        <legend>Tránh</legend>
+        <ListField
+          label="Những gì phá phong cách"
+          value={form.avoid}
+          onChange={(v) => setForm((f) => ({ ...f, avoid: v }))}
+          testId="reference-avoid-input"
+        />
+      </fieldset>
+
+      <fieldset className={styles.group}>
+        <legend>Prompt sinh ảnh</legend>
+        <FormField label="Mẫu prompt · có chỗ trống {subject} và {setting}">
+          <TextArea
+            value={form.prompt_template}
+            onChange={(e) => setForm((f) => ({ ...f, prompt_template: e.target.value }))}
+            maxLength={PROMPT_MAX}
+            rows={4}
+            data-testid="reference-prompt-template-input"
+          />
+        </FormField>
+        <FormField label="Negative prompt" className={glass.mtSm}>
+          <TextArea
+            value={form.negative_prompt}
+            onChange={(e) => setForm((f) => ({ ...f, negative_prompt: e.target.value }))}
+            maxLength={PROMPT_MAX}
+            rows={2}
+            data-testid="reference-negative-prompt-input"
+          />
+        </FormField>
       </fieldset>
 
       {style && (
@@ -447,7 +598,31 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
   );
 }
 
-/** Read-only view of one description with every drawing and layout field. */
+/** A read-only list of a description, or a dash when it is empty. */
+function DetailList({ items, testId }: { items: string[]; testId: string }) {
+  if (items.length === 0) return <p className={glass.cardHint}>—</p>;
+  return (
+    <ul className={styles.detailList} data-testid={testId}>
+      {items.map((it, i) => (
+        <li key={`${i}-${it}`}>{it}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** A prompt of a description in a copy box, or a dash when it is empty. */
+function DetailPrompt({ text, what, testId }: { text: string; what: string; testId: string }) {
+  if (!text) return <p className={glass.cardHint}>—</p>;
+  return (
+    <CopyBox text={text} what={what} copyTestId={`${testId}-copy`}>
+      <pre className={styles.prompt} data-testid={testId}>
+        {text}
+      </pre>
+    </CopyBox>
+  );
+}
+
+/** Read-only view of one description with every field. */
 function ReferenceDetailDialog({
   style,
   onClose,
@@ -467,7 +642,7 @@ function ReferenceDetailDialog({
       open={style !== null}
       onClose={onClose}
       size="lg"
-      title={style ? `${style.id} · ${style.name}` : ""}
+      title={style ? `${style.id} · ${style.style_name}` : ""}
       testId="reference-detail-dialog"
       footer={
         <Button variant="ghost" onClick={onClose} data-testid="reference-detail-close">
@@ -477,15 +652,42 @@ function ReferenceDetailDialog({
     >
       {style && (
         <>
-          <p className={styles.description}>{style.summary}</p>
+          <p className={styles.description}>{style.intent}</p>
+          <h3 className={styles.detailHead}>Luật cốt lõi</h3>
+          <DetailList items={style.core_rules} testId="reference-detail-core-rules" />
           <h3 className={styles.detailHead}>Cách vẽ</h3>
           <dl className={styles.detail} data-testid="reference-detail-drawing">
             {rows(DRAWING_FIELDS.map((f) => ({ label: f.label, value: style.drawing[f.key] })))}
           </dl>
-          <h3 className={styles.detailHead}>Layout</h3>
-          <dl className={styles.detail} data-testid="reference-detail-layout">
-            {rows(LAYOUT_FIELDS.map((f) => ({ label: f.label, value: style.layout[f.key] })))}
+          <h3 className={styles.detailHead}>Màu</h3>
+          <dl className={styles.detail} data-testid="reference-detail-color">
+            {rows(COLOR_FIELDS.map((f) => ({ label: f.label, value: style.color_rules[f.key] })))}
           </dl>
+          <h3 className={styles.detailHead}>Bố cục</h3>
+          <dl className={styles.detail} data-testid="reference-detail-composition">
+            {rows(
+              COMPOSITION_FIELDS.map((f) => ({ label: f.label, value: style.composition[f.key] })),
+            )}
+          </dl>
+          <h3 className={styles.detailHead}>Thủ pháp tuỳ chọn</h3>
+          <DetailList
+            items={style.composition.optional_devices}
+            testId="reference-detail-devices"
+          />
+          <h3 className={styles.detailHead}>Tránh</h3>
+          <DetailList items={style.avoid} testId="reference-detail-avoid" />
+          <h3 className={styles.detailHead}>Mẫu prompt</h3>
+          <DetailPrompt
+            text={style.prompt_template}
+            what="mẫu prompt"
+            testId="reference-detail-prompt-template"
+          />
+          <h3 className={styles.detailHead}>Negative prompt</h3>
+          <DetailPrompt
+            text={style.negative_prompt}
+            what="negative prompt"
+            testId="reference-detail-negative-prompt"
+          />
           <h3 className={styles.detailHead}>Nguồn</h3>
           <SourceLink style={style} />
         </>
@@ -573,7 +775,7 @@ function DeleteReferenceDialog({ style, onClose, onDeleted }: DeleteDialogProps)
     >
       {style && (
         <p>
-          Xoá mô tả <b>{style.name}</b>. Không khôi phục được; mã {style.id} không dùng lại.
+          Xoá mô tả <b>{style.style_name}</b>. Không khôi phục được; mã {style.id} không dùng lại.
         </p>
       )}
       <div className={glass.mtSm}>
@@ -631,7 +833,7 @@ export function ReferenceLibraryPage() {
     <div data-testid="reference-library-page">
       <AppShell
         title="Thư viện tham chiếu"
-        subtitle="Mô tả phong cách để AI đọc ở bước Ngôn ngữ hình ảnh. Mỗi mục có tóm tắt, nguồn, cách vẽ và layout của một phong cách. Dùng chung cho mọi video; ở bước 8 chỉ tick chọn. Bấm một dòng để xem đủ."
+        subtitle="Mô tả phong cách để AI đọc ở bước Ngôn ngữ hình ảnh. Mỗi mục có mục đích, luật cốt lõi, cách vẽ, quan hệ màu, bố cục, điều cần tránh và prompt sinh ảnh của một phong cách. Dùng chung cho mọi video; ở bước 8 chỉ tick chọn. Bấm một dòng để xem đủ."
         wide
       >
         <div className={styles.toolbar}>
@@ -666,7 +868,7 @@ export function ReferenceLibraryPage() {
                   <tr>
                     <th>Mã</th>
                     <th>Tên</th>
-                    <th>Tóm tắt</th>
+                    <th>Mục đích</th>
                     <th>Nhãn</th>
                     <th>Nguồn</th>
                     <th aria-label="Thao tác" />
@@ -682,9 +884,9 @@ export function ReferenceLibraryPage() {
                     >
                       <td className={styles.id}>{r.id}</td>
                       <td>
-                        <b>{r.name}</b>
+                        <b>{r.style_name}</b>
                       </td>
-                      <td className={styles.description}>{r.summary}</td>
+                      <td className={styles.description}>{r.intent}</td>
                       <td>
                         <span className={styles.tags}>
                           {r.tags.map((t) => (

@@ -29,11 +29,11 @@ func TestReferenceStyles_CreateListUpdateDelete(t *testing.T) {
 	repo := openReferenceRepository(t)
 	ctx := context.Background()
 
-	first, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{Name: referenceTestPrefix + "-a", Summary: "d", Tags: []string{"x"}})
+	first, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{StyleName: referenceTestPrefix + "-a", Intent: "d", Tags: []string{"x"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{Name: referenceTestPrefix + "-b", Summary: "d", Tags: []string{}})
+	second, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{StyleName: referenceTestPrefix + "-b", Intent: "d", Tags: []string{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,18 +58,18 @@ func TestReferenceStyles_CreateListUpdateDelete(t *testing.T) {
 		t.Fatalf("list must hold both in the order they were added: %d, %d", firstAt, secondAt)
 	}
 
-	updated, err := repo.UpdateReferenceStyle(ctx, first.ID, domain.ReferenceStyleInput{Name: referenceTestPrefix + "-a2", Summary: "d2", Tags: []string{"y", "z"}})
+	updated, err := repo.UpdateReferenceStyle(ctx, first.ID, domain.ReferenceStyleInput{StyleName: referenceTestPrefix + "-a2", Intent: "d2", Tags: []string{"y", "z"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Name != referenceTestPrefix+"-a2" || len(updated.Tags) != 2 || updated.UpdatedAt.Before(first.UpdatedAt) {
+	if updated.StyleName != referenceTestPrefix+"-a2" || len(updated.Tags) != 2 || updated.UpdatedAt.Before(first.UpdatedAt) {
 		t.Errorf("update returned %+v", updated)
 	}
 
 	if err := repo.DeleteReferenceStyle(ctx, second.ID); err != nil {
 		t.Fatal(err)
 	}
-	third, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{Name: referenceTestPrefix + "-c", Summary: "d", Tags: []string{}})
+	third, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{StyleName: referenceTestPrefix + "-c", Intent: "d", Tags: []string{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestReferenceStyles_UnknownIDIsNotFound(t *testing.T) {
 	repo := openReferenceRepository(t)
 	ctx := context.Background()
 	const unknown = "R-none"
-	if _, err := repo.UpdateReferenceStyle(ctx, unknown, domain.ReferenceStyleInput{Name: "n", Summary: "d", Tags: []string{}}); !errors.Is(err, application.ErrReferenceStyleNotFound) {
+	if _, err := repo.UpdateReferenceStyle(ctx, unknown, domain.ReferenceStyleInput{StyleName: "n", Intent: "d", Tags: []string{}}); !errors.Is(err, application.ErrReferenceStyleNotFound) {
 		t.Errorf("update: %v", err)
 	}
 	if err := repo.DeleteReferenceStyle(ctx, unknown); !errors.Is(err, application.ErrReferenceStyleNotFound) {
@@ -96,7 +96,7 @@ func TestReferenceStyles_UnknownIDIsNotFound(t *testing.T) {
 func TestReferenceStyles_UsersAndCascadeOnDelete(t *testing.T) {
 	repo := openReferenceRepository(t)
 	ctx := context.Background()
-	s, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{Name: referenceTestPrefix + "-used", Summary: "d", Tags: []string{}})
+	s, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{StyleName: referenceTestPrefix + "-used", Intent: "d", Tags: []string{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,16 +127,21 @@ func TestReferenceStyles_DetailRoundTrips(t *testing.T) {
 	repo := openReferenceRepository(t)
 	ctx := context.Background()
 	in := domain.ReferenceStyleInput{
-		Name: referenceTestPrefix + "-detail", Summary: "tóm tắt", Tags: []string{},
-		Source:  domain.ReferenceSource{URL: "https://example.com/v", Title: "t", Kind: "video"},
-		Drawing: domain.ReferenceDrawing{Shape: "tròn", Texture: "giấy"},
-		Layout:  domain.ReferenceLayout{Structure: "lưới", PersistentElements: "logo"},
+		StyleName: referenceTestPrefix + "-detail", Intent: "tóm tắt", Tags: []string{},
+		Source:    domain.ReferenceSource{URL: "https://example.com/v", Title: "t", Kind: "video"},
+		Drawing:   domain.ReferenceDrawing{Shape: "tròn", Texture: "giấy"},
+		CoreRules: []string{"no outlines"}, Avoid: []string{"pastel"},
+		ColorRules:     domain.ReferenceColorRules{Background: "tối", Accents: "phát sáng"},
+		Composition:    domain.ReferenceComposition{Structure: "lưới", OptionalDevices: []string{"inset"}},
+		PromptTemplate: "{subject} in {setting}", NegativePrompt: "outline",
 	}
 	created, err := repo.CreateReferenceStyle(ctx, in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.Summary != "tóm tắt" || created.Source != in.Source || created.Drawing != in.Drawing || created.Layout != in.Layout {
+	if created.Intent != "tóm tắt" || created.Source != in.Source || created.Drawing != in.Drawing || created.ColorRules != in.ColorRules ||
+		created.CoreRules[0] != "no outlines" || created.Avoid[0] != "pastel" || created.Composition.OptionalDevices[0] != "inset" ||
+		created.PromptTemplate != in.PromptTemplate || created.NegativePrompt != in.NegativePrompt {
 		t.Fatalf("created %+v", created)
 	}
 	in.Drawing.Shape = "vuông"
@@ -149,7 +154,7 @@ func TestReferenceStyles_DetailRoundTrips(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, s := range list {
-		if s.ID == created.ID && (s.Drawing.Shape != "vuông" || s.Source.URL != "" || s.Layout.Structure != "lưới") {
+		if s.ID == created.ID && (s.Drawing.Shape != "vuông" || s.Source.URL != "" || s.Composition.Structure != "lưới") {
 			t.Errorf("listed %+v", s)
 		}
 	}

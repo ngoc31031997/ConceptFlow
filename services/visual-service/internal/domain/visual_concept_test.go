@@ -8,8 +8,9 @@ import (
 	"time"
 )
 
-var r01 = PickedReference{ID: "R01", Name: "Sáng xuyên lớp", Summary: "nền tối ấm",
-	Drawing: RefDrawing{Shape: "tròn mềm", Fill: "phẳng", Light: "sau lớp mỏng"}, Layout: RefLayout{Layering: "ba lớp"}}
+var r01 = PickedReference{ID: "R01", ReferenceStyleInput: ReferenceStyleInput{StyleName: "Sáng xuyên lớp", Intent: "nền tối ấm",
+	CoreRules: []string{"no outlines"}, Drawing: ReferenceDrawing{Shape: "tròn mềm", Fill: "phẳng", Light: "sau lớp mỏng"},
+	Composition: ReferenceComposition{Layering: "ba lớp"}, PromptTemplate: "{subject} in {setting}"}}
 
 func TestValidPartsPassEveryCheck(t *testing.T) {
 	in := conceptInput(t, r01)
@@ -176,7 +177,7 @@ func TestNewConceptInput_HashesEachSource(t *testing.T) {
 		t.Error("the script source must change")
 	}
 	edited := r01
-	edited.Summary = "khác"
+	edited.Intent = "khác"
 	c := conceptInput(t, edited)
 	if c.Hashes[SourceRefs] == a.Hashes[SourceRefs] || c.Hashes[SourceBeats] != a.Hashes[SourceBeats] {
 		t.Error("editing a picked description changes only the refs source")
@@ -239,8 +240,9 @@ func TestAccuracyNotesAndDocument(t *testing.T) {
 		t.Error("do_not_use is a plain array in the document")
 	}
 	refs := m["reference_styles"].([]any)[0].(map[string]any)
-	if refs["summary"] != "nền tối ấm" || refs["drawing"].(map[string]any)["shape"] != "tròn mềm" || refs["layout"].(map[string]any)["layering"] != "ba lớp" || refs["description"] != nil {
-		t.Errorf("reference copied as summary, drawing and layout: %v", refs)
+	if refs["intent"] != "nền tối ấm" || refs["drawing"].(map[string]any)["shape"] != "tròn mềm" || refs["composition"].(map[string]any)["layering"] != "ba lớp" ||
+		refs["core_rules"].([]any)[0] != "no outlines" || refs["prompt_template"] != nil || refs["tags"] != nil {
+		t.Errorf("reference copied as intent, core rules, drawing and composition, without the image prompts or tags: %v", refs)
 	}
 	comments := m["review"].(map[string]any)["comments"].([]any)
 	if len(comments) != 1 || comments[0].(map[string]any)["decision"] != "accepted" {

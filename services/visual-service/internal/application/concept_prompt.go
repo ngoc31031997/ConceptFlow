@@ -119,6 +119,9 @@ func glossaryText(in domain.ConceptInput) string {
 	return strings.Join(lines, "\n")
 }
 
+// refsText lists each picked description as the AI reads it: name and intent,
+// then the core rules, drawing, colour relations, composition and what to
+// avoid. Empty fields are left out.
 func refsText(refs []domain.PickedReference) string {
 	if len(refs) == 0 {
 		return "(Creator chưa chọn mô tả tham chiếu nào.)"
@@ -126,23 +129,37 @@ func refsText(refs []domain.PickedReference) string {
 	var blocks []string
 	for _, r := range refs {
 		var sb strings.Builder
-		fmt.Fprintf(&sb, "%s · %s: %s", r.ID, r.Name, r.Summary)
-		for _, f := range []struct {
-			label string
-			v     domain.FlexText
-		}{
-			{"chất liệu", r.Drawing.Medium}, {"hình dạng", r.Drawing.Shape}, {"đường nét", r.Drawing.Outline}, {"tô", r.Drawing.Fill},
-			{"đổ bóng", r.Drawing.Shading}, {"ánh sáng", r.Drawing.Light}, {"chiều sâu", r.Drawing.Depth}, {"phối cảnh", r.Drawing.Perspective},
-			{"kết cấu", r.Drawing.Texture}, {"layout · cấu trúc", r.Layout.Structure}, {"layout · lớp", r.Layout.Layering},
-			{"layout · thành phần cố định", r.Layout.PersistentElements},
+		fmt.Fprintf(&sb, "%s · %s: %s", r.ID, r.StyleName, r.Intent)
+		writeRefList(&sb, "luật cốt lõi", r.CoreRules)
+		d, c, k := r.Drawing, r.ColorRules, r.Composition
+		for _, f := range []struct{ label, v string }{
+			{"chất liệu", d.Medium}, {"hình dạng", d.Shape}, {"đường nét", d.Outline}, {"tô", d.Fill},
+			{"đổ bóng", d.Shading}, {"ánh sáng", d.Light}, {"chiều sâu", d.Depth}, {"phối cảnh", d.Perspective},
+			{"kết cấu", d.Texture}, {"màu · nền", c.Background}, {"màu · chủ thể", c.Subject},
+			{"màu · điểm nhấn", c.Accents}, {"màu · ghi chú", c.Note},
+			{"bố cục · cấu trúc", k.Structure}, {"bố cục · lớp", k.Layering},
 		} {
 			if f.v != "" {
 				fmt.Fprintf(&sb, "\n  - %s: %s", f.label, f.v)
 			}
 		}
+		writeRefList(&sb, "bố cục · thủ pháp tuỳ chọn", k.OptionalDevices)
+		writeRefList(&sb, "tránh", r.Avoid)
 		blocks = append(blocks, sb.String())
 	}
 	return strings.Join(blocks, "\n")
+}
+
+// writeRefList writes a labelled list of a reference, one item per line; an
+// empty list writes nothing.
+func writeRefList(sb *strings.Builder, label string, items []string) {
+	if len(items) == 0 {
+		return
+	}
+	fmt.Fprintf(sb, "\n  - %s:", label)
+	for _, it := range items {
+		fmt.Fprintf(sb, "\n    · %s", it)
+	}
 }
 
 func fontsText(fonts []string) string {

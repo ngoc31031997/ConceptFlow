@@ -28,7 +28,7 @@ func TestConceptRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := data.pool.Exec(ctx, `UPDATE reference_styles SET detail = '{"drawing":{"shape":"tròn","light":["a","b"]},"layout":{"layering":"ba lớp"},"source":{"url":"u"}}' WHERE id = $1`, r1); err != nil {
+	if _, err := data.pool.Exec(ctx, `UPDATE reference_styles SET detail = '{"drawing":{"shape":"tròn","light":"a"},"composition":{"layering":"ba lớp","optional_devices":["inset"]},"avoid":["sharp corners"],"source":{"url":"u"}}' WHERE id = $1`, r1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,10 +64,10 @@ func TestConceptRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	picked, _ := repo.PickedReferences(ctx, p)
-	if len(picked) != 2 || picked[0].ID != r2 || picked[0].Tags[0] != "a" || picked[0].Summary != "d" || picked[0].Drawing.Shape != "" {
+	if len(picked) != 2 || picked[0].ID != r2 || picked[0].Tags[0] != "a" || picked[0].Intent != "d" || picked[0].Drawing.Shape != "" || picked[0].Avoid == nil || picked[0].CoreRules == nil {
 		t.Errorf("picks in library order: %+v", picked)
 	}
-	if picked[1].Drawing.Shape != "tròn" || picked[1].Drawing.Light != "a; b" || picked[1].Layout.Layering != "ba lớp" || picked[1].Source.URL != "u" {
+	if picked[1].Drawing.Shape != "tròn" || picked[1].Drawing.Light != "a" || picked[1].Composition.Layering != "ba lớp" || picked[1].Composition.OptionalDevices[0] != "inset" || picked[1].Avoid[0] != "sharp corners" || picked[1].Source.URL != "u" {
 		t.Errorf("detail read: %+v", picked[1])
 	}
 	if err := repo.SetPicks(ctx, p, []string{r1}); err != nil {

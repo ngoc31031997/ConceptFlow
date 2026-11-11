@@ -33,7 +33,7 @@ type fakeStore struct {
 
 func newStore() *fakeStore {
 	return &fakeStore{units: map[string]domain.ReviewUnit{},
-		library: []domain.PickedReference{{ID: "R01", Name: "Sáng", Summary: "nền tối", Drawing: domain.RefDrawing{Shape: "tròn", Fill: "phẳng"}, Layout: domain.RefLayout{Layering: "ba lớp"}}, {ID: "R02", Name: "Sơ đồ", Summary: "nét mảnh"}}}
+		library: []domain.PickedReference{{ID: "R01", ReferenceStyleInput: domain.ReferenceStyleInput{StyleName: "Sáng", Intent: "nền tối", Drawing: domain.ReferenceDrawing{Shape: "tròn", Fill: "phẳng"}, Composition: domain.ReferenceComposition{Layering: "ba lớp"}}}, {ID: "R02", ReferenceStyleInput: domain.ReferenceStyleInput{StyleName: "Sơ đồ", Intent: "nét mảnh"}}}}
 }
 
 func (s *fakeStore) ListUnits(_ context.Context, p, kind string) ([]domain.ReviewUnit, error) {

@@ -62,9 +62,14 @@ CREATE TABLE IF NOT EXISTS reference_styles (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- description holds the summary; detail holds the structured source, drawing
--- and layout fields of the description.
+-- name holds style_name, description holds intent; detail holds the other
+-- structured fields (source, core_rules, drawing, color_rules, composition,
+-- avoid, prompt_template, negative_prompt).
 ALTER TABLE reference_styles ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}';
+-- Every stored description carries a composition key; a row without one is in
+-- an earlier layout that the library no longer reads, and is removed together
+-- with the videos' picks of it.
+DELETE FROM reference_styles WHERE NOT (detail ? 'composition');
 -- Which descriptions a video's visual concept reads.
 CREATE TABLE IF NOT EXISTS project_reference_picks (
     project_id TEXT NOT NULL,
