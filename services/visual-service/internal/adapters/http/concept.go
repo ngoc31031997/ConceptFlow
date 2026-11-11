@@ -104,17 +104,18 @@ func writeConceptError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrBeatStale):
 		status, code = http.StatusConflict, "beat_stale"
 	case errors.Is(err, domain.ErrUnknownUnit), errors.Is(err, domain.ErrUnknownFinding), errors.Is(err, domain.ErrNoVersion),
-		errors.Is(err, domain.ErrUnknownPlanUnit), errors.Is(err, domain.ErrUnknownQuestion):
+		errors.Is(err, domain.ErrUnknownPlanUnit), errors.Is(err, domain.ErrUnknownQuestion), errors.Is(err, domain.ErrUnknownPlanBeat):
 		status = http.StatusNotFound
 	case errors.Is(err, domain.ErrInvalidEdit), errors.Is(err, domain.ErrFindingNotApplicable), errors.Is(err, domain.ErrUnknownReference),
 		errors.Is(err, application.ErrUnknownModel), errors.Is(err, domain.ErrUnknownStep), errors.Is(err, application.ErrNoProjectID),
 		errors.Is(err, application.ErrExternalAISingleTurn), errors.Is(err, domain.ErrNotSplittable), errors.Is(err, domain.ErrNotMergeable):
 		status = http.StatusBadRequest
 	case errors.Is(err, domain.ErrUnitRunning), errors.Is(err, domain.ErrUnitInvalid), errors.Is(err, domain.ErrUnitNotWritten),
-		errors.Is(err, domain.ErrLockNotReady), errors.Is(err, domain.ErrNothingToLock), errors.Is(err, domain.ErrVersionExists):
+		errors.Is(err, domain.ErrLockNotReady), errors.Is(err, domain.ErrNothingToLock), errors.Is(err, domain.ErrVersionExists),
+		errors.Is(err, domain.ErrNoNarrationPace):
 		status = http.StatusConflict
 	case errors.Is(err, domain.ErrUnreadableReply), errors.Is(err, application.ErrLLMFailed), errors.Is(err, application.ErrPromptNotFound),
-		errors.Is(err, application.ErrAuthoringFailed), errors.Is(err, application.ErrRenderingFailed):
+		errors.Is(err, application.ErrAuthoringFailed), errors.Is(err, application.ErrRenderingFailed), errors.Is(err, application.ErrLLMNotConfigured):
 		status = http.StatusBadGateway
 	}
 	msg := err.Error()

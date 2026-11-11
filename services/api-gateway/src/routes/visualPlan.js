@@ -5,15 +5,23 @@ const { proxyHandler } = require('../handlers/proxyHandler');
 
 /**
  * Step 9 "Kế hoạch hình", forwarded straight to visual-service
- * (docs/contracts/visual-plan-v1.md).
+ * (docs/contracts/visual-plan-v1.md). The routes that ask the AI go through
+ * `visualAiClient`, which has no gateway timeout, like the AI routes of step 8;
+ * the `X-External-AI` header passes through with the rest.
  *
  * @param {import('../clients/httpClient').HttpClient} visualClient
+ * @param {import('../clients/httpClient').HttpClient} visualAiClient
  */
-function visualPlanRouter(visualClient) {
+function visualPlanRouter(visualClient, visualAiClient) {
   const router = express.Router();
   const base = '/v1/projects/:id/visual-plan';
   const plain = proxyHandler(visualClient, 'visual-service');
+  const ai = proxyHandler(visualAiClient, 'visual-service');
   router.get(base, plain);
+  router.put(`${base}/model`, plain);
+  router.post(`${base}/generate`, ai);
+  router.post(`${base}/beats/:beat/generate`, ai);
+  router.post(`${base}/review`, ai);
   router.put(`${base}/units/:unit`, plain);
   router.put(`${base}/units/:unit/questions/:question`, plain);
   router.post(`${base}/units/:unit/split`, plain);

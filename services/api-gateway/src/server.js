@@ -91,7 +91,7 @@ function main() {
   app.use(referenceStylesRouter(visualClient));
   app.use(authRouter(publisherClient));
   app.use(visualConceptRouter(visualClient, visualAiClient));
-  app.use(visualPlanRouter(visualClient));
+  app.use(visualPlanRouter(visualClient, visualAiClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());
 

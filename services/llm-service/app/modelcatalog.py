@@ -35,7 +35,7 @@ CATALOG: tuple[ModelOption, ...] = (
 #: concept step.
 STEPS: tuple[str, ...] = (
     "brief", "research", "story_frame", "beat_sheet", "story", "storyboard", "code", "publish", "illustrations",
-    "visual_concept",
+    "visual_concept", "visual_plan",
 )
 
 

@@ -135,6 +135,10 @@ type PlanStorePort interface {
 	// ReserveUnitNumbers hands out n consecutive unit numbers of the video and
 	// returns the first. A number is never handed out twice.
 	ReserveUnitNumbers(ctx context.Context, projectID string, n int) (int, error)
+	// PlanModel returns the video's model of step 9; "" when none is saved.
+	PlanModel(ctx context.Context, projectID string) (string, error)
+	// SetPlanModel saves the video's model of step 9.
+	SetPlanModel(ctx context.Context, projectID, model string) error
 	// LatestConceptVersion returns the latest locked visual concept with its
 	// document, or domain.ErrNoVersion.
 	LatestConceptVersion(ctx context.Context, projectID string) (VersionRecord, error)

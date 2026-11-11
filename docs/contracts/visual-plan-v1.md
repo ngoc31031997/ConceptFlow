@@ -1,8 +1,22 @@
 # Kế hoạch hình: API của bước 9 (`/v1`)
 
-Bước 9 (visual-service, ADR-0049) đọc kịch bản đã chốt ở bước 7 và ngôn ngữ hình ảnh đã chốt ở bước 8, giữ các **unit hình** của từng beat để Creator sửa, tách, gộp, trả lời câu hỏi, duyệt, xử lý vấn đề rà soát và chốt một phiên bản bất biến cho các bước hình ảnh sau đọc. Mọi đường dẫn công khai đi qua api-gateway. Mã: `services/visual-service/internal/domain/` (`visual_plan.go`, `plan_input.go`, `plan_checks.go`, `plan_document.go`), `internal/application/plan_desk.go`, `plan_actions.go`, `internal/adapters/http/plan.go`, `internal/adapters/postgres/plan_repository.go`.
+Bước 9 (visual-service, ADR-0049) đọc kịch bản đã chốt ở bước 7 và ngôn ngữ hình ảnh đã chốt ở bước 8, giữ các **unit hình** của từng beat để Creator sửa, tách, gộp, trả lời câu hỏi, duyệt, xử lý vấn đề rà soát và chốt một phiên bản bất biến cho các bước hình ảnh sau đọc. Mọi đường dẫn công khai đi qua api-gateway. Mã: `services/visual-service/internal/domain/` (`visual_plan.go`, `plan_input.go`, `plan_checks.go`, `plan_document.go`, `plan_reply.go`, `plan_prompt_seeds.go`), `internal/application/plan_desk.go`, `plan_actions.go`, `plan_writer.go`, `plan_reviewer.go`, `plan_prompt.go`, `internal/adapters/http/plan.go`, `internal/adapters/postgres/plan_repository.go`.
 
-Phần gọi AI (lập kế hoạch từng beat, rà soát, model riêng của video) chưa có trong phiên bản này: route `generate`, `beats/{k}/generate`, `review` và `model` thuộc CR-114b.
+## Lượt gọi AI
+
+Hai vai prompt, đẩy lên llm-service với `owner = "visual"` cùng các prompt của bước 8: `visual_plan_beat` (viết các unit của MỘT beat) và `visual_plan_review` (rà soát cả kế hoạch). Mỗi lượt là một lần `POST /v1/chat` với `step = visual_plan`, `role` = tên vai, `expect_json = true`. Model: `project_visual.plan_model` của video; để trống thì model mặc định của bước `visual_plan` ở llm-service (`GET /internal/v1/step-models`).
+
+**Lập kế hoạch một beat** (`beats/{k}/generate`). Prompt nhận: creative brief, hồ sơ nghiên cứu, thẻ beat, các câu của beat (mã câu, dữ kiện, số giây tối thiểu của từng câu), tổng tối thiểu của beat, ghi chú bàn giao của beat, beat liền trước và liền sau cùng các unit đã có của chúng, bảng thuật ngữ, mọi ID quy tắc của bản chốt bước 8 (`concept_rule_refs` chỉ lấy từ danh sách này), danh sách «cách thể hiện không được dùng», các unit hiện có cùng trường Creator đã sửa, ghi chú của Creator. AI trả `{"units":[…]}`: mỗi unit có `script_refs, narration_summary, communication_goal, essential_visual_info, on_screen_text, visual_approach, narration_relationship, duration{planned_s, extra_reason}, risk_notes, open_questions`. **Không có** `unit_id, fact_refs, status, order, narration_min_s`: máy cấp hoặc tính, khoá lạ thì cả reply bị từ chối.
+
+Reply bị từ chối (`502`, không ghi gì, không dùng mã unit) khi: không phải JSON đúng khuôn; `method`, `narration_relationship` hoặc `priority` ngoài danh sách; unit không có câu; các unit không phủ đúng mỗi câu của beat một lần, đúng thứ tự; hoặc bỏ mất một unit Creator đã sửa tay. Điều còn lại (ref concept, ghi chú rủi ro, thời lượng, chữ trên hình) được kiểm sau khi lưu và hiện ở thẻ unit.
+
+Ghép với kế hoạch cũ của beat: unit mới phủ **đúng các câu** của một unit cũ thì là unit đó (giữ mã, giữ các trường Creator đã sửa, phần còn lại là của AI); unit nào khác nhận mã `VP-xxx` mới từ bộ đếm. Mọi unit về `pending`, beat được ghi với hash nguồn hiện tại nên hết stale. Cần `creative brief` có thời lượng và kịch bản có chữ để tính mức tối thiểu; thiếu thì `409`.
+
+**Lập mọi beat còn trống** (`generate`): lần lượt theo thứ tự beat, chỉ các beat chưa có unit, mỗi lượt đọc các beat đã viết trước nó. Lỗi ở một beat thì dừng, các beat đã viết ở lại. Route này không có chế độ AI ngoài.
+
+**Rà soát** (`review`). Prompt nhận brief, hồ sơ nghiên cứu, bảng thuật ngữ, quy tắc và «không được dùng» của bước 8, cả kế hoạch theo thứ tự beat (kèm câu thoại và thời lượng), kết quả máy kiểm, các vấn đề lần trước còn hiệu lực. AI trả `{"findings":[{group, unit_key, field, text, detail, fix, same_as}], "notes":[…]}`. Reply bị từ chối khi `group` ngoài bốn nhóm, `unit_key` không là mã unit của kế hoạch, `field` không là trường Creator sửa được, vấn đề rỗng, hoặc `same_as` không khớp vấn đề cũ. Vòng sau gộp với vòng trước như bước 8 (vấn đề không còn được nhắc thì `fixed`).
+
+**AI ngoài hệ thống.** `beats/{k}/generate` và `review` nhận header `X-External-AI: prompt` (trả `{"external_prompt":"…"}`, chưa gọi model, chưa ghi gì) hoặc `paste` (body có `external_reply`), như bước 8 (ADR-0047). Một lượt model cho mỗi request.
 
 ## Đầu vào
 
@@ -62,13 +76,17 @@ JSON đọc chặt: khoá lạ hoặc sai kiểu khi sửa tay là `400`.
 
 ## Rà soát
 
-Kết quả rà soát lưu ở `review_units` `kind = visual_plan_review`, `unit_key = main`, cùng khuôn với bước 8 (`findings[{id, group, unit_key, field, text, detail, fix, state, why}]`, `rounds`, `notes`, quyết định cho máy kiểm). `unit_key` của một vấn đề là mã unit (`VP-002`), `field` là trường cấp ngoài của unit. Nhóm (`group`): `flow` Mạch hình giữa các unit, `goal` Mục tiêu truyền đạt, `accuracy` Độ chính xác khoa học, `concept` Trái quy tắc ngôn ngữ hình ảnh, `timing` Thời lượng giữ hình, `text` Chữ trên hình. Lượt gọi AI để tạo vấn đề thuộc CR-114b; xử lý vấn đề có ở đây.
+Kết quả rà soát lưu ở `review_units` `kind = visual_plan_review`, `unit_key = main`, cùng khuôn với bước 8 (`findings[{id, group, unit_key, field, text, detail, fix, state, why}]`, `rounds`, `notes`, quyết định cho máy kiểm). `unit_key` của một vấn đề là mã unit (`VP-002`), `field` là trường cấp ngoài của unit. Nhóm (`group`) dùng chung với bước 8: `accuracy` Độ chính xác khoa học (hình hiểu lầm, sai so với dossier, thiếu ghi chú rủi ro), `consistency` Nhất quán (trái ngôn ngữ hình ảnh đã chốt, mạch hình đứt hoặc lặp, chữ lệch thuật ngữ), `clarity` Rõ ràng (mục tiêu mơ hồ, mô tả mơ hồ, chữ quá nhiều, thời lượng giữ hình bất hợp lý), `feasibility` Khả thi (khó dựng bằng code).
 
 ## API công khai
 
 | Phương thức | Đường dẫn | Việc |
 |---|---|---|
 | GET | `/v1/projects/{id}/visual-plan` | Toàn màn: `input`, `beats[]` (mỗi beat: `stale`, `stale_sources[]`, `timing`, `units[]`), `units_total`, `units_approved`, `coverage`, `timing`, `checks[]`, `review`, `blockers[]`, `can_lock`, `versions[]`, `locked_version`, `next_version`, `draft[]` |
+| PUT | `…/model` | `{"model":"…"}` model của bước 9 cho video này; `""` là mặc định của bước. Model ngoài danh mục `400`. Toàn màn thêm `model`, `default_model`, `models[]` |
+| POST | `…/generate` | `{"note":"…"}` AI lập các beat còn trống, lần lượt. Có thể chạy lâu: api-gateway không đặt hạn thời gian |
+| POST | `…/beats/{k}/generate` | `{"note":"…"}` AI lập (hoặc lập lại) các unit của beat `k`. Beat lạ `404`; reply không dùng được `502`. Có `X-External-AI` |
+| POST | `…/review` | `{"note":"…"}` AI rà soát cả kế hoạch. Chưa có unit `409`. Có `X-External-AI` |
 | PUT | `…/units/{vp}` | Sửa tay `{"fields":{…}}`; chỉ các trường: `narration_summary, communication_goal, essential_visual_info, on_screen_text, visual_approach, narration_relationship, risk_notes, open_questions, duration`. Trường sửa thành của Creator, unit về `pending`. Sai trường hoặc sai kiểu: `400` |
 | PUT | `…/units/{vp}/questions/{qid}` | `{"answer":"…"}` trả lời câu hỏi mở; unit về `pending`. Câu hỏi lạ `404`, câu trả lời rỗng `400` |
 | POST | `…/units/{vp}/split` | `{"at_line":"b1.2"}` cắt trước câu đó; unit mới nhận mã mới, câu hỏi mở ở lại unit đầu. `400` khi câu không thuộc unit hoặc là câu đầu |
@@ -108,7 +126,7 @@ Kết quả rà soát lưu ở `review_units` `kind = visual_plan_review`, `unit
     "open_questions": [{ "id": "Q1", "question": "…", "answer": "…" }],
     "status": "approved"
   }],
-  "review": { "reviewer": "creator", "approved_at": "…", "comments": [{ "id": "f1", "group": "flow", "text": "…", "decision": "applied|accepted|fixed", "why": "…" }] }
+  "review": { "reviewer": "creator", "approved_at": "…", "comments": [{ "id": "f1", "group": "consistency", "text": "…", "decision": "applied|accepted|fixed", "why": "…" }] }
 }
 ```
 

@@ -18,6 +18,7 @@ type fakePlanStore struct {
 	seq      int
 	concepts []VersionRecord
 	versions []PlanVersionRecord
+	model    string
 }
 
 func newPlanStore(t *testing.T) *fakePlanStore {
@@ -44,6 +45,11 @@ func (s *fakePlanStore) ReserveUnitNumbers(_ context.Context, _ string, n int) (
 	first := s.seq
 	s.seq += n
 	return first, nil
+}
+func (s *fakePlanStore) PlanModel(context.Context, string) (string, error) { return s.model, nil }
+func (s *fakePlanStore) SetPlanModel(_ context.Context, _ string, m string) error {
+	s.model = m
+	return nil
 }
 func (s *fakePlanStore) LatestConceptVersion(context.Context, string) (VersionRecord, error) {
 	if len(s.concepts) == 0 {

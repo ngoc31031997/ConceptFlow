@@ -4,14 +4,14 @@ const express = require('express');
 const request = require('supertest');
 const { visualPlanRouter } = require('../../src/routes/visualPlan');
 
-function buildApp(plain) {
+function buildApp(plain, ai = ok()) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.requestId = 'test-id';
     next();
   });
-  app.use(visualPlanRouter(plain));
+  app.use(visualPlanRouter(plain, ai));
   return app;
 }
 
@@ -38,6 +38,26 @@ describe('visual plan routing', () => {
     const res = await request(buildApp(plain))[method](path).send({});
     expect(res.status).toBe(200);
     expect(plain.request).toHaveBeenCalledWith(expect.objectContaining({ method: method.toUpperCase(), path }));
+  });
+
+  test.each([
+    ['post', `${base}/generate`],
+    ['post', `${base}/beats/b2/generate`],
+    ['post', `${base}/review`],
+  ])('%s %s goes to visual-service through the client with no timeout', async (method, path) => {
+    const plain = ok();
+    const ai = ok();
+    const res = await request(buildApp(plain, ai))[method](path).set('X-External-AI', 'prompt').send({ note: 'n' });
+    expect(res.status).toBe(200);
+    expect(plain.request).not.toHaveBeenCalled();
+    expect(ai.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', path }));
+  });
+
+  test('the model of step 9 is a plain call', async () => {
+    const plain = ok();
+    const res = await request(buildApp(plain)).put(`${base}/model`).send({ model: 'ollama' });
+    expect(res.status).toBe(200);
+    expect(plain.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'PUT', path: `${base}/model` }));
   });
 
   test('the answer of visual-service is mirrored', async () => {

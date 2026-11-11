@@ -11,18 +11,37 @@ import (
 	"visual/internal/domain"
 )
 
+// PlanStep is the step name of the visual plan in llm-service (default model,
+// call log).
+const PlanStep = "visual_plan"
+
 // PlanDesk is step 9 "Kế hoạch hình": it reads the locked script and the locked
 // visual concept, keeps the visual-plan units of every beat and their review,
-// and locks versions.
+// has the AI write and review them, and locks versions.
 type PlanDesk struct {
 	authoring AuthoringInputPort
 	store     PlanStorePort
 	now       func() time.Time
+	running   *runningSet
+
+	// The AI side; unset until WithAI, and then the AI routes fail with
+	// ErrLLMNotConfigured.
+	llm       LLMPort
+	prompts   PromptLibraryPort
+	models    ModelCatalogPort
+	maxTokens int
 }
 
-// NewPlanDesk wires the desk.
+// NewPlanDesk wires the desk without an AI.
 func NewPlanDesk(authoring AuthoringInputPort, store PlanStorePort) *PlanDesk {
-	return &PlanDesk{authoring: authoring, store: store, now: time.Now}
+	return &PlanDesk{authoring: authoring, store: store, now: time.Now, running: &runningSet{m: map[string]map[string]bool{}}}
+}
+
+// WithAI gives the desk the model, the prompt library and the model catalog it
+// writes and reviews with.
+func (d *PlanDesk) WithAI(llm LLMPort, prompts PromptLibraryPort, models ModelCatalogPort, maxTokens int) *PlanDesk {
+	d.llm, d.prompts, d.models, d.maxTokens = llm, prompts, models, maxTokens
+	return d
 }
 
 // planData is everything one request works on.
@@ -180,6 +199,10 @@ type PlanState struct {
 	LockedVersion int                 `json:"locked_version"`
 	NextVersion   int                 `json:"next_version"`
 	Draft         []string            `json:"draft"`
+	// Model is the model the video's step 9 runs on; "" is the step default.
+	Model        string        `json:"model"`
+	DefaultModel string        `json:"default_model"`
+	Models       []ModelOption `json:"models"`
 }
 
 // State returns the screen.
@@ -248,7 +271,7 @@ func (d *PlanDesk) state(ctx context.Context, projectID string, data *planData) 
 	st.Review = PlanReviewView{Reviewed: data.review.Rounds > 0, Rounds: data.review.Rounds, Notes: data.review.Notes,
 		OpenCount: data.review.OpenCount(), Findings: []PlanFindingView{}}
 	for _, f := range data.review.Findings {
-		st.Review.Findings = append(st.Review.Findings, PlanFindingView{Finding: f, GroupLabel: domain.PlanFindingGroupLabels[f.Group]})
+		st.Review.Findings = append(st.Review.Findings, PlanFindingView{Finding: f, GroupLabel: domain.FindingGroupLabels[f.Group]})
 	}
 
 	versions, err := d.store.PlanVersions(ctx, projectID)
@@ -306,6 +329,19 @@ func (d *PlanDesk) state(ctx context.Context, projectID string, data *planData) 
 		st.Blockers = append(st.Blockers, "Không có thay đổi so với v"+fmt.Sprint(st.LockedVersion)+".")
 	}
 	st.CanLock = len(st.Blockers) == 0
+
+	st.Models = []ModelOption{}
+	if d.models != nil {
+		if st.Model, err = d.store.PlanModel(ctx, projectID); err != nil {
+			return nil, err
+		}
+		if st.DefaultModel, err = d.models.StepDefaultModel(ctx, PlanStep); err != nil {
+			return nil, err
+		}
+		if st.Models, err = d.models.Models(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return st, nil
 }
 

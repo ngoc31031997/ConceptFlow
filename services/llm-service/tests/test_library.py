@@ -259,3 +259,9 @@ async def test_settings_routes_serve_the_step_defaults_and_the_catalog(client):
     assert (await client.put("/internal/v1/step-models", json={"models": {"brief": "ollama"}})).status_code == 204
     ids = [m["id"] for m in (await client.get("/internal/v1/models")).json()["models"]]
     assert ids[0] == "ollama" and len(ids) == 3
+
+
+async def test_the_visual_plan_step_has_a_default_model(lib):
+    assert "visual_plan" in (await lib.step_models())["step_models"]
+    await lib.set_step_model("visual_plan", "zai-org/glm-5.3-flash")
+    assert (await lib.step_models())["step_models"]["visual_plan"] == "zai-org/glm-5.3-flash"

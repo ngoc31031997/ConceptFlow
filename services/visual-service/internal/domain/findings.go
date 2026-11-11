@@ -133,6 +133,20 @@ type ReviewReply struct {
 // exist, an empty finding, or a same_as naming no earlier finding makes the
 // whole reply unusable.
 func ParseReviewReply(raw []byte, prev ReviewState) (ReviewReply, error) {
+	return parseReviewReply(raw, prev, func(f ReviewReplyItem) string {
+		if _, ok := UnitSpecOf(f.UnitKey); !ok {
+			return "nói về phần lạ «" + f.UnitKey + "»"
+		}
+		if f.Field != "" && !contains(PartFields(f.UnitKey), f.Field) {
+			return "nói về trường lạ «" + f.Field + "»"
+		}
+		return ""
+	})
+}
+
+// parseReviewReply reads a review reply; place says what is wrong with where a
+// finding points (the part or unit and its field), or "" when it is fine.
+func parseReviewReply(raw []byte, prev ReviewState, place func(ReviewReplyItem) string) (ReviewReply, error) {
 	var r ReviewReply
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return ReviewReply{}, fmt.Errorf("%w: %v", ErrUnreadableReply, err)
@@ -145,11 +159,8 @@ func ParseReviewReply(raw []byte, prev ReviewState) (ReviewReply, error) {
 		if !contains(FindingGroups, f.Group) {
 			return ReviewReply{}, bad("có nhóm lạ «" + f.Group + "»")
 		}
-		if _, ok := UnitSpecOf(f.UnitKey); !ok {
-			return ReviewReply{}, bad("nói về phần lạ «" + f.UnitKey + "»")
-		}
-		if f.Field != "" && !contains(PartFields(f.UnitKey), f.Field) {
-			return ReviewReply{}, bad("nói về trường lạ «" + f.Field + "»")
+		if why := place(f); why != "" {
+			return ReviewReply{}, bad(why)
 		}
 		if strings.TrimSpace(f.Text) == "" {
 			return ReviewReply{}, bad("không có nội dung")

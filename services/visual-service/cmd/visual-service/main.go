@@ -53,7 +53,8 @@ func main() {
 		llmClient, llmClient, rendering.NewClient(cfg.RenderingURL, 10*time.Second), cfg.MaxOutputTokens,
 	)
 	router.WithConcept(conceptDesk)
-	router.WithPlan(application.NewPlanDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewPlanRepository(pool)))
+	router.WithPlan(application.NewPlanDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewPlanRepository(pool)).
+		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
 	go pushSystemPrompts(ctx, logger, llmClient)
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler(), ReadHeaderTimeout: 10 * time.Second}
@@ -74,7 +75,7 @@ func main() {
 	}
 }
 
-// pushSystemPrompts sends the shipped prompts of step 8 to llm-service,
+// pushSystemPrompts sends the shipped prompts of steps 8 and 9 to llm-service,
 // retrying with a growing pause until it accepts them or the process stops.
 func pushSystemPrompts(ctx context.Context, logger *slog.Logger, client *llm.Client) {
 	pause := 2 * time.Second

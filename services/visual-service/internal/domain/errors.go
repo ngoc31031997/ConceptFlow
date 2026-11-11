@@ -48,6 +48,8 @@ var (
 	ErrNotSplittable = errors.New("không tách được unit tại câu này")
 	// ErrNotMergeable: the two units are not neighbours of the same beat.
 	ErrNotMergeable = errors.New("chỉ gộp được hai unit liền nhau trong cùng một beat")
+	// ErrUnknownPlanBeat: the key names no beat of the locked script.
+	ErrUnknownPlanBeat = errors.New("kịch bản chốt không có beat này")
 	// ErrNoNarrationPace: the speaking pace of the video cannot be worked out.
 	ErrNoNarrationPace = errors.New("không tính được mức tối thiểu của lời thoại: creative brief chưa có thời lượng hoặc kịch bản chưa có chữ")
 )

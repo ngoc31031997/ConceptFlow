@@ -14,6 +14,10 @@ import (
 // planDesk backs the routes of step 9 "Kế hoạch hình".
 type planDesk interface {
 	State(ctx context.Context, projectID string) (*application.PlanState, error)
+	SetModel(ctx context.Context, projectID, model string) (*application.PlanState, error)
+	Generate(ctx context.Context, projectID, note string) (*application.PlanState, error)
+	GenerateBeat(ctx context.Context, projectID, beatKey, note string) (*application.PlanState, error)
+	Review(ctx context.Context, projectID, note string) (*application.PlanState, error)
 	Edit(ctx context.Context, projectID, unitID string, fields map[string]json.RawMessage) (*application.PlanState, error)
 	SetAnswer(ctx context.Context, projectID, unitID, questionID, answer string) (*application.PlanState, error)
 	Split(ctx context.Context, projectID, unitID, atLine string) (*application.PlanState, error)
@@ -38,6 +42,10 @@ func (rt *Router) mountPlan(r chi.Router) {
 	r.Get("/internal/v1/visual/{project_id}/plan", rt.handleLatestPlan)
 	r.Route("/v1/projects/{project_id}/visual-plan", func(r chi.Router) {
 		r.Get("/", rt.planState)
+		r.Put("/model", rt.planModel)
+		r.Post("/generate", rt.planGenerate)
+		r.With(externalAI).Post("/beats/{beat}/generate", rt.planGenerateBeat)
+		r.With(externalAI).Post("/review", rt.planReview)
 		r.Put("/units/{unit}", rt.planEdit)
 		r.Put("/units/{unit}/questions/{question}", rt.planAnswer)
 		r.Post("/units/{unit}/split", rt.planSplit)
@@ -58,6 +66,48 @@ func (rt *Router) mountPlan(r chi.Router) {
 
 func (rt *Router) planState(w http.ResponseWriter, r *http.Request) {
 	st, err := rt.plan.State(r.Context(), pid(r))
+	writeConcept(w, st, err)
+}
+
+func (rt *Router) planModel(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Model string `json:"model"`
+	}
+	if err := decodeBody(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	st, err := rt.plan.SetModel(r.Context(), pid(r), in.Model)
+	writeConcept(w, st, err)
+}
+
+func (rt *Router) planGenerate(w http.ResponseWriter, r *http.Request) {
+	var in noteBody
+	if err := decodeBody(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	st, err := rt.plan.Generate(r.Context(), pid(r), in.Note)
+	writeConcept(w, st, err)
+}
+
+func (rt *Router) planGenerateBeat(w http.ResponseWriter, r *http.Request) {
+	var in noteBody
+	if err := decodeBody(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	st, err := rt.plan.GenerateBeat(r.Context(), pid(r), chi.URLParam(r, "beat"), in.Note)
+	writeConcept(w, st, err)
+}
+
+func (rt *Router) planReview(w http.ResponseWriter, r *http.Request) {
+	var in noteBody
+	if err := decodeBody(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	st, err := rt.plan.Review(r.Context(), pid(r), in.Note)
 	writeConcept(w, st, err)
 }
 

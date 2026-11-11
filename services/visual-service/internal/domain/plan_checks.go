@@ -12,19 +12,6 @@ const (
 	CheckPlanAvoid = "m-plan-avoid"
 )
 
-// Groups of a plan review finding.
-var PlanFindingGroups = []string{"flow", "goal", "accuracy", "concept", "timing", "text"}
-
-// PlanFindingGroupLabels names each group for the Creator.
-var PlanFindingGroupLabels = map[string]string{
-	"flow":     "Mạch hình giữa các unit",
-	"goal":     "Mục tiêu truyền đạt",
-	"accuracy": "Độ chính xác khoa học",
-	"concept":  "Trái quy tắc ngôn ngữ hình ảnh",
-	"timing":   "Thời lượng giữ hình",
-	"text":     "Chữ trên hình",
-}
-
 // PlanContext is what one unit is checked against.
 type PlanContext struct {
 	// BeatKey is the beat the unit belongs to.

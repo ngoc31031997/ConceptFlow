@@ -41,6 +41,30 @@ func (r *PlanRepository) ReserveUnitNumbers(ctx context.Context, projectID strin
 	return first, nil
 }
 
+// PlanModel returns the video's model of step 9; "" when none is saved.
+func (r *PlanRepository) PlanModel(ctx context.Context, projectID string) (string, error) {
+	var m string
+	err := r.pool.QueryRow(ctx, `SELECT plan_model FROM project_visual WHERE project_id = $1`, projectID).Scan(&m)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read plan model: %w", err)
+	}
+	return m, nil
+}
+
+// SetPlanModel saves the video's model of step 9.
+func (r *PlanRepository) SetPlanModel(ctx context.Context, projectID, model string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_visual (project_id, plan_model) VALUES ($1, $2)
+		ON CONFLICT (project_id) DO UPDATE SET plan_model = EXCLUDED.plan_model, updated_at = now()`, projectID, model)
+	if err != nil {
+		return fmt.Errorf("save plan model: %w", err)
+	}
+	return nil
+}
+
 // LatestConceptVersion returns the newest locked visual concept with its document.
 func (r *PlanRepository) LatestConceptVersion(ctx context.Context, projectID string) (application.VersionRecord, error) {
 	v := application.VersionRecord{ProjectID: projectID}

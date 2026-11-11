@@ -100,8 +100,27 @@ func TestPlanRepository(t *testing.T) {
 		t.Fatalf("a beat's units round trip: %+v %v", units, err)
 	}
 
+	if m, err := repo.PlanModel(ctx, p); err != nil || m != "" {
+		t.Fatalf("a video with no model of its own: %q %v", m, err)
+	}
+	if err := repo.SetPlanModel(ctx, p, "ollama"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetConceptModel(ctx, p, "deepseek-chat"); err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := repo.PlanModel(ctx, p); m != "ollama" {
+		t.Errorf("the plan model is its own, got %q", m)
+	}
+	if m, _ := repo.ConceptModel(ctx, p); m != "deepseek-chat" {
+		t.Errorf("saving the plan model must not touch the concept model, got %q", m)
+	}
+
 	if err := data.DeleteProjectData(ctx, p); err != nil {
 		t.Fatal(err)
+	}
+	if m, _ := repo.PlanModel(ctx, p); m != "" {
+		t.Errorf("deleting the video must remove its plan model: %q", m)
 	}
 	if v, _ := repo.PlanVersions(ctx, p); len(v) != 0 {
 		t.Errorf("deleting the video must remove its plan versions: %v", v)

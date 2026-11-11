@@ -67,9 +67,14 @@ func storyText(story map[string]domain.StoryField) string {
 func beatsText(in domain.ConceptInput) string {
 	var lines []string
 	for _, b := range in.Beats {
-		lines = append(lines, fmt.Sprintf("%s · B%d · %s · %s · %d giây\n  Mục tiêu: %s", b.Key, b.Number, b.Fn, b.Title, b.Dur, b.Goal))
+		lines = append(lines, beatLine(b))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// beatLine is a beat's card: key, number, function, title, length and goal.
+func beatLine(b domain.Beat) string {
+	return fmt.Sprintf("%s · B%d · %s · %s · %d giây\n  Mục tiêu: %s", b.Key, b.Number, b.Fn, b.Title, b.Dur, b.Goal)
 }
 
 func scriptText(in domain.ConceptInput) string {
@@ -88,21 +93,28 @@ func scriptText(in domain.ConceptInput) string {
 }
 
 func handoffText(in domain.ConceptInput) string {
-	var sb strings.Builder
+	var parts []string
 	for _, b := range in.Beats {
-		h := in.Handoff[b.Key]
-		fmt.Fprintf(&sb, "%s · B%d · %s\n", b.Key, b.Number, b.Title)
-		for _, s := range []struct {
-			label string
-			list  []string
-		}{{"Bắt buộc truyền đạt", h.Must}, {"Thuật ngữ", h.Terms}, {"Phải giữ chính xác", h.Exact}, {"Được phép sáng tạo", h.Free}, {"Điểm chưa chắc", h.Unsure}} {
-			if len(s.list) == 0 {
-				continue
-			}
-			fmt.Fprintf(&sb, "  %s:\n", s.label)
-			for _, l := range s.list {
-				fmt.Fprintf(&sb, "  - %s\n", l)
-			}
+		parts = append(parts, handoffOfBeat(in, b))
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+// handoffOfBeat is the handoff note of one beat.
+func handoffOfBeat(in domain.ConceptInput, b domain.Beat) string {
+	var sb strings.Builder
+	h := in.Handoff[b.Key]
+	fmt.Fprintf(&sb, "%s · B%d · %s\n", b.Key, b.Number, b.Title)
+	for _, s := range []struct {
+		label string
+		list  []string
+	}{{"Bắt buộc truyền đạt", h.Must}, {"Thuật ngữ", h.Terms}, {"Phải giữ chính xác", h.Exact}, {"Được phép sáng tạo", h.Free}, {"Điểm chưa chắc", h.Unsure}} {
+		if len(s.list) == 0 {
+			continue
+		}
+		fmt.Fprintf(&sb, "  %s:\n", s.label)
+		for _, l := range s.list {
+			fmt.Fprintf(&sb, "  - %s\n", l)
 		}
 	}
 	return strings.TrimSpace(sb.String())

@@ -77,7 +77,7 @@ func TestLibrary(t *testing.T) {
 	if _, err := c.ActiveTemplate(ctx, "nope"); !errors.Is(err, application.ErrPromptNotFound) {
 		t.Errorf("%v", err)
 	}
-	if err := c.PushSystemPrompts(ctx, domain.PromptOwner, domain.SystemPrompts()); err != nil || pushed["owner"] != "visual" || len(pushed["prompts"].([]any)) != 10 {
+	if err := c.PushSystemPrompts(ctx, domain.PromptOwner, domain.SystemPrompts()); err != nil || pushed["owner"] != "visual" || len(pushed["prompts"].([]any)) != 12 {
 		t.Errorf("push %v %v", pushed["owner"], err)
 	}
 	if m, err := c.StepDefaultModel(ctx, "visual_concept"); err != nil || m != "ollama" {

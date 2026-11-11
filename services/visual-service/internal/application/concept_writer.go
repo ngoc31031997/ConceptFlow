@@ -23,17 +23,29 @@ func (d *ConceptDesk) modelFor(ctx context.Context, projectID string) (string, e
 
 // ask runs one turn of role on template vars and returns the JSON object of the reply.
 func (d *ConceptDesk) ask(ctx context.Context, projectID, role string, vars map[string]string) (json.RawMessage, error) {
-	template, err := d.prompts.ActiveTemplate(ctx, role)
-	if err != nil {
-		return nil, err
-	}
 	model, err := d.modelFor(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	res, err := d.llm.Chat(ctx, ChatRequest{
-		System: renderTemplate(template, vars), User: userTurnNudge, Model: model, MaxTokens: d.maxTokens,
-		ProjectID: projectID, Role: role, Step: ConceptStep, ExpectJSON: true,
+	return askJSON(ctx, d.llm, d.prompts, askCall{ProjectID: projectID, Role: role, Step: ConceptStep, Model: model, MaxTokens: d.maxTokens}, vars)
+}
+
+// askCall is what one JSON turn of a step needs besides its prompt variables.
+type askCall struct {
+	ProjectID, Role, Step, Model string
+	MaxTokens                    int
+}
+
+// askJSON fills the template of call.Role with vars, runs one turn on the
+// model and returns the JSON object of the reply.
+func askJSON(ctx context.Context, llm LLMPort, prompts PromptLibraryPort, call askCall, vars map[string]string) (json.RawMessage, error) {
+	template, err := prompts.ActiveTemplate(ctx, call.Role)
+	if err != nil {
+		return nil, err
+	}
+	res, err := llm.Chat(ctx, ChatRequest{
+		System: renderTemplate(template, vars), User: userTurnNudge, Model: call.Model, MaxTokens: call.MaxTokens,
+		ProjectID: call.ProjectID, Role: call.Role, Step: call.Step, ExpectJSON: true,
 	})
 	if err != nil {
 		return nil, err

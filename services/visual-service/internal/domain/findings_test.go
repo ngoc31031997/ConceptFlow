@@ -85,7 +85,7 @@ func TestCheckDecisionHoldsWhileTheDetailIsTheSame(t *testing.T) {
 
 func TestSystemPromptsCoverEveryPart(t *testing.T) {
 	ps := SystemPrompts()
-	if len(ps) != 10 || ps[8].Role != PromptRoleReview || ps[9].Role != PromptRoleReferenceYouTube || ps[9].Name != ReferenceYouTubeName {
+	if len(ps) != 12 || ps[8].Role != PromptRoleReview || ps[9].Role != PromptRoleReferenceYouTube || ps[9].Name != ReferenceYouTubeName {
 		t.Fatalf("%d prompts", len(ps))
 	}
 	for _, p := range ps {

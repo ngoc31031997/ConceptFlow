@@ -30,6 +30,39 @@ func (f *fakePlan) ret(call string) (*application.PlanState, error) {
 func (f *fakePlan) State(context.Context, string) (*application.PlanState, error) {
 	return f.ret("state")
 }
+func (f *fakePlan) SetModel(_ context.Context, _ string, m string) (*application.PlanState, error) {
+	return f.ret("model:" + m)
+}
+func (f *fakePlan) Generate(_ context.Context, _ string, note string) (*application.PlanState, error) {
+	return f.ret("generate:" + note)
+}
+func (f *fakePlan) GenerateBeat(ctx context.Context, _ string, beat, note string) (*application.PlanState, error) {
+	return f.askModel(ctx, "beat:"+beat+":"+note)
+}
+func (f *fakePlan) Review(ctx context.Context, _ string, note string) (*application.PlanState, error) {
+	return f.askModel(ctx, "review:"+note)
+}
+
+// askModel stands for a flow that asks one model turn: under an external-AI
+// request the provider builds the prompt and stops, or hands back the reply.
+func (f *fakePlan) askModel(ctx context.Context, call string) (*application.PlanState, error) {
+	if application.UsingExternalAI(ctx) {
+		res, err := application.NewExternalAIProvider(nil, pasted{}).Chat(ctx, application.ChatRequest{System: "PROMPT"})
+		if err != nil {
+			return nil, err
+		}
+		call += ":reply=" + res.Content
+	}
+	return f.ret(call)
+}
+
+// pasted hands back the reply the Creator pasted.
+type pasted struct{}
+
+func (pasted) ChatExternal(_ context.Context, _ application.ChatRequest, reply string) (application.ChatResult, error) {
+	return application.ChatResult{Content: reply}, nil
+}
+
 func (f *fakePlan) Edit(_ context.Context, _ string, id string, fields map[string]json.RawMessage) (*application.PlanState, error) {
 	return f.ret(fmt.Sprintf("edit:%s:%d", id, len(fields)))
 }
@@ -90,6 +123,10 @@ func TestPlanRoutesReachTheDesk(t *testing.T) {
 		{"POST", base + "/findings/f1/apply", "", "apply:f1"},
 		{"POST", base + "/findings/f1/accept", `{"why":"ổn"}`, "accept:f1:ổn"},
 		{"POST", base + "/lock", `{"note":"v1"}`, "lock:v1"},
+		{"PUT", base + "/model", `{"model":"ollama"}`, "model:ollama"},
+		{"POST", base + "/generate", `{"note":"ngắn"}`, "generate:ngắn"},
+		{"POST", base + "/beats/b2/generate", `{"note":"rõ hơn"}`, "beat:b2:rõ hơn"},
+		{"POST", base + "/review", `{"note":"kỹ"}`, "review:kỹ"},
 	} {
 		f := &fakePlan{}
 		rec := planRequest(f, c.method, c.path, c.body)
@@ -132,6 +169,10 @@ func TestPlanErrorsMapToStatusAndCode(t *testing.T) {
 		{domain.ErrLockNotReady, 409, ""},
 		{domain.ErrUnknownPlanUnit, 404, ""},
 		{domain.ErrUnknownQuestion, 404, ""},
+		{domain.ErrUnknownPlanBeat, 404, ""},
+		{domain.ErrNoNarrationPace, 409, ""},
+		{domain.ErrUnreadableReply, 502, ""},
+		{application.ErrLLMNotConfigured, 502, ""},
 		{domain.ErrNotSplittable, 400, ""},
 		{domain.ErrNotMergeable, 400, ""},
 		{domain.ErrInvalidEdit, 400, ""},
@@ -158,5 +199,35 @@ func TestPlanRoutesAreAbsentWithoutADesk(t *testing.T) {
 	NewRouter(&fakeDelete{}).Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/projects/p1/visual-plan/", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("no plan desk wired: want 404, got %d", rec.Code)
+	}
+}
+
+func TestPlanAIRoutesRunThroughAnAIOutsideTheSystem(t *testing.T) {
+	const base = "/v1/projects/p1/visual-plan"
+	for _, route := range []struct{ path, call string }{{base + "/beats/b2/generate", "beat:b2:"}, {base + "/review", "review:"}} {
+		prompt := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", route.path, strings.NewReader(`{}`))
+		req.Header.Set(externalAIHeader, "prompt")
+		f := &fakePlan{}
+		NewRouter(&fakeDelete{}).WithPlan(f).Handler().ServeHTTP(prompt, req)
+		if prompt.Code != 200 || !strings.Contains(prompt.Body.String(), `"external_prompt":"PROMPT"`) || f.last != "" {
+			t.Errorf("%s in prompt mode: %d %s (desk finished %q)", route.path, prompt.Code, prompt.Body.String(), f.last)
+		}
+		paste := httptest.NewRecorder()
+		req = httptest.NewRequest("POST", route.path, strings.NewReader(`{"external_reply":"{\"units\":[]}"}`))
+		req.Header.Set(externalAIHeader, "paste")
+		NewRouter(&fakeDelete{}).WithPlan(f).Handler().ServeHTTP(paste, req)
+		if paste.Code != 200 || !strings.Contains(f.last, route.call) || !strings.Contains(f.last, `:reply={"units":[]}`) {
+			t.Errorf("%s in paste mode: %d %s (desk saw %q)", route.path, paste.Code, paste.Body.String(), f.last)
+		}
+	}
+	// The whole-plan writer runs many turns, so it has no external-AI mode.
+	req := httptest.NewRequest("POST", base+"/generate", strings.NewReader(`{}`))
+	req.Header.Set(externalAIHeader, "prompt")
+	f := &fakePlan{}
+	rec := httptest.NewRecorder()
+	NewRouter(&fakeDelete{}).WithPlan(f).Handler().ServeHTTP(rec, req)
+	if f.last != "generate:" || strings.Contains(rec.Body.String(), "external_prompt") {
+		t.Errorf("generate must ignore the external-AI header: %d %s", rec.Code, rec.Body.String())
 	}
 }
