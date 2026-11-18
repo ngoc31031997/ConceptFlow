@@ -35,8 +35,13 @@ Nhánh `feature/cr-115-visual-sequencing` (worktree riêng). Khuôn: bước 9 (
 **Q7. Giao diện.** Làm mockup artifact để Creator chốt trước khi code, như bước 9? Đề xuất: có.
 => ok
 
-## Trả lời câu hỏi bổ sung (2026-11-18)
-Q8–Q11: Creator duyệt theo đề xuất (khuôn trường như Q8; Q9 A; Q10 A; seed nháp ở `cr-115-library-seed-draft.md` chờ duyệt).
+## Quyết định cuối về nhịp và chuyển cảnh (2026-11-18, thay Q3, Q4, Q8–Q11)
+- **Bỏ hẳn thư viện nhịp và chuyển cảnh** (`pacing_patterns`, `transition_types` không làm; seed nháp đã xoá). Lý do: bắt AI chọn mã cố định làm mất tính sáng tạo.
+- AI tự viết nhịp và chuyển cảnh bằng chữ tự do; Creator sửa được ở hộp thoại "Sửa chuỗi". Không kiểm tính dựng được bằng code ở bước này; nếu lúc render không dựng được thì xử lý ở bước đó.
+- Giữ một trường `tempo` ∈ `slow, medium, fast, calm` cho mỗi unit (để tô dải dòng chảy và so với `pace` của bước 8); `via_motif` tuỳ chọn, nếu có thì máy kiểm motif đó có ở cả unit trước lẫn unit này.
+- Mockup: https://claude.ai/artifact/JoL1XHbGXYhsBDih6ubhUE. v1 Creator duyệt; v2 chỉ bỏ thư viện (nhịp, chuyển cảnh thành chữ tự do), chờ Creator xác nhận.
+
+Các câu Q8–Q11 dưới đây giữ lại làm lịch sử, không còn hiệu lực.
 
 ## Câu hỏi bổ sung (theo trả lời Q3, Q4: master data nhịp và chuyển cảnh)
 
