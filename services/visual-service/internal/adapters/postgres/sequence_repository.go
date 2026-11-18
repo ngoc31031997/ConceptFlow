@@ -92,3 +92,27 @@ func (r *SequenceRepository) InsertSequenceVersion(ctx context.Context, v applic
 	}
 	return nil
 }
+
+// SequenceModel returns the video's model of step 10; "" when none is saved.
+func (r *SequenceRepository) SequenceModel(ctx context.Context, projectID string) (string, error) {
+	var m string
+	err := r.pool.QueryRow(ctx, `SELECT sequence_model FROM project_visual WHERE project_id = $1`, projectID).Scan(&m)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read sequence model: %w", err)
+	}
+	return m, nil
+}
+
+// SetSequenceModel saves the video's model of step 10.
+func (r *SequenceRepository) SetSequenceModel(ctx context.Context, projectID, model string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_visual (project_id, sequence_model) VALUES ($1, $2)
+		ON CONFLICT (project_id) DO UPDATE SET sequence_model = EXCLUDED.sequence_model, updated_at = now()`, projectID, model)
+	if err != nil {
+		return fmt.Errorf("save sequence model: %w", err)
+	}
+	return nil
+}

@@ -59,6 +59,8 @@ var (
 	ErrPlanOutdated = errors.New("Kế hoạch hình dựa trên bản cũ của kịch bản hoặc ngôn ngữ hình ảnh, chốt lại bước 9")
 	// ErrUnknownMotif: no motif of the video has the id.
 	ErrUnknownMotif = errors.New("không có motif này")
+	// ErrMotifsNotApproved: the AI writes a beat's sequence only over approved motifs.
+	ErrMotifsNotApproved = errors.New("Duyệt danh sách motif trước khi viết chuỗi")
 	// ErrNoMotif: there is no motif to approve.
 	ErrNoMotif = errors.New("chưa có motif nào")
 )

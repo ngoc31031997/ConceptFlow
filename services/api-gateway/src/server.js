@@ -93,7 +93,7 @@ function main() {
   app.use(authRouter(publisherClient));
   app.use(visualConceptRouter(visualClient, visualAiClient));
   app.use(visualPlanRouter(visualClient, visualAiClient));
-  app.use(visualSequenceRouter(visualClient));
+  app.use(visualSequenceRouter(visualClient, visualAiClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());
 

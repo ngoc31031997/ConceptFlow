@@ -17,6 +17,15 @@ type fakeSequenceStore struct {
 	concepts []VersionRecord
 	plans    []PlanVersionRecord
 	versions []SequenceVersionRecord
+	model    string
+}
+
+func (s *fakeSequenceStore) SequenceModel(context.Context, string) (string, error) {
+	return s.model, nil
+}
+func (s *fakeSequenceStore) SetSequenceModel(_ context.Context, _ string, m string) error {
+	s.model = m
+	return nil
 }
 
 func (s *fakeSequenceStore) ListUnits(_ context.Context, p, kind string) ([]domain.ReviewUnit, error) {

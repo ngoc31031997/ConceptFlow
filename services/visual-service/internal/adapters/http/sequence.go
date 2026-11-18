@@ -29,6 +29,11 @@ type sequenceDesk interface {
 	Lock(ctx context.Context, projectID, note string) (*application.SequenceState, error)
 	Version(ctx context.Context, projectID string, version int) (application.SequenceVersionRecord, error)
 	LatestDocument(ctx context.Context, projectID string) (json.RawMessage, error)
+	SetModel(ctx context.Context, projectID, model string) (*application.SequenceState, error)
+	GenerateMotifs(ctx context.Context, projectID, note string) (*application.SequenceState, error)
+	Generate(ctx context.Context, projectID, note string) (*application.SequenceState, error)
+	GenerateBeat(ctx context.Context, projectID, beatKey, note string) (*application.SequenceState, error)
+	Review(ctx context.Context, projectID, note string) (*application.SequenceState, error)
 }
 
 // WithSequence adds the routes of step 10 to the router.
@@ -46,6 +51,11 @@ func (rt *Router) mountSequence(r chi.Router) {
 	r.Get("/internal/v1/visual/{project_id}/sequence", rt.handleLatestSequence)
 	r.Route("/v1/projects/{project_id}/visual-sequence", func(r chi.Router) {
 		r.Get("/", rt.seqProject(rt.sequence.State))
+		r.Put("/model", rt.seqModel)
+		r.With(externalAI).Post("/motifs/generate", rt.seqNote(rt.sequence.GenerateMotifs))
+		r.Post("/generate", rt.seqNote(rt.sequence.Generate))
+		r.With(externalAI).Post("/beats/{beat}/generate", rt.seqGenerateBeat)
+		r.With(externalAI).Post("/review", rt.seqNote(rt.sequence.Review))
 		r.Put("/units/{unit}", rt.seqFields("unit", rt.sequence.Edit))
 		r.Post("/units/{unit}/approve", rt.seqParam("unit", rt.sequence.Approve))
 		r.Post("/units/{unit}/unapprove", rt.seqParam("unit", rt.sequence.Unapprove))
@@ -144,4 +154,41 @@ func (rt *Router) handleLatestSequence(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(doc)
+}
+
+// seqModel saves the model the video's step 10 runs on.
+func (rt *Router) seqModel(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Model string `json:"model"`
+	}
+	if err := decodeBody(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	st, err := rt.sequence.SetModel(r.Context(), pid(r), in.Model)
+	writeConcept(w, st, err)
+}
+
+// seqNote serves an AI call that takes the project and the Creator's note.
+func (rt *Router) seqNote(fn func(ctx context.Context, projectID, note string) (*application.SequenceState, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in noteBody
+		if err := decodeBody(r, &in); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		st, err := fn(r.Context(), pid(r), in.Note)
+		writeConcept(w, st, err)
+	}
+}
+
+// seqGenerateBeat has the AI write one beat's sequence.
+func (rt *Router) seqGenerateBeat(w http.ResponseWriter, r *http.Request) {
+	var in noteBody
+	if err := decodeBody(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	st, err := rt.sequence.GenerateBeat(r.Context(), pid(r), chi.URLParam(r, "beat"), in.Note)
+	writeConcept(w, st, err)
 }

@@ -55,7 +55,8 @@ func main() {
 	router.WithConcept(conceptDesk)
 	router.WithPlan(application.NewPlanDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewPlanRepository(pool)).
 		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
-	router.WithSequence(application.NewSequenceDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewSequenceRepository(pool)))
+	router.WithSequence(application.NewSequenceDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewSequenceRepository(pool)).
+		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
 	go pushSystemPrompts(ctx, logger, llmClient)
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler(), ReadHeaderTimeout: 10 * time.Second}

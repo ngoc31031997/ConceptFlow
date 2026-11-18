@@ -108,6 +108,8 @@ func writeConceptError(w http.ResponseWriter, err error) {
 		status, code = http.StatusConflict, "plan_not_locked"
 	case errors.Is(err, domain.ErrPlanOutdated):
 		status, code = http.StatusConflict, "plan_outdated"
+	case errors.Is(err, domain.ErrMotifsNotApproved):
+		status, code = http.StatusConflict, "motifs_not_approved"
 	case errors.Is(err, domain.ErrUnknownUnit), errors.Is(err, domain.ErrUnknownFinding), errors.Is(err, domain.ErrNoVersion),
 		errors.Is(err, domain.ErrUnknownPlanUnit), errors.Is(err, domain.ErrUnknownQuestion), errors.Is(err, domain.ErrUnknownPlanBeat), errors.Is(err, domain.ErrUnknownMotif):
 		status = http.StatusNotFound

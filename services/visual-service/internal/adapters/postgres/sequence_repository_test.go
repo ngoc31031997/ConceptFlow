@@ -54,10 +54,29 @@ func TestSequenceRepository(t *testing.T) {
 		t.Errorf("a version not locked: want ErrNoVersion, got %v", err)
 	}
 
+	if m, err := repo.SequenceModel(ctx, p); err != nil || m != "" {
+		t.Fatalf("a video with no model of its own: %q %v", m, err)
+	}
+	if err := repo.SetPlanModel(ctx, p, "ollama"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetSequenceModel(ctx, p, "deepseek-chat"); err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := repo.SequenceModel(ctx, p); m != "deepseek-chat" {
+		t.Errorf("the sequence model is its own, got %q", m)
+	}
+	if m, _ := repo.PlanModel(ctx, p); m != "ollama" {
+		t.Errorf("saving the sequence model must not touch the plan model, got %q", m)
+	}
+
 	if err := data.DeleteProjectData(ctx, p); err != nil {
 		t.Fatal(err)
 	}
 	if v, _ := repo.SequenceVersions(ctx, p); len(v) != 0 {
 		t.Errorf("deleting the video removes its sequence versions, left %v", v)
+	}
+	if m, _ := repo.SequenceModel(ctx, p); m != "" {
+		t.Errorf("deleting the video removes its sequence model: %q", m)
 	}
 }

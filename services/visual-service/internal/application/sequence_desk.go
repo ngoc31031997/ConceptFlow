@@ -19,11 +19,26 @@ type SequenceDesk struct {
 	authoring AuthoringInputPort
 	store     SequenceStorePort
 	now       func() time.Time
+	running   *runningSet
+
+	// The AI side; unset until WithAI, and then the AI routes fail with
+	// ErrLLMNotConfigured.
+	llm       LLMPort
+	prompts   PromptLibraryPort
+	models    ModelCatalogPort
+	maxTokens int
 }
 
-// NewSequenceDesk wires the desk.
+// NewSequenceDesk wires the desk without an AI.
 func NewSequenceDesk(authoring AuthoringInputPort, store SequenceStorePort) *SequenceDesk {
-	return &SequenceDesk{authoring: authoring, store: store, now: time.Now}
+	return &SequenceDesk{authoring: authoring, store: store, now: time.Now, running: &runningSet{m: map[string]map[string]bool{}}}
+}
+
+// WithAI gives the desk the model, the prompt library and the model catalog it
+// writes and reviews with.
+func (d *SequenceDesk) WithAI(llm LLMPort, prompts PromptLibraryPort, models ModelCatalogPort, maxTokens int) *SequenceDesk {
+	d.llm, d.prompts, d.models, d.maxTokens = llm, prompts, models, maxTokens
+	return d
 }
 
 // sequenceData is everything one request works on.
@@ -208,6 +223,10 @@ type SequenceState struct {
 	LockedVersion int                     `json:"locked_version"`
 	NextVersion   int                     `json:"next_version"`
 	Draft         []string                `json:"draft"`
+	// Model is the model the video's step 10 runs on; "" is the step default.
+	Model        string        `json:"model"`
+	DefaultModel string        `json:"default_model"`
+	Models       []ModelOption `json:"models"`
 }
 
 // State returns the screen.
@@ -317,6 +336,20 @@ func (d *SequenceDesk) state(ctx context.Context, projectID string, data *sequen
 		st.Blockers = append(st.Blockers, fmt.Sprintf("Không có thay đổi so với v%d.", st.LockedVersion))
 	}
 	st.CanLock = len(st.Blockers) == 0
+
+	st.Models = []ModelOption{}
+	if d.models != nil {
+		var err error
+		if st.Model, err = d.store.SequenceModel(ctx, projectID); err != nil {
+			return nil, err
+		}
+		if st.DefaultModel, err = d.models.StepDefaultModel(ctx, SequenceStep); err != nil {
+			return nil, err
+		}
+		if st.Models, err = d.models.Models(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return st, nil
 }
 

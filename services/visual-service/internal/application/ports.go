@@ -179,4 +179,8 @@ type SequenceStorePort interface {
 	SequenceVersion(ctx context.Context, projectID string, version int) (SequenceVersionRecord, error)
 	// InsertSequenceVersion adds a version; a taken number is domain.ErrVersionExists.
 	InsertSequenceVersion(ctx context.Context, v SequenceVersionRecord) error
+	// SequenceModel returns the video's model of step 10; "" when none is saved.
+	SequenceModel(ctx context.Context, projectID string) (string, error)
+	// SetSequenceModel saves the video's model of step 10.
+	SetSequenceModel(ctx context.Context, projectID, model string) error
 }

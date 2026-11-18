@@ -265,3 +265,9 @@ async def test_the_visual_plan_step_has_a_default_model(lib):
     assert "visual_plan" in (await lib.step_models())["step_models"]
     await lib.set_step_model("visual_plan", "zai-org/glm-5.3-flash")
     assert (await lib.step_models())["step_models"]["visual_plan"] == "zai-org/glm-5.3-flash"
+
+
+async def test_the_visual_sequence_step_has_a_default_model(lib):
+    assert "visual_sequence" in (await lib.step_models())["step_models"]
+    await lib.set_step_model("visual_sequence", "zai-org/glm-5.3-flash")
+    assert (await lib.step_models())["step_models"]["visual_sequence"] == "zai-org/glm-5.3-flash"

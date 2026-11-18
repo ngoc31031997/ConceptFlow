@@ -4,20 +4,21 @@ const express = require('express');
 const request = require('supertest');
 const { visualSequenceRouter } = require('../../src/routes/visualSequence');
 
-function buildApp(plain) {
+const ok = () => ({
+  request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { ok: true } }),
+});
+
+function buildApp(plain, ai = ok()) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.requestId = 'test-id';
     next();
   });
-  app.use(visualSequenceRouter(plain));
+  app.use(visualSequenceRouter(plain, ai));
   return app;
 }
 
-const ok = () => ({
-  request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { ok: true } }),
-});
 
 describe('visual sequence routing', () => {
   const base = '/v1/projects/test-seq-gw/visual-sequence';
@@ -38,6 +39,7 @@ describe('visual sequence routing', () => {
     ['post', `${base}/findings/m-seq-via/accept`],
     ['post', `${base}/lock`],
     ['get', `${base}/versions/1`],
+    ['put', `${base}/model`],
   ])('%s %s goes to visual-service', async (method, path) => {
     const plain = ok();
     const res = await request(buildApp(plain))[method](path).send({});
@@ -45,6 +47,20 @@ describe('visual sequence routing', () => {
     expect(plain.request).toHaveBeenCalledWith(
       expect.objectContaining({ method: method.toUpperCase(), path }),
     );
+  });
+
+  test.each([
+    ['post', `${base}/motifs/generate`],
+    ['post', `${base}/generate`],
+    ['post', `${base}/beats/b2/generate`],
+    ['post', `${base}/review`],
+  ])('%s %s goes to visual-service through the client with no timeout', async (method, path) => {
+    const plain = ok();
+    const ai = ok();
+    const res = await request(buildApp(plain, ai))[method](path).set('X-External-AI', 'prompt').send({ note: 'n' });
+    expect(res.status).toBe(200);
+    expect(plain.request).not.toHaveBeenCalled();
+    expect(ai.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', path }));
   });
 
   test('the answer of visual-service is mirrored', async () => {

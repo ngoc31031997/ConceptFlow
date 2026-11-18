@@ -28,6 +28,21 @@ func (f *fakeSequence) ret(call string) (*application.SequenceState, error) {
 func (f *fakeSequence) State(context.Context, string) (*application.SequenceState, error) {
 	return f.ret("state")
 }
+func (f *fakeSequence) SetModel(_ context.Context, _ string, m string) (*application.SequenceState, error) {
+	return f.ret("model " + m)
+}
+func (f *fakeSequence) GenerateMotifs(_ context.Context, _ string, note string) (*application.SequenceState, error) {
+	return f.ret("motifs " + note)
+}
+func (f *fakeSequence) Generate(_ context.Context, _ string, note string) (*application.SequenceState, error) {
+	return f.ret("generate " + note)
+}
+func (f *fakeSequence) GenerateBeat(_ context.Context, _ string, k, note string) (*application.SequenceState, error) {
+	return f.ret("beat " + k + " " + note)
+}
+func (f *fakeSequence) Review(_ context.Context, _ string, note string) (*application.SequenceState, error) {
+	return f.ret("review " + note)
+}
 func (f *fakeSequence) Edit(_ context.Context, _ string, id string, fields map[string]json.RawMessage) (*application.SequenceState, error) {
 	return f.ret(fmt.Sprintf("edit:%s:%d", id, len(fields)))
 }
@@ -87,6 +102,11 @@ func TestSequenceRoutesReachTheDesk(t *testing.T) {
 	const base = "/v1/projects/p1/visual-sequence"
 	for _, c := range []struct{ method, path, body, want string }{
 		{"GET", base + "/", "", "state"},
+		{"PUT", base + "/model", `{"model":"deepseek-chat"}`, "model deepseek-chat"},
+		{"POST", base + "/motifs/generate", `{"note":"n"}`, "motifs n"},
+		{"POST", base + "/generate", `{"note":"n"}`, "generate n"},
+		{"POST", base + "/beats/b2/generate", `{"note":"n"}`, "beat b2 n"},
+		{"POST", base + "/review", `{"note":"n"}`, "review n"},
 		{"PUT", base + "/units/VP-001", `{"fields":{"purpose_in_flow":"x","pacing":{}}}`, "edit:VP-001:2"},
 		{"POST", base + "/units/VP-001/approve", "", "approve:VP-001"},
 		{"POST", base + "/units/VP-001/unapprove", "", "unapprove:VP-001"},
@@ -122,6 +142,8 @@ func TestSequenceRoutesMapErrors(t *testing.T) {
 		{domain.ErrPlanOutdated, 409, "plan_outdated"},
 		{domain.ErrConceptNotLocked, 409, "concept_not_locked"},
 		{domain.ErrBeatStale, 409, "beat_stale"},
+		{domain.ErrMotifsNotApproved, 409, "motifs_not_approved"},
+		{domain.ErrUnreadableReply, 502, ""},
 		{domain.ErrNoMotif, 409, ""},
 		{domain.ErrUnknownMotif, 404, ""},
 		{domain.ErrUnknownPlanUnit, 404, ""},
@@ -142,5 +164,18 @@ func TestSequenceRoutesMapErrors(t *testing.T) {
 	}
 	if rec := sequenceRequest(&fakeSequence{err: domain.ErrNoVersion}, "GET", "/internal/v1/visual/p1/sequence", ""); rec.Code != 404 {
 		t.Errorf("no locked sequence: want 404, got %d", rec.Code)
+	}
+}
+
+func TestSequenceAIRoutesTakeTheExternalAIHeader(t *testing.T) {
+	const base = "/v1/projects/p1/visual-sequence"
+	for _, path := range []string{"/motifs/generate", "/beats/b1/generate", "/review"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", base+path, strings.NewReader(`{}`))
+		req.Header.Set("X-External-AI", "nope")
+		NewRouter(&fakeDelete{}).WithSequence(&fakeSequence{}).Handler().ServeHTTP(rec, req)
+		if rec.Code != 400 {
+			t.Errorf("%s with a bad X-External-AI: want 400, got %d", path, rec.Code)
+		}
 	}
 }

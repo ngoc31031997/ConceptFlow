@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS visual_plan_seq (
     project_id TEXT PRIMARY KEY,
     next       INTEGER NOT NULL
 );
--- Per-video settings of the visual steps. concept_model and plan_model '' = the
+-- Per-video settings of the visual steps. concept_model, plan_model and sequence_model '' = the
 -- default model of the step, kept with the prompt library in llm-service.
 CREATE TABLE IF NOT EXISTS project_visual (
     project_id    TEXT PRIMARY KEY,
@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS reference_styles (
 -- avoid, prompt_template, negative_prompt).
 ALTER TABLE reference_styles ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE project_visual ADD COLUMN IF NOT EXISTS plan_model TEXT NOT NULL DEFAULT '';
+ALTER TABLE project_visual ADD COLUMN IF NOT EXISTS sequence_model TEXT NOT NULL DEFAULT '';
 -- Every stored description carries a composition key; a row without one is in
 -- an earlier layout that the library no longer reads, and is removed together
 -- with the videos' picks of it.
