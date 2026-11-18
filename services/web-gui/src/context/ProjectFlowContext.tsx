@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useMatch } from "react-router-dom";
-import { getBeats, getProject, getResearch, getScript, getScriptLock, getStory, getVisualConcept, getVisualPlan } from "../api/client";
+import { getBeats, getProject, getResearch, getScript, getScriptLock, getStory, getVisualConcept, getVisualPlan, getVisualSequence } from "../api/client";
 import { ProjectDraftContext } from "./ProjectDraftContext";
 import type { Project } from "../types";
 import { FLOW_STORY, isAuthoringEditable } from "../utils/flow";
@@ -43,6 +43,8 @@ export interface ProjectFlow {
   conceptLocked: boolean;
   /** A version of the visual plan is locked. Only read once the concept is locked; false before that. */
   planLocked: boolean;
+  /** A version of the visual sequence is locked. */
+  sequenceLocked: boolean;
   /**
    * The server has answered for this project at least once, so a null
    * `project` means "not on the server yet" rather than "still asking".
@@ -52,7 +54,7 @@ export interface ProjectFlow {
 }
 
 const noFlow: ProjectFlow = {
-  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, conceptLocked: false, planLocked: false, loaded: true,
+  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, conceptLocked: false, planLocked: false, sequenceLocked: false, loaded: true,
   refetch: () => {},
 };
 
@@ -70,6 +72,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
   const [scriptLocked, setScriptLocked] = useState(false);
   const [conceptLocked, setConceptLocked] = useState(false);
   const [planLocked, setPlanLocked] = useState(false);
+  const [sequenceLocked, setSequenceLocked] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
@@ -87,6 +90,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
         const lockedDone = scriptDone ? await getScriptLock(projectId).then((l) => l.lockedVersion > 0, () => false) : false;
         const conceptDone = lockedDone ? await getVisualConcept(projectId).then((v) => v.locked_version > 0, () => false) : false;
         const planDone = conceptDone ? await getVisualPlan(projectId).then((v) => v.locked_version > 0, () => false) : false;
+        const sequenceDone = planDone ? await getVisualSequence(projectId).then((v) => v.locked_version > 0, () => false) : false;
         setProject(p);
         setResearchResolved(resolved);
         setStoryApproved(storyDone);
@@ -95,6 +99,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
         setScriptLocked(lockedDone);
         setConceptLocked(conceptDone);
         setPlanLocked(planDone);
+        setSequenceLocked(sequenceDone);
       })
       .catch(() => setProject(null)) // no such project on the server yet
       .finally(() => setLoaded(true));
@@ -109,6 +114,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
     setScriptLocked(false);
     setConceptLocked(false);
     setPlanLocked(false);
+    setSequenceLocked(false);
     setLoaded(!projectId);
     load();
     if (!projectId) return;
@@ -130,6 +136,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
     scriptLocked,
     conceptLocked,
     planLocked,
+    sequenceLocked,
     loaded,
     refetch: load,
   };

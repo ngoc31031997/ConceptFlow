@@ -1,0 +1,220 @@
+/* Step 10 "Chuỗi hình": the flow strip, the motif cards and the transition box. */
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  row-gap: var(--space-xs);
+  padding: 4px 2px var(--space-xs);
+}
+
+.seg {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
+  padding: 6px 8px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seg:focus-visible {
+  outline: 3px solid var(--run);
+  outline-offset: 2px;
+}
+
+.segEmpty {
+  border-style: dashed;
+}
+
+.segId {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.slow {
+  background: var(--info-soft);
+}
+
+.medium {
+  background: var(--accent-soft);
+}
+
+.fast {
+  background: var(--danger-soft);
+}
+
+.calm {
+  background: var(--ok-soft);
+}
+
+.dots {
+  display: flex;
+  gap: 3px;
+  min-height: 10px;
+}
+
+.tr {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  max-width: 96px;
+  padding: 0 4px;
+  font: 700 10px var(--font-mono);
+  color: var(--ink-soft);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  font-size: 12px;
+}
+
+.legend span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: var(--border-w) solid var(--border-color);
+}
+
+.motifs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.motif {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.motifWarn {
+  box-shadow: 4px 4px 0 var(--warning);
+}
+
+.motifHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-weight: 700;
+}
+
+.motifActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+}
+
+.dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: 50%;
+}
+
+.c0 {
+  background: var(--ink);
+}
+.c1 {
+  background: var(--accent2);
+}
+.c2 {
+  background: var(--accent);
+}
+.c3 {
+  background: var(--run);
+}
+.c4 {
+  background: var(--info);
+}
+.c5 {
+  background: var(--ok);
+}
+.c6 {
+  background: var(--impact);
+}
+.c7 {
+  background: var(--danger);
+}
+
+.motifTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.anchor {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.trbox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.cols3 {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+}
+
+.cols3 > div + div {
+  border-left: var(--border-w) solid var(--border-color);
+}
+
+@media (max-width: 860px) {
+  .cols3 {
+    grid-template-columns: 1fr;
+  }
+
+  .cols3 > div + div {
+    border-left: none;
+    border-top: var(--border-w) solid var(--border-color);
+  }
+}
+
+.sticky {
+  position: sticky;
+  top: var(--space-xs);
+  z-index: 5;
+  box-shadow: var(--shadow-sm);
+}

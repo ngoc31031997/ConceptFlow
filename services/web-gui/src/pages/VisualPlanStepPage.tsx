@@ -14,7 +14,7 @@ import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useVisualPlan } from "../hooks/useVisualPlan";
-import { VIEW_VISUAL_PLAN, comingRoute, lockRoute, readOnlyReason, visualConceptRoute } from "../utils/flow";
+import { VIEW_VISUAL_PLAN, lockRoute, readOnlyReason, visualConceptRoute, visualSequenceRoute } from "../utils/flow";
 
 const SUBTITLE = "Chia kịch bản thành các đơn vị hình, mỗi đơn vị một mục tiêu truyền đạt, cách hiển thị và thời lượng.";
 
@@ -29,7 +29,7 @@ function stripOf(s: VisualPlanState, running: boolean): StepStripProps {
     return { tone: "run", label: "AI đang làm", message: "Unit đã duyệt và trường bạn sửa tay giữ nguyên." };
   }
   if (s.locked_version > 0 && s.draft.length === 0) {
-    return { tone: "ok", label: `Đã chốt v${s.locked_version}`, message: "Tiếp theo: diễn tiến hình ảnh." };
+    return { tone: "ok", label: `Đã chốt v${s.locked_version}`, message: "Tiếp theo: chuỗi hình." };
   }
   if (s.locked_version > 0) {
     return {
@@ -191,13 +191,13 @@ export function VisualPlanStepPage() {
         allowWhenLocked
         hint={
           state && state.locked_version > 0
-            ? `Đã chốt v${state.locked_version}. Sang Diễn tiến hình ảnh.`
-            : "Chốt kế hoạch hình để sang Diễn tiến hình ảnh."
+            ? `Đã chốt v${state.locked_version}. Sang Chuỗi hình.`
+            : "Chốt kế hoạch hình để sang Chuỗi hình."
         }
         onBack={() => navigate(visualConceptRoute(projectId))}
-        onNext={() => navigate(comingRoute(VIEW_VISUAL_PLAN + 1, projectId))}
+        onNext={() => navigate(visualSequenceRoute(projectId))}
         nextDisabled={!state || state.locked_version === 0}
-        nextLabel="Sang Diễn tiến hình ảnh"
+        nextLabel="Sang Chuỗi hình"
         nextTestId="plan-next"
       />
     </div>

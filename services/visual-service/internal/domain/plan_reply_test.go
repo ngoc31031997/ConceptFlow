@@ -126,10 +126,10 @@ func TestParsePlanReviewReply_AcceptsOnlyUnitsAndFieldsOfThePlan(t *testing.T) {
 
 func TestPlanSystemPromptsShipWithTheConceptOnes(t *testing.T) {
 	ps := SystemPrompts()
-	if len(ps) != 12 || ps[10].Role != "visual_plan_beat" || ps[11].Role != "visual_plan_review" {
+	if len(ps) != 15 || ps[10].Role != "visual_plan_beat" || ps[11].Role != "visual_plan_review" {
 		t.Fatalf("%d prompts", len(ps))
 	}
-	for _, p := range ps[10:] {
+	for _, p := range ps[10:12] {
 		if p.Name != SystemPromptName || !strings.Contains(p.TemplateText, "```json") || strings.Contains(p.TemplateText, "{{url}}") {
 			t.Errorf("%s is not shipped as written", p.Role)
 		}
@@ -142,6 +142,22 @@ func TestPlanSystemPromptsShipWithTheConceptOnes(t *testing.T) {
 	for _, r := range NarrationRelationships {
 		if !strings.Contains(ps[10].TemplateText, r) {
 			t.Errorf("the beat prompt does not name the relationship %s", r)
+		}
+	}
+}
+
+func TestSequenceSystemPromptsShipAfterThePlanOnes(t *testing.T) {
+	ps := SystemPrompts()
+	want := []string{PromptRoleSequenceMotifs, PromptRoleSequenceUnit, PromptRoleSequenceReview}
+	for i, role := range want {
+		p := ps[12+i]
+		if p.Role != role || p.Name != SystemPromptName || !strings.Contains(p.TemplateText, "```json") {
+			t.Errorf("%d: %s is not shipped as written", 12+i, p.Role)
+		}
+	}
+	for _, tempo := range Tempos {
+		if !strings.Contains(ps[13].TemplateText, tempo) {
+			t.Errorf("the beat prompt does not name the tempo %s", tempo)
 		}
 	}
 }

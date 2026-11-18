@@ -52,4 +52,15 @@ var (
 	ErrUnknownPlanBeat = errors.New("kịch bản chốt không có beat này")
 	// ErrNoNarrationPace: the speaking pace of the video cannot be worked out.
 	ErrNoNarrationPace = errors.New("không tính được mức tối thiểu của lời thoại: creative brief chưa có thời lượng hoặc kịch bản chưa có chữ")
+	// ErrPlanNotLocked: step 10 reads the locked visual plan, and there is none yet.
+	ErrPlanNotLocked = errors.New("Chốt Kế hoạch hình ở bước 9 trước")
+	// ErrPlanOutdated: the locked visual plan was written from an older script or
+	// visual concept than the latest locked ones, so the sequence cannot lock.
+	ErrPlanOutdated = errors.New("Kế hoạch hình dựa trên bản cũ của kịch bản hoặc ngôn ngữ hình ảnh, chốt lại bước 9")
+	// ErrUnknownMotif: no motif of the video has the id.
+	ErrUnknownMotif = errors.New("không có motif này")
+	// ErrMotifsNotApproved: the AI writes a beat's sequence only over approved motifs.
+	ErrMotifsNotApproved = errors.New("Duyệt danh sách motif trước khi viết chuỗi")
+	// ErrNoMotif: there is no motif to approve.
+	ErrNoMotif = errors.New("chưa có motif nào")
 )

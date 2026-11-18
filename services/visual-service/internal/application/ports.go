@@ -149,3 +149,38 @@ type PlanStorePort interface {
 	// InsertPlanVersion adds a version; a taken number is domain.ErrVersionExists.
 	InsertPlanVersion(ctx context.Context, v PlanVersionRecord) error
 }
+
+// SequenceVersionRecord is one locked version of a video's visual sequence.
+type SequenceVersionRecord struct {
+	ProjectID      string          `json:"-"`
+	Version        int             `json:"version"`
+	PlanVersion    int             `json:"plan_version"`
+	ConceptVersion int             `json:"concept_version"`
+	ScriptVersion  int             `json:"script_version"`
+	Document       json.RawMessage `json:"document,omitempty"`
+	Note           string          `json:"note"`
+	LockedAt       time.Time       `json:"locked_at"`
+}
+
+// SequenceStorePort keeps step 10's data in visual-db and reads the locked
+// visual concept of step 8 and the locked visual plan of step 9.
+type SequenceStorePort interface {
+	ListUnits(ctx context.Context, projectID, kind string) ([]domain.ReviewUnit, error)
+	SaveUnit(ctx context.Context, u domain.ReviewUnit) error
+	// LatestConceptVersion returns the latest locked visual concept with its
+	// document, or domain.ErrNoVersion.
+	LatestConceptVersion(ctx context.Context, projectID string) (VersionRecord, error)
+	// LatestPlanVersion returns the latest locked visual plan with its document,
+	// or domain.ErrNoVersion.
+	LatestPlanVersion(ctx context.Context, projectID string) (PlanVersionRecord, error)
+	// SequenceVersions lists the locked sequence versions without documents, oldest first.
+	SequenceVersions(ctx context.Context, projectID string) ([]SequenceVersionRecord, error)
+	// SequenceVersion returns one locked sequence version, or domain.ErrNoVersion.
+	SequenceVersion(ctx context.Context, projectID string, version int) (SequenceVersionRecord, error)
+	// InsertSequenceVersion adds a version; a taken number is domain.ErrVersionExists.
+	InsertSequenceVersion(ctx context.Context, v SequenceVersionRecord) error
+	// SequenceModel returns the video's model of step 10; "" when none is saved.
+	SequenceModel(ctx context.Context, projectID string) (string, error)
+	// SetSequenceModel saves the video's model of step 10.
+	SetSequenceModel(ctx context.Context, projectID, model string) error
+}

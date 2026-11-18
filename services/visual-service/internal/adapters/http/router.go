@@ -22,6 +22,7 @@ type Router struct {
 	deleteProject    deleteProjectUseCase
 	concept          conceptDesk
 	plan             planDesk
+	sequence         sequenceDesk
 	referenceLibrary referenceLibraryUseCase
 }
 
@@ -40,6 +41,9 @@ func (rt *Router) Handler() http.Handler {
 	}
 	if rt.plan != nil {
 		rt.mountPlan(r)
+	}
+	if rt.sequence != nil {
+		rt.mountSequence(r)
 	}
 	rt.mountReferenceLibrary(r)
 	return r

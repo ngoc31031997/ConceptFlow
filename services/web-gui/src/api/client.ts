@@ -3995,3 +3995,241 @@ export function lockVisualPlan(projectId: string, note: string): Promise<VisualP
 export function getVisualPlanVersion(projectId: string, version: number): Promise<VisualPlanVersion> {
   return apiFetch<VisualPlanVersion>(`${visualPlanPath(projectId)}/versions/${version}`);
 }
+
+// --- Step 10 · Chuỗi hình (visual-service, docs/contracts/visual-sequence-v1.md) ---
+
+/** How fast a unit moves; the only fixed list of step 10. */
+export type SequenceTempo = "slow" | "medium" | "fast" | "calm";
+
+export interface SequencePacing {
+  name: string;
+  tempo: SequenceTempo | "";
+  description: string;
+}
+
+export interface SequenceTransition {
+  type: string;
+  description: string;
+  /** The motif both units share that carries the passage; "" for none. */
+  via_motif: string;
+}
+
+/** What step 10 adds to one unit of the locked visual plan. */
+export interface SequenceItem {
+  unit_id: string;
+  purpose_in_flow: string;
+  pacing: SequencePacing;
+  /** null only on the unit that opens the video. */
+  transition_from_previous: SequenceTransition | null;
+  motif_refs: string[];
+  status: "pending" | "approved";
+}
+
+/** One unit of the locked plan with its sequence item. */
+export interface SequenceUnit {
+  unit_id: string;
+  order: number;
+  script_refs: string[];
+  planned_s: number;
+  communication_goal: string;
+  visual_approach: { method: PlanMethod; description: string; concept_rule_refs: string[] };
+  narration_relationship: PlanRelationship;
+  /** The unit right before this one in the video; "" on the first. */
+  previous_unit: string;
+  item: SequenceItem | null;
+  problems: string[];
+  creator_fields: string[];
+}
+
+export interface SequenceBeat {
+  key: string;
+  number: number;
+  fn: string;
+  title: string;
+  /** The motion speed step 8 locked for the beat; "" when none. */
+  pace: string;
+  written: boolean;
+  approved: boolean;
+  stale: boolean;
+  stale_sources: string[];
+  units: SequenceUnit[];
+}
+
+export interface SequenceMotif {
+  motif_id: string;
+  name: string;
+  description: string;
+  anchor_ref: string;
+  role: string;
+  planned_units: string[];
+  /** What step 8 locked on how to draw the anchor; "" when the anchor does not exist. */
+  anchor_text: string;
+  /** The units whose items carry the motif, gathered by the machine. */
+  unit_refs: string[];
+  problems: string[];
+  creator_fields: string[];
+}
+
+export interface SequenceVersion {
+  version: number;
+  plan_version: number;
+  concept_version: number;
+  script_version: number;
+  note: string;
+  locked_at: string;
+  document?: Record<string, unknown>;
+}
+
+/** The whole screen of step 10. */
+export interface VisualSequenceState {
+  input: { plan_version: number; concept_version: number; script_version: number; units_count: number; outdated: string[] };
+  motifs: {
+    status: "pending" | "approved";
+    stale: boolean;
+    stale_sources: string[];
+    motifs: SequenceMotif[];
+    /** The representation rules a motif can anchor to, with their text. */
+    anchors: Record<string, string>;
+  };
+  beats: SequenceBeat[];
+  items_approved: number;
+  coverage: { units_total: number; units_sequenced: number; missing: string[]; extra: string[] };
+  checks: VisualPlanCheck[];
+  review: {
+    reviewed: boolean;
+    rounds: number;
+    /** `unit_key` is a unit (`VP-002`) or a motif (`MOTIF-01`). */
+    findings: VisualPlanFinding[];
+    notes: string[];
+    open_count: number;
+  };
+  blockers: string[];
+  can_lock: boolean;
+  versions: SequenceVersion[];
+  locked_version: number;
+  next_version: number;
+  draft: string[];
+  /** The units whose item waits for review, in plan order. */
+  pending_units: string[];
+  model: string;
+  default_model: string;
+  models: { id: string; label: string; local: boolean }[];
+}
+
+const visualSequencePath = (projectId: string) => `/v1/projects/${projectId}/visual-sequence`;
+
+/**
+ * The screen of step 10; rejects with code `plan_not_locked`, `concept_not_locked`
+ * or `script_not_locked` while an earlier step is not locked.
+ */
+export function getVisualSequence(projectId: string): Promise<VisualSequenceState> {
+  return apiFetch<VisualSequenceState>(visualSequencePath(projectId));
+}
+
+function sendVisualSequence(
+  projectId: string,
+  method: string,
+  sub: string,
+  body?: object,
+  call?: AiCall,
+): Promise<VisualSequenceState> {
+  const init = operationInit(call);
+  return apiFetch<VisualSequenceState>(`${visualSequencePath(projectId)}${sub}`, {
+    method,
+    headers: { ...JSON_HEADERS, ...init.headers },
+    signal: init.signal,
+    body: operationBody(body ?? {}, call),
+  });
+}
+
+/** Sets the model of step 10 for this video; "" is the step default. */
+export function setVisualSequenceModel(projectId: string, model: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "PUT", "/model", { model });
+}
+
+/** Has the AI set the video's motifs; the motifs go back to review. */
+export function generateSequenceMotifs(projectId: string, note: string, call?: AiCall): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/motifs/generate", { note }, call);
+}
+
+/** Has the AI write every unit with no item yet, one turn per unit in plan order. */
+export function generateVisualSequence(projectId: string, note: string, call?: OperationCall): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/generate", { note }, call);
+}
+
+/** Has the AI write or rewrite one unit's item in one turn; needs approved motifs (`motifs_not_approved`). */
+export function generateSequenceUnit(projectId: string, unitId: string, note: string, call?: AiCall): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", `/units/${unitId}/generate`, { note }, call);
+}
+
+/** Has the AI rewrite every unit of one beat, one turn per unit, on the system's AI. */
+export function generateSequenceBeat(projectId: string, beatKey: string, note: string, call?: OperationCall): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", `/beats/${beatKey}/generate`, { note }, call);
+}
+
+/** Has the AI review the whole sequence. */
+export function reviewVisualSequence(projectId: string, note: string, call?: AiCall): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/review", { note }, call);
+}
+
+/** Writes the Creator's fields into a unit's item; they become the Creator's. */
+export function editSequenceItem(projectId: string, unitId: string, fields: Record<string, unknown>): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "PUT", `/units/${unitId}`, { fields });
+}
+
+export function approveSequenceItem(projectId: string, unitId: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", `/units/${unitId}/approve`);
+}
+
+export function unapproveSequenceItem(projectId: string, unitId: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", `/units/${unitId}/unapprove`);
+}
+
+/** Approves every item that passes its checks in a beat that is not stale. */
+export function approveAllVisualSequence(projectId: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/approve-all");
+}
+
+/** Confirms a stale beat still fits; its items go back to review. */
+export function confirmSequenceBeat(projectId: string, beatKey: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", `/beats/${beatKey}/confirm`);
+}
+
+/** Adds a motif the Creator wrote. */
+export function addSequenceMotif(projectId: string, fields: Record<string, unknown>): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/motifs", { fields });
+}
+
+export function editSequenceMotif(projectId: string, motifId: string, fields: Record<string, unknown>): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "PUT", `/motifs/${motifId}`, { fields });
+}
+
+/** Deletes a motif and takes it out of every item; its number is not used again. */
+export function deleteSequenceMotif(projectId: string, motifId: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "DELETE", `/motifs/${motifId}`);
+}
+
+export function approveSequenceMotifs(projectId: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/motifs/approve");
+}
+
+export function unapproveSequenceMotifs(projectId: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/motifs/unapprove");
+}
+
+export function applyVisualSequenceFinding(projectId: string, findingId: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", `/findings/${findingId}/apply`);
+}
+
+export function acceptVisualSequenceFinding(projectId: string, findingId: string, why: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", `/findings/${findingId}/accept`, { why });
+}
+
+export function lockVisualSequence(projectId: string, note: string): Promise<VisualSequenceState> {
+  return sendVisualSequence(projectId, "POST", "/lock", { note });
+}
+
+/** One locked version with its document. */
+export function getVisualSequenceVersion(projectId: string, version: number): Promise<SequenceVersion> {
+  return apiFetch<SequenceVersion>(`${visualSequencePath(projectId)}/versions/${version}`);
+}

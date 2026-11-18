@@ -31,11 +31,11 @@ CATALOG: tuple[ModelOption, ...] = (
 
 #: Steps that call an AI and can carry a default model: the seven of a video's
 #: own model choices in authoring-service, the publish step, the drawings of the
-#: illustration library, which belong to no video, and visual-service's visual
-#: concept step.
+#: illustration library, which belong to no video, and visual-service's steps
+#: (visual concept, visual plan, visual sequence).
 STEPS: tuple[str, ...] = (
     "brief", "research", "story_frame", "beat_sheet", "story", "storyboard", "code", "publish", "illustrations",
-    "visual_concept", "visual_plan",
+    "visual_concept", "visual_plan", "visual_sequence",
 )
 
 

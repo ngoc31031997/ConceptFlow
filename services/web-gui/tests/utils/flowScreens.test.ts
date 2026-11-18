@@ -8,6 +8,7 @@ import {
   VIEW_STORY,
   VIEW_VISUAL_CONCEPT,
   VIEW_VISUAL_PLAN,
+  VIEW_VISUAL_SEQUENCE,
   beatsRoute,
   comingRoute,
   isBuilt,
@@ -20,6 +21,7 @@ import {
   storyRoute,
   visualConceptRoute,
   visualPlanRoute,
+  visualSequenceRoute,
 } from "../../src/utils/flow";
 
 describe("steps with a screen of their own", () => {
@@ -44,7 +46,7 @@ describe("steps with a screen of their own", () => {
 
   it("leaves the steps nobody has built as not built", () => {
     const notBuilt = FLOW_VIEW.filter((v) => !isBuilt(v)).map((v) => v.n);
-    expect(notBuilt).toEqual([10, 11, 12, 13, 14, 15, 16, 20]);
+    expect(notBuilt).toEqual([11, 12, 13, 14, 15, 16, 20]);
   });
 
   it("addresses the research screen under its video and a not-developed step under a video or alone", () => {
@@ -53,7 +55,7 @@ describe("steps with a screen of their own", () => {
     expect(comingRoute(7, "")).toBe("/create/coming/7");
   });
 
-  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, conceptLocked: false, planLocked: false };
+  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, conceptLocked: false, planLocked: false, sequenceLocked: false };
   const researched = { ...none, researchResolved: true };
   const storied = { ...researched, storyApproved: true };
   const beaten = { ...storied, beatsApproved: true };
@@ -120,7 +122,7 @@ describe("steps with a screen of their own", () => {
 
 describe("the visual concept step", () => {
   const concept = FLOW_VIEW[VIEW_VISUAL_CONCEPT - 1];
-  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: false, conceptLocked: false, planLocked: false };
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: false, conceptLocked: false, planLocked: false, sequenceLocked: false };
 
   it("is step 8 with a screen of its own", () => {
     expect(concept.label).toBe("Ngôn ngữ hình ảnh");
@@ -139,7 +141,7 @@ describe("the visual concept step", () => {
 
 describe("the visual plan step", () => {
   const plan = FLOW_VIEW[VIEW_VISUAL_PLAN - 1];
-  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: false, planLocked: false };
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: false, planLocked: false, sequenceLocked: false };
 
   it("is step 9 with a screen of its own", () => {
     expect(plan.label).toBe("Kế hoạch hình");
@@ -153,5 +155,24 @@ describe("the visual plan step", () => {
     expect(screenStatus(plan, 3, none)).toBe("pending");
     expect(screenStatus(plan, 3, { ...none, conceptLocked: true })).toBe("waiting");
     expect(screenStatus(plan, 3, { ...none, conceptLocked: true, planLocked: true })).toBe("done");
+  });
+});
+
+describe("the visual sequence step", () => {
+  const seq = FLOW_VIEW[VIEW_VISUAL_SEQUENCE - 1];
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: true, planLocked: false, sequenceLocked: false };
+
+  it("is step 10 with a screen of its own", () => {
+    expect(seq.label).toBe("Chuỗi hình");
+    expect(seq.phase).toBe(1);
+    expect(isBuilt(seq)).toBe(true);
+    expect(screenRoute(seq, "p1")).toBe("/projects/p1/visual-sequence");
+    expect(visualSequenceRoute("p1")).toBe("/projects/p1/visual-sequence");
+  });
+
+  it("opens once the visual plan is locked and passes once a sequence is locked", () => {
+    expect(screenStatus(seq, 3, none)).toBe("pending");
+    expect(screenStatus(seq, 3, { ...none, planLocked: true })).toBe("waiting");
+    expect(screenStatus(seq, 3, { ...none, planLocked: true, sequenceLocked: true })).toBe("done");
   });
 });

@@ -38,15 +38,16 @@ const PromptRoleReferenceYouTube = "reference_style_youtube"
 const ReferenceYouTubeName = "Đọc link YouTube thành mô tả tham chiếu"
 
 // SystemPrompts lists the shipped prompts: the writers of step 8 in part order,
-// its reviewer, the reference-library prompt, then the two of step 9.
+// its reviewer, the reference-library prompt, then those of steps 9 and 10.
 func SystemPrompts() []SystemPrompt {
-	out := make([]SystemPrompt, 0, len(ConceptUnits)+4)
+	out := make([]SystemPrompt, 0, len(ConceptUnits)+7)
 	for _, u := range ConceptUnits {
 		out = append(out, SystemPrompt{Role: PromptRoleOf(u.Key), Name: SystemPromptName, TemplateText: conceptPrompts[u.Key]})
 	}
 	out = append(out, SystemPrompt{Role: PromptRoleReview, Name: SystemPromptName, TemplateText: conceptReviewVI})
 	out = append(out, SystemPrompt{Role: PromptRoleReferenceYouTube, Name: ReferenceYouTubeName, TemplateText: referenceYouTubeVI})
-	return append(out, planPrompts()...)
+	out = append(out, planPrompts()...)
+	return append(out, sequencePrompts()...)
 }
 
 const conceptRole = `Bạn là ĐẠO DIỄN HÌNH ẢNH của một kênh video phổ biến kiến thức. Ở bước này bạn đặt NGÔN NGỮ HÌNH ẢNH chung cho cả video: video trông như thế nào và người xem tiếp nhận thông tin qua hình ra sao. Bạn không chọn shot, không làm storyboard, không vẽ tài nguyên. Bộ quy tắc gồm tám phần; lượt này bạn chỉ viết MỘT phần.`
