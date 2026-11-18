@@ -57,7 +57,7 @@ func seqItemJSON(unit string, first bool, tempo, via string, motifs ...string) s
 		unit, tempo, tr, strings.Join(q, ","))
 }
 
-func itemsReply(items ...string) string { return `{"items":[` + strings.Join(items, ",") + `]}` }
+func itemReply(item string) string { return `{"item":` + item + `}` }
 
 // approvedMotifs has the AI set two motifs and the Creator approve them.
 func (f *seqAIFixture) approvedMotifs() {
@@ -117,54 +117,59 @@ func TestSequenceAI_AMotifReplyThatDoesNotFitStoresNothing(t *testing.T) {
 	}
 }
 
-func TestSequenceAI_BeatNeedsApprovedMotifsAndWritesEveryUnitInOrder(t *testing.T) {
+func TestSequenceAI_UnitNeedsApprovedMotifsAndReadsItsNeighbours(t *testing.T) {
 	f := newSeqAIFixture(t)
-	if _, err := f.desk.GenerateBeat(f.ctx, project, "b1", ""); !errors.Is(err, domain.ErrMotifsNotApproved) {
+	if _, err := f.desk.GenerateUnit(f.ctx, project, "VP-001", ""); !errors.Is(err, domain.ErrMotifsNotApproved) {
 		t.Fatalf("no approved motif: want ErrMotifsNotApproved, got %v", err)
 	}
 	f.approvedMotifs()
-	f.queue(domain.PromptRoleSequenceBeat, itemsReply(seqItemJSON("VP-001", true, "slow", "", "MOTIF-01"), seqItemJSON("VP-002", false, "fast", "MOTIF-01", "MOTIF-01", "MOTIF-02")))
-	st := f.must(f.desk.GenerateBeat(f.ctx, project, "b1", "nhanh dần"))
-	call := f.llm.calls[len(f.llm.calls)-1]
-	if call.Role != domain.PromptRoleSequenceBeat || strings.Contains(call.System, "{{") || !strings.Contains(call.System, "unit đầu video") ||
-		!strings.Contains(call.System, "MOTIF-02") || !strings.Contains(call.System, "nhanh dần") {
-		t.Fatalf("the beat prompt is filled:\n%s", call.System)
+	if _, err := f.desk.GenerateUnit(f.ctx, project, "VP-099", ""); !errors.Is(err, domain.ErrUnknownPlanUnit) {
+		t.Fatalf("a unit the plan lacks: %v", err)
 	}
-	it := item(st, "VP-002")
-	if it.Item == nil || it.Item.Pacing.Tempo != "fast" || it.Item.TransitionFromPrevious.ViaMotif != "MOTIF-01" || it.Item.Status != domain.UnitPending || len(it.Problems) != 0 {
-		t.Fatalf("VP-002 is written and waits for review: %+v", it)
+	f.queue(domain.PromptRoleSequenceUnit, itemReply(seqItemJSON("VP-001", true, "slow", "", "MOTIF-01")))
+	st := f.must(f.desk.GenerateUnit(f.ctx, project, "VP-001", "chậm"))
+	call := f.llm.calls[len(f.llm.calls)-1]
+	if call.Role != domain.PromptRoleSequenceUnit || strings.Contains(call.System, "{{") || !strings.Contains(call.System, "unit đầu video") ||
+		!strings.Contains(call.System, "MOTIF-02") || !strings.Contains(call.System, "chậm") {
+		t.Fatalf("the unit prompt is filled:\n%s", call.System)
+	}
+	if it := item(st, "VP-001"); it.Item == nil || it.Item.Pacing.Tempo != "slow" || item(st, "VP-002").Item != nil {
+		t.Fatalf("only VP-001 is written: %+v", it)
+	}
+
+	f.queue(domain.PromptRoleSequenceUnit, itemReply(seqItemJSON("VP-002", false, "fast", "MOTIF-01", "MOTIF-01", "MOTIF-02")))
+	f.must(f.desk.GenerateUnit(f.ctx, project, "VP-002", ""))
+	if s := f.llm.calls[len(f.llm.calls)-1].System; !strings.Contains(s, `"tempo":"slow"`) || !strings.Contains(s, "(unit đang viết)") {
+		t.Errorf("the next unit reads the item before it and the beat's items:\n%s", s)
 	}
 
 	f.must(f.desk.Edit(f.ctx, project, "VP-001", fields(t, map[string]any{"purpose_in_flow": "của Creator"})))
-	f.queue(domain.PromptRoleSequenceBeat, itemsReply(seqItemJSON("VP-003", false, "calm", "MOTIF-02", "MOTIF-02")))
-	f.must(f.desk.GenerateBeat(f.ctx, project, "b2", ""))
-	if s := f.llm.calls[len(f.llm.calls)-1].System; !strings.Contains(s, `"tempo":"fast"`) {
-		t.Errorf("the next beat reads the last unit of the beat before and its item:\n%s", s)
+	f.queue(domain.PromptRoleSequenceUnit, itemReply(seqItemJSON("VP-001", true, "medium", "")))
+	st = f.must(f.desk.GenerateUnit(f.ctx, project, "VP-001", ""))
+	if it := item(st, "VP-001"); it.Item.PurposeInFlow != "của Creator" || it.Item.Pacing.Tempo != "medium" || item(st, "VP-002").Item.Pacing.Tempo != "fast" {
+		t.Errorf("a rewrite keeps the Creator's field, takes the AI's others and leaves the other unit: %+v", it.Item)
 	}
-
-	f.queue(domain.PromptRoleSequenceBeat, itemsReply(seqItemJSON("VP-001", true, "medium", ""), seqItemJSON("VP-002", false, "medium", "")))
-	st = f.must(f.desk.GenerateBeat(f.ctx, project, "b1", ""))
-	if it := item(st, "VP-001"); it.Item.PurposeInFlow != "của Creator" || it.Item.Pacing.Tempo != "medium" {
-		t.Errorf("a rewrite keeps the Creator's field and takes the AI's others: %+v", it.Item)
+	if !strings.Contains(f.llm.calls[len(f.llm.calls)-1].System, "VP-001.purpose_in_flow") {
+		t.Errorf("the prompt names the Creator's field of this unit")
 	}
 }
 
-func TestSequenceAI_ABeatReplyThatDoesNotFitStoresNothing(t *testing.T) {
+func TestSequenceAI_AUnitReplyThatDoesNotFitStoresNothing(t *testing.T) {
 	f := newSeqAIFixture(t)
 	f.approvedMotifs()
 	before := fmt.Sprint(f.store.units)
-	for name, reply := range map[string]string{
-		"missing unit":             itemsReply(seqItemJSON("VP-001", true, "slow", "")),
-		"wrong order":              itemsReply(seqItemJSON("VP-002", false, "slow", ""), seqItemJSON("VP-001", true, "slow", "")),
-		"tempo outside its list":   itemsReply(seqItemJSON("VP-001", true, "rapid", ""), seqItemJSON("VP-002", false, "slow", "")),
-		"unknown motif":            itemsReply(seqItemJSON("VP-001", true, "slow", "", "MOTIF-09"), seqItemJSON("VP-002", false, "slow", "")),
-		"opening has a transition": itemsReply(seqItemJSON("VP-001", false, "slow", ""), seqItemJSON("VP-002", false, "slow", "")),
-		"no transition":            itemsReply(seqItemJSON("VP-001", true, "slow", ""), seqItemJSON("VP-002", true, "slow", "")),
-		"via a motif not carried":  itemsReply(seqItemJSON("VP-001", true, "slow", ""), seqItemJSON("VP-002", false, "slow", "MOTIF-01")),
-		"machine key":              `{"items":[{"unit_id":"VP-001","status":"approved"}]}`,
+	for name, c := range map[string]struct{ unit, reply string }{
+		"another unit":             {"VP-002", itemReply(seqItemJSON("VP-003", false, "slow", ""))},
+		"a list instead of one":    {"VP-002", `{"items":[` + seqItemJSON("VP-002", false, "slow", "") + `]}`},
+		"tempo outside its list":   {"VP-002", itemReply(seqItemJSON("VP-002", false, "rapid", ""))},
+		"unknown motif":            {"VP-002", itemReply(seqItemJSON("VP-002", false, "slow", "", "MOTIF-09"))},
+		"opening has a transition": {"VP-001", itemReply(seqItemJSON("VP-001", false, "slow", ""))},
+		"no transition":            {"VP-002", itemReply(seqItemJSON("VP-002", true, "slow", ""))},
+		"via a motif not carried":  {"VP-002", itemReply(seqItemJSON("VP-002", false, "slow", "MOTIF-01"))},
+		"machine key":              {"VP-002", `{"item":{"unit_id":"VP-002","status":"approved"}}`},
 	} {
-		f.queue(domain.PromptRoleSequenceBeat, reply)
-		if _, err := f.desk.GenerateBeat(f.ctx, project, "b1", ""); !errors.Is(err, domain.ErrUnreadableReply) {
+		f.queue(domain.PromptRoleSequenceUnit, c.reply)
+		if _, err := f.desk.GenerateUnit(f.ctx, project, c.unit, ""); !errors.Is(err, domain.ErrUnreadableReply) {
 			t.Errorf("%s: want ErrUnreadableReply, got %v", name, err)
 		}
 	}
@@ -173,22 +178,38 @@ func TestSequenceAI_ABeatReplyThatDoesNotFitStoresNothing(t *testing.T) {
 	}
 }
 
-func TestSequenceAI_GenerateWritesEmptyBeatsInOrder(t *testing.T) {
+func TestSequenceAI_GenerateWritesEachEmptyUnitInItsOwnTurn(t *testing.T) {
 	f := newSeqAIFixture(t)
 	f.approvedMotifs()
-	f.queue(domain.PromptRoleSequenceBeat,
-		itemsReply(seqItemJSON("VP-001", true, "slow", "", "MOTIF-01"), seqItemJSON("VP-002", false, "fast", "", "MOTIF-01")),
-		itemsReply(seqItemJSON("VP-003", false, "calm", "", "MOTIF-02")))
+	f.queue(domain.PromptRoleSequenceUnit,
+		itemReply(seqItemJSON("VP-001", true, "slow", "", "MOTIF-01")),
+		itemReply(seqItemJSON("VP-002", false, "fast", "", "MOTIF-01")),
+		itemReply(seqItemJSON("VP-003", false, "calm", "", "MOTIF-02")))
 	st := f.must(f.desk.Generate(f.ctx, project, ""))
-	if !st.Coverage.Complete() || len(f.llm.calls) != 3 {
-		t.Fatalf("both beats are written in two turns: %+v, %d calls", st.Coverage, len(f.llm.calls))
+	if !st.Coverage.Complete() || len(f.llm.calls) != 4 {
+		t.Fatalf("three units in three turns after the motifs: %+v, %d calls", st.Coverage, len(f.llm.calls))
 	}
-	if !strings.Contains(f.llm.calls[2].System, `"tempo":"fast"`) {
-		t.Errorf("the second beat reads the item the first one just wrote")
+	if !strings.Contains(f.llm.calls[3].System, `"tempo":"fast"`) {
+		t.Errorf("each unit reads the item written just before it")
 	}
 	f.must(f.desk.Generate(f.ctx, project, ""))
-	if len(f.llm.calls) != 3 {
-		t.Error("written beats are not written again")
+	if len(f.llm.calls) != 4 {
+		t.Error("written units are not written again")
+	}
+}
+
+func TestSequenceAI_RewritingABeatRunsEachUnitAndClearsItsStaleness(t *testing.T) {
+	f := newSeqAIFixture(t)
+	f.approvedMotifs()
+	f.queue(domain.PromptRoleSequenceUnit,
+		itemReply(seqItemJSON("VP-001", true, "slow", "")),
+		itemReply(seqItemJSON("VP-002", false, "fast", "")))
+	st := f.must(f.desk.GenerateBeat(f.ctx, project, "b1", ""))
+	if len(f.llm.calls) != 3 || item(st, "VP-002").Item == nil || st.Beats[0].Stale {
+		t.Fatalf("b1 is written one unit a turn: %d calls, %+v", len(f.llm.calls), st.Beats[0])
+	}
+	if _, err := f.desk.GenerateBeat(f.ctx, project, "b9", ""); !errors.Is(err, domain.ErrUnknownPlanBeat) {
+		t.Errorf("a beat the plan lacks: %v", err)
 	}
 }
 

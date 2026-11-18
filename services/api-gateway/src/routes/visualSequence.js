@@ -22,6 +22,7 @@ function visualSequenceRouter(visualClient, visualAiClient) {
   router.post(`${base}/motifs/generate`, ai);
   router.post(`${base}/generate`, ai);
   router.post(`${base}/beats/:beat/generate`, ai);
+  router.post(`${base}/units/:unit/generate`, ai);
   router.post(`${base}/review`, ai);
   router.put(`${base}/units/:unit`, plain);
   router.post(`${base}/units/:unit/approve`, plain);

@@ -84,7 +84,7 @@ Trả về DUY NHẤT một khối ```json theo mẫu, không thêm chữ nào k
 {"motifs":[{"same_as":"","name":"...","description":"...","anchor_ref":"...","role":"...","planned_units":["VP-001","VP-002"]}]}
 ````
 
-## `visual_sequence_beat`
+## `visual_sequence_beat` (đã thay bằng `visual_sequence_unit`, xem cuối file)
 
 Biến: `{{beat}}`, `{{beat_units}}`, `{{brief}}`, `{{creator_fields}}`, `{{current}}`, `{{handoff}}`, `{{motifs}}`, `{{motion_language}}`, `{{next_beat}}`, `{{note}}`, `{{pace}}`, `{{prev_unit}}`
 
@@ -211,3 +211,84 @@ Trả về DUY NHẤT một khối ```json theo mẫu, không thêm chữ nào k
 1. **Motif bị AI bỏ:** thiết kế nói motif đang được unit dùng mà AI bỏ thì reply bị từ chối (502). Prompt đã dặn giữ lại; giữ luật từ chối như thiết kế.
 2. **Unit đầu beat thấy unit cuối beat trước kèm chuỗi của nó** (nếu beat trước đã viết) để chuyển cảnh và `via_motif` khớp; beat trước chưa viết thì chỉ thấy kế hoạch hình của unit đó.
 3. **`fix` một câu** chỉ áp dụng được cho trường chữ (`purpose_in_flow`, `name`, `description`, `role`); trường có cấu trúc để Creator sửa trong modal.
+
+---
+
+# Sửa đổi 2026-11-18: viết chuỗi từng unit (Creator duyệt 2026-11-18, kể cả DeepSeek mỗi unit một lượt)
+
+Lý do: reply của một beat dài (nhiều unit) dễ hỏng JSON khi dùng AI ngoài. Vai `visual_sequence_beat` được thay bằng `visual_sequence_unit`: mỗi lượt AI viết đúng MỘT item. "Viết lại beat" và "Viết mọi beat còn trống" chạy lần lượt từng unit; unit sau đọc item unit trước vừa viết. Hàng đợi DeepSeek xếp mỗi unit một mục.
+
+Biến mới: `{{unit}}` (unit đang viết: kế hoạch hình và lời thoại), `{{beat_items}}` (các unit khác của beat cùng item đã có, theo thứ tự), `{{next_unit}}` (unit liền sau, kèm item nếu có). Bỏ `{{beat_units}}`, `{{next_beat}}`. `{{prev_unit}}` nay là unit liền trước unit đang viết (có thể ở beat trước), kèm item nếu có.
+
+## `visual_sequence_unit`
+
+Biến: `{{beat}}`, `{{beat_items}}`, `{{brief}}`, `{{creator_fields}}`, `{{current}}`, `{{handoff}}`, `{{motifs}}`, `{{motion_language}}`, `{{next_unit}}`, `{{note}}`, `{{pace}}`, `{{prev_unit}}`, `{{unit}}`
+
+````text
+Bạn là ĐẠO DIỄN HÌNH ẢNH của một kênh video phổ biến kiến thức. Kế hoạch hình đã chốt chia video thành các unit theo thứ tự; thứ tự đó giữ nguyên. Ở bước này bạn viết CHUỖI HÌNH: với mỗi unit, nó đóng vai trò gì trong mạch, đi với nhịp nào, chuyển cảnh từ unit trước ra sao, và mang motif nào. Lượt này bạn chỉ viết cho MỘT unit. Bạn không chọn shot, không chi tiết chuyển động từng shot.
+
+## CREATIVE BRIEF
+{{brief}}
+
+## NGÔN NGỮ HÌNH ẢNH ĐÃ CHỐT: NHỊP CHUNG (định hướng, không phải danh sách bắt buộc)
+{{pace}}
+
+## NGÔN NGỮ HÌNH ẢNH ĐÃ CHỐT: NGÔN NGỮ CHUYỂN ĐỘNG (định hướng; điều ghi «tránh» thì không dùng)
+{{motion_language}}
+
+## MOTIF ĐÃ DUYỆT (mã, tên, mô tả, neo, vai trò, unit dự định)
+{{motifs}}
+
+## BEAT CHỨA UNIT (mã, chức năng, tiêu đề, mục tiêu)
+{{beat}}
+
+## GHI CHÚ BÀN GIAO CỦA BEAT
+{{handoff}}
+
+## CÁC UNIT CỦA BEAT VÀ CHUỖI ĐÃ CÓ (theo thứ tự)
+{{beat_items}}
+
+## UNIT LIỀN TRƯỚC (và chuỗi của nó nếu đã có)
+{{prev_unit}}
+
+## UNIT ĐANG VIẾT (kế hoạch hình đã chốt và lời thoại)
+{{unit}}
+
+## UNIT LIỀN SAU (và chuỗi của nó nếu đã có)
+{{next_unit}}
+
+## CHUỖI HIỆN CÓ CỦA UNIT (rỗng nếu viết lần đầu)
+{{current}}
+
+## TRƯỜNG CREATOR ĐÃ SỬA TAY (giữ nguyên)
+{{creator_fields}}
+
+## GHI CHÚ CỦA CREATOR CHO LẦN VIẾT NÀY
+{{note}}
+
+## VIỆC CẦN LÀM
+Viết đúng một item cho unit đang viết.
+- unit_id: mã unit đang viết, chép đúng.
+- purpose_in_flow: unit này làm gì cho mạch video ở vị trí của nó (mở ra, dẫn dắt, đối chiếu, đẩy lên, lắng lại, chốt lại…), một câu; không lặp lại mục tiêu truyền đạt của kế hoạch hình.
+- pacing: name là tên nhịp do bạn đặt, ngắn; tempo là một trong slow, medium, fast, calm; description nói nhịp đó diễn ra thế nào trên hình theo lời thoại, tối đa hai câu. Nhịp phải hợp với thời lượng và việc hình cần làm, và đặt trong nhịp của cả beat.
+- transition_from_previous: cách hình đi từ unit liền trước sang unit này, ở mức ý đồ (không phải thông số dựng). type là tên chuyển cảnh do bạn đặt, ngắn; description nói vì sao và diễn ra thế nào, tối đa hai câu; via_motif là mã motif mà chuyển cảnh đi qua, hoặc "" nếu không. Nếu ở trên ghi đây là unit đầu video thì transition_from_previous là null.
+- motif_refs: các mã motif xuất hiện trong unit, chỉ lấy từ danh sách motif đã duyệt; không có thì []. Bám unit dự định của motif khi hợp lý; lệch thì phải vì hình của unit cần thế.
+- Nếu via_motif không rỗng thì motif đó phải có trong motif_refs của unit này và của unit liền trước.
+
+## LUẬT CHUNG
+- Chỉ dựa vào đầu vào ở trên; không đổi thứ tự, không sửa kế hoạch hình, không viết cho unit khác.
+- Không dùng chuyển cảnh hay nhịp mà ngôn ngữ chuyển động bảo tránh. Không lặp kiểu chuyển cảnh của unit liền trước nếu không có lý do.
+- Nối mạch: hình của unit này phải để ngỏ được sang unit liền sau.
+- Các trường Creator đã sửa tay giữ nguyên giá trị đang có, trừ khi ghi chú của Creator yêu cầu đổi.
+- Không viết khoá status: máy tự tính.
+- Viết bằng tiếng Việt; mã unit, mã motif và giá trị tempo giữ nguyên dạng ASCII.
+
+## ĐẦU RA
+Trả về DUY NHẤT một khối ```json theo mẫu, không thêm chữ nào khác, không thêm hay bớt khoá. Trong nội dung KHÔNG dùng dấu nháy kép thẳng ("): dùng dấu « » hoặc nháy đơn, và không xuống dòng giữa một ô. Trước khi trả, kiểm tra mọi dấu { và [ đều đã được đóng.
+{"item":{"unit_id":"VP-001","purpose_in_flow":"...","pacing":{"name":"...","tempo":"medium","description":"..."},"transition_from_previous":{"type":"...","description":"...","via_motif":""},"motif_refs":["MOTIF-01"]}}
+````
+
+## Điểm cần Creator quyết
+1. Thêm giới hạn "tối đa hai câu" cho mô tả nhịp và chuyển cảnh, và dòng tự kiểm ngoặc ở `## ĐẦU RA`.
+2. Bỏ hẳn vai `visual_sequence_beat`, thay bằng `visual_sequence_unit`. Nút "Viết lại beat này" vẫn giữ, chạy lần lượt từng unit của beat bằng AI hệ thống; AI ngoài và DeepSeek đi theo từng unit.
+3. Chuỗi đã viết theo beat giữ nguyên, không phải viết lại.

@@ -33,6 +33,7 @@ type sequenceDesk interface {
 	GenerateMotifs(ctx context.Context, projectID, note string) (*application.SequenceState, error)
 	Generate(ctx context.Context, projectID, note string) (*application.SequenceState, error)
 	GenerateBeat(ctx context.Context, projectID, beatKey, note string) (*application.SequenceState, error)
+	GenerateUnit(ctx context.Context, projectID, unitID, note string) (*application.SequenceState, error)
 	Review(ctx context.Context, projectID, note string) (*application.SequenceState, error)
 }
 
@@ -54,7 +55,8 @@ func (rt *Router) mountSequence(r chi.Router) {
 		r.Put("/model", rt.seqModel)
 		r.With(externalAI).Post("/motifs/generate", rt.seqNote(rt.sequence.GenerateMotifs))
 		r.Post("/generate", rt.seqNote(rt.sequence.Generate))
-		r.With(externalAI).Post("/beats/{beat}/generate", rt.seqGenerateBeat)
+		r.Post("/beats/{beat}/generate", rt.seqGenerate("beat", rt.sequence.GenerateBeat))
+		r.With(externalAI).Post("/units/{unit}/generate", rt.seqGenerate("unit", rt.sequence.GenerateUnit))
 		r.With(externalAI).Post("/review", rt.seqNote(rt.sequence.Review))
 		r.Put("/units/{unit}", rt.seqFields("unit", rt.sequence.Edit))
 		r.Post("/units/{unit}/approve", rt.seqParam("unit", rt.sequence.Approve))
@@ -182,13 +184,15 @@ func (rt *Router) seqNote(fn func(ctx context.Context, projectID, note string) (
 	}
 }
 
-// seqGenerateBeat has the AI write one beat's sequence.
-func (rt *Router) seqGenerateBeat(w http.ResponseWriter, r *http.Request) {
-	var in noteBody
-	if err := decodeBody(r, &in); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
+// seqGenerate serves an AI call on one beat or unit, named by a path parameter, with the Creator's note.
+func (rt *Router) seqGenerate(param string, fn func(ctx context.Context, projectID, id, note string) (*application.SequenceState, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in noteBody
+		if err := decodeBody(r, &in); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		st, err := fn(r.Context(), pid(r), chi.URLParam(r, param), in.Note)
+		writeConcept(w, st, err)
 	}
-	st, err := rt.sequence.GenerateBeat(r.Context(), pid(r), chi.URLParam(r, "beat"), in.Note)
-	writeConcept(w, st, err)
 }

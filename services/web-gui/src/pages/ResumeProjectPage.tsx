@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { getAuthoringState, getBeats, getProject, getResearch, getScript, getScriptLock, getStory, getVisualConcept } from "../api/client";
+import { getAuthoringState, getBeats, getProject, getResearch, getScript, getScriptLock, getStory, getVisualConcept, getVisualPlan } from "../api/client";
 import { ProjectDraftDispatchContext, defaultSubtitleStyle } from "../context/ProjectDraftContext";
 import type { ProjectDraft } from "../context/ProjectDraftContext";
 import { projectPath } from "../utils/pipelineLabels";
-import { FLOW_CODE, FLOW_CONFIG, FLOW_STORY, authoringRoute, beatsRoute, lockRoute, scriptRoute, visualConceptRoute, visualPlanRoute } from "../utils/flow";
+import { FLOW_CODE, FLOW_CONFIG, FLOW_STORY, authoringRoute, beatsRoute, lockRoute, scriptRoute, visualConceptRoute, visualPlanRoute, visualSequenceRoute } from "../utils/flow";
 import type { Project } from "../types";
 import type { AuthoringState } from "../api/client";
 import glass from "../styles/glass.module.css";
@@ -87,7 +87,8 @@ async function beatsApproved(projectId: string): Promise<boolean> {
 /**
  * The furthest screen the Creator has reached once the beats are approved: the
  * script until it is approved, the lock until a version is locked, then the
- * visual concept. An unreadable state lands on the earlier screen.
+ * visual concept, the visual plan and the visual sequence, each once the one
+ * before it is locked. An unreadable state lands on the earlier screen.
  */
 async function screenAfterBeats(projectId: string): Promise<string> {
   const scriptDone = await getScript(projectId).then((c) => c.status === "approved", () => false);
@@ -95,7 +96,9 @@ async function screenAfterBeats(projectId: string): Promise<string> {
   const locked = await getScriptLock(projectId).then((l) => l.lockedVersion > 0, () => false);
   if (!locked) return lockRoute(projectId);
   const conceptLocked = await getVisualConcept(projectId).then((v) => v.locked_version > 0, () => false);
-  return conceptLocked ? visualPlanRoute(projectId) : visualConceptRoute(projectId);
+  if (!conceptLocked) return visualConceptRoute(projectId);
+  const planLocked = await getVisualPlan(projectId).then((v) => v.locked_version > 0, () => false);
+  return planLocked ? visualSequenceRoute(projectId) : visualPlanRoute(projectId);
 }
 
 /**

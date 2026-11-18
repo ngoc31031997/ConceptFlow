@@ -53,6 +53,7 @@ describe('visual sequence routing', () => {
     ['post', `${base}/motifs/generate`],
     ['post', `${base}/generate`],
     ['post', `${base}/beats/b2/generate`],
+    ['post', `${base}/units/VP-002/generate`],
     ['post', `${base}/review`],
   ])('%s %s goes to visual-service through the client with no timeout', async (method, path) => {
     const plain = ok();

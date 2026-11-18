@@ -40,6 +40,9 @@ func (f *fakeSequence) Generate(_ context.Context, _ string, note string) (*appl
 func (f *fakeSequence) GenerateBeat(_ context.Context, _ string, k, note string) (*application.SequenceState, error) {
 	return f.ret("beat " + k + " " + note)
 }
+func (f *fakeSequence) GenerateUnit(_ context.Context, _ string, id, note string) (*application.SequenceState, error) {
+	return f.ret("unit " + id + " " + note)
+}
 func (f *fakeSequence) Review(_ context.Context, _ string, note string) (*application.SequenceState, error) {
 	return f.ret("review " + note)
 }
@@ -106,6 +109,7 @@ func TestSequenceRoutesReachTheDesk(t *testing.T) {
 		{"POST", base + "/motifs/generate", `{"note":"n"}`, "motifs n"},
 		{"POST", base + "/generate", `{"note":"n"}`, "generate n"},
 		{"POST", base + "/beats/b2/generate", `{"note":"n"}`, "beat b2 n"},
+		{"POST", base + "/units/VP-003/generate", `{"note":"n"}`, "unit VP-003 n"},
 		{"POST", base + "/review", `{"note":"n"}`, "review n"},
 		{"PUT", base + "/units/VP-001", `{"fields":{"purpose_in_flow":"x","pacing":{}}}`, "edit:VP-001:2"},
 		{"POST", base + "/units/VP-001/approve", "", "approve:VP-001"},
@@ -169,7 +173,7 @@ func TestSequenceRoutesMapErrors(t *testing.T) {
 
 func TestSequenceAIRoutesTakeTheExternalAIHeader(t *testing.T) {
 	const base = "/v1/projects/p1/visual-sequence"
-	for _, path := range []string{"/motifs/generate", "/beats/b1/generate", "/review"} {
+	for _, path := range []string{"/motifs/generate", "/units/VP-001/generate", "/review"} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("POST", base+path, strings.NewReader(`{}`))
 		req.Header.Set("X-External-AI", "nope")

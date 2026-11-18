@@ -109,66 +109,88 @@ func motifsVars(data *sequenceData, note string) map[string]string {
 	return vars
 }
 
-// beatUnitsText lists a beat's units with their plan fields and their lines.
-func beatUnitsText(in domain.SequenceInput, b domain.SequenceBeat) string {
+// unitDetailText is one plan unit with its plan fields and the lines it covers.
+func unitDetailText(in domain.SequenceInput, u domain.DocumentUnit) string {
 	text := map[string]string{}
-	for _, l := range in.Script.Lines[b.Key] {
+	for _, l := range in.Script.Lines[u.BeatID] {
 		text[l.ID] = l.Text
 	}
 	var sb strings.Builder
-	for _, u := range b.Units {
-		sb.WriteString(planUnitLine(u) + "\n")
-		fmt.Fprintf(&sb, "  quan hệ với lời thoại: %s\n", u.NarrationRelationship)
-		if len(u.OnScreenText) > 0 {
-			fmt.Fprintf(&sb, "  chữ trên hình: %s\n", strings.Join(u.OnScreenText, " | "))
-		}
-		for _, id := range u.ScriptRefs {
-			fmt.Fprintf(&sb, "  %s %s\n", id, text[id])
-		}
+	sb.WriteString(planUnitLine(u) + "\n")
+	fmt.Fprintf(&sb, "  quan hệ với lời thoại: %s\n", u.NarrationRelationship)
+	if len(u.OnScreenText) > 0 {
+		fmt.Fprintf(&sb, "  chữ trên hình: %s\n", strings.Join(u.OnScreenText, " | "))
+	}
+	for _, id := range u.ScriptRefs {
+		fmt.Fprintf(&sb, "  %s %s\n", id, text[id])
 	}
 	return strings.TrimSpace(sb.String())
 }
 
-// prevUnitText is the last unit before beat at, with its item when written.
-func prevUnitText(data *sequenceData, at int) string {
-	if at == 0 {
-		return "(không có, unit đầu tiên của beat là unit đầu video)"
+// itemText is a unit's stored item without its status, or that it has none.
+func (data *sequenceData) itemText(beatKey, unitID string) string {
+	seq := data.beats[beatKey]
+	i := seq.Index(unitID)
+	if i < 0 {
+		return "(chưa có chuỗi)"
 	}
-	prev := data.in.Beats[at-1]
-	u := prev.Units[len(prev.Units)-1]
-	line := planUnitLine(u)
-	seq := data.beats[prev.Key]
-	if i := seq.Index(u.UnitID); i >= 0 {
-		raw, _ := json.Marshal(seq.Items[i])
-		return line + "\n  chuỗi: " + string(raw)
-	}
-	return line + "\n  (chưa có chuỗi)"
+	it := seq.Items[i]
+	it.Status = ""
+	raw, _ := json.Marshal(it)
+	return string(raw)
 }
 
-// nextBeatText is the beat after beat at, with its first unit.
-func nextBeatText(in domain.SequenceInput, at int) string {
-	if at+1 >= len(in.Beats) {
-		return none
+// neighbourUnitText is the plan unit at position at of the video with its item,
+// or none when there is no unit there.
+func neighbourUnitText(data *sequenceData, at int, missing string) string {
+	units := data.in.Plan.Units
+	if at < 0 || at >= len(units) {
+		return missing
 	}
-	b := in.Beats[at+1]
-	return beatLine(b.Beat) + "\n  unit đầu: " + planUnitLine(b.Units[0])
+	u := units[at]
+	return planUnitLine(u) + "\n  chuỗi: " + data.itemText(u.BeatID, u.UnitID)
 }
 
-// seqBeatVars are the variables of the prompt that writes beat at's sequence.
-func seqBeatVars(data *sequenceData, at int, creatorFields []string, note string) map[string]string {
+// beatItemsText lists the units of a beat with their items, marking the one
+// being written.
+func beatItemsText(data *sequenceData, b domain.SequenceBeat, writing string) string {
+	var lines []string
+	for _, u := range b.Units {
+		if u.UnitID == writing {
+			lines = append(lines, planUnitLine(u)+"\n  (unit đang viết)")
+			continue
+		}
+		lines = append(lines, planUnitLine(u)+"\n  chuỗi: "+data.itemText(b.Key, u.UnitID))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// unitPosition is where plan unit id stands in the video, or -1.
+func unitPosition(in domain.SequenceInput, id string) int {
+	for i, u := range in.Plan.Units {
+		if u.UnitID == id {
+			return i
+		}
+	}
+	return -1
+}
+
+// seqUnitVars are the variables of the prompt that writes one unit's item.
+// creatorFields are the fields the Creator wrote in that item.
+func seqUnitVars(data *sequenceData, b domain.SequenceBeat, unitID string, creatorFields []string, note string) map[string]string {
 	in := data.in
-	b := in.Beats[at]
+	at := unitPosition(in, unitID)
 	vars := sequenceSharedVars(in)
 	vars["motifs"] = motifsText(data.motifs)
 	vars["beat"] = beatLine(b.Beat)
-	vars["beat_units"] = beatUnitsText(in, b)
 	vars["handoff"] = handoffOfBeat(in.Script, b.Beat)
-	vars["prev_unit"] = prevUnitText(data, at)
-	vars["next_beat"] = nextBeatText(in, at)
+	vars["beat_items"] = beatItemsText(data, b, unitID)
+	vars["prev_unit"] = neighbourUnitText(data, at-1, "(không có: unit đang viết là unit đầu video)")
+	vars["unit"] = unitDetailText(in, in.Plan.Units[at])
+	vars["next_unit"] = neighbourUnitText(data, at+1, "(không có: unit đang viết là unit cuối video)")
 	vars["current"], vars["creator_fields"] = "(chưa có)", none
-	if cur := data.beats[b.Key]; len(cur.Items) > 0 {
-		raw, _ := cur.Encode()
-		vars["current"] = string(raw)
+	if data.beats[b.Key].Index(unitID) >= 0 {
+		vars["current"] = data.itemText(b.Key, unitID)
 		vars["creator_fields"] = creatorFieldsText(creatorFields)
 	}
 	vars["note"] = orNone(note)

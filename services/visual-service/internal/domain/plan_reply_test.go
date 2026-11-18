@@ -148,7 +148,7 @@ func TestPlanSystemPromptsShipWithTheConceptOnes(t *testing.T) {
 
 func TestSequenceSystemPromptsShipAfterThePlanOnes(t *testing.T) {
 	ps := SystemPrompts()
-	want := []string{PromptRoleSequenceMotifs, PromptRoleSequenceBeat, PromptRoleSequenceReview}
+	want := []string{PromptRoleSequenceMotifs, PromptRoleSequenceUnit, PromptRoleSequenceReview}
 	for i, role := range want {
 		p := ps[12+i]
 		if p.Role != role || p.Name != SystemPromptName || !strings.Contains(p.TemplateText, "```json") {

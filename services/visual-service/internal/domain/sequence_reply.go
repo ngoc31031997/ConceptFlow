@@ -123,7 +123,7 @@ func ParseMotifsReply(raw []byte, cur MotifSet, creatorFields []string, planUnit
 	return out, nil
 }
 
-// --- one beat's sequence -------------------------------------------------------------
+// --- one unit's sequence -------------------------------------------------------------
 
 // seqItemReply is one item as the AI writes it; the status is the machine's.
 type seqItemReply struct {
@@ -134,61 +134,56 @@ type seqItemReply struct {
 	MotifRefs              []string    `json:"motif_refs"`
 }
 
-type beatSeqReply struct {
-	Items []seqItemReply `json:"items"`
+type unitSeqReply struct {
+	Item *seqItemReply `json:"item"`
 }
 
-// ParseBeatSequenceReply reads the AI's items of one beat. The reply is
+// ParseUnitSequenceReply reads the AI's item for one unit. The reply is
 // unusable, and nothing is stored, when a key or value has the wrong shape, the
-// items do not cover the beat's units once each in plan order, a tempo is
-// outside its list, a motif is not one of the video's, the unit that opens the
-// video has a transition into it, another unit has none, or a transition goes
-// through a motif the unit does not carry. Whether via_motif is also on the
-// unit before is the machine check of the whole sequence. firstOfVideo says
-// whether the beat's first unit opens the video.
-func ParseBeatSequenceReply(raw []byte, beat SequenceBeat, firstOfVideo bool, motifs map[string]bool) ([]SeqItem, error) {
-	var r beatSeqReply
+// item names another unit, the tempo is outside its list, a motif is not one of
+// the video's, the unit that opens the video has a transition into it, another
+// unit has none, or the transition goes through a motif the unit does not
+// carry. Whether via_motif is also on the unit before is the machine check of
+// the whole sequence. firstOfVideo says whether the unit opens the video.
+func ParseUnitSequenceReply(raw []byte, unitID string, firstOfVideo bool, motifs map[string]bool) (SeqItem, error) {
+	var r unitSeqReply
 	if err := decodeReply(raw, &r); err != nil {
-		return nil, err
+		return SeqItem{}, err
 	}
-	if len(r.Items) != len(beat.Units) {
-		return nil, unreadable("có %d item, beat có %d unit", len(r.Items), len(beat.Units))
+	ri := r.Item
+	if ri == nil {
+		return SeqItem{}, unreadable("không có item")
 	}
-	items := make([]SeqItem, 0, len(r.Items))
-	for i, ri := range r.Items {
-		want := beat.Units[i].UnitID
-		if ri.UnitID != want {
-			return nil, unreadable("item thứ %d là %s, đáng lẽ là %s: mỗi unit của beat có đúng một item, đúng thứ tự", i+1, ri.UnitID, want)
-		}
-		if !contains(Tempos, ri.Pacing.Tempo) {
-			return nil, unreadable("%s có tempo lạ «%s»", want, ri.Pacing.Tempo)
-		}
-		for _, m := range ri.MotifRefs {
-			if !motifs[m] {
-				return nil, unreadable("%s dùng motif lạ «%s»", want, m)
-			}
-		}
-		t := ri.TransitionFromPrevious
-		switch {
-		case i == 0 && firstOfVideo && t != nil:
-			return nil, unreadable("%s mở đầu video, transition_from_previous phải là null", want)
-		case !(i == 0 && firstOfVideo) && (t == nil || strings.TrimSpace(t.Type) == ""):
-			return nil, unreadable("%s thiếu chuyển cảnh từ unit trước", want)
-		}
-		if t != nil && t.ViaMotif != "" {
-			if !motifs[t.ViaMotif] {
-				return nil, unreadable("%s chuyển cảnh qua motif lạ «%s»", want, t.ViaMotif)
-			}
-			if !contains(ri.MotifRefs, t.ViaMotif) {
-				return nil, unreadable("%s chuyển cảnh qua %s nhưng motif_refs không có nó", want, t.ViaMotif)
-			}
-		}
-		it := SeqItem{UnitID: want, PurposeInFlow: ri.PurposeInFlow, Pacing: ri.Pacing, TransitionFromPrevious: t,
-			MotifRefs: ri.MotifRefs, Status: UnitPending}
-		it.normalize()
-		items = append(items, it)
+	if ri.UnitID != unitID {
+		return SeqItem{}, unreadable("item là của %s, đáng lẽ là %s", ri.UnitID, unitID)
 	}
-	return items, nil
+	if !contains(Tempos, ri.Pacing.Tempo) {
+		return SeqItem{}, unreadable("%s có tempo lạ «%s»", unitID, ri.Pacing.Tempo)
+	}
+	for _, m := range ri.MotifRefs {
+		if !motifs[m] {
+			return SeqItem{}, unreadable("%s dùng motif lạ «%s»", unitID, m)
+		}
+	}
+	t := ri.TransitionFromPrevious
+	switch {
+	case firstOfVideo && t != nil:
+		return SeqItem{}, unreadable("%s mở đầu video, transition_from_previous phải là null", unitID)
+	case !firstOfVideo && (t == nil || strings.TrimSpace(t.Type) == ""):
+		return SeqItem{}, unreadable("%s thiếu chuyển cảnh từ unit trước", unitID)
+	}
+	if t != nil && t.ViaMotif != "" {
+		if !motifs[t.ViaMotif] {
+			return SeqItem{}, unreadable("%s chuyển cảnh qua motif lạ «%s»", unitID, t.ViaMotif)
+		}
+		if !contains(ri.MotifRefs, t.ViaMotif) {
+			return SeqItem{}, unreadable("%s chuyển cảnh qua %s nhưng motif_refs không có nó", unitID, t.ViaMotif)
+		}
+	}
+	it := SeqItem{UnitID: unitID, PurposeInFlow: ri.PurposeInFlow, Pacing: ri.Pacing, TransitionFromPrevious: t,
+		MotifRefs: ri.MotifRefs, Status: UnitPending}
+	it.normalize()
+	return it, nil
 }
 
 // MergeSequenceItems keeps, in the AI's items, the fields the Creator wrote in

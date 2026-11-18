@@ -6,7 +6,8 @@ import { Button, Dialog, FormField, Select, TextArea, TextInput } from "../ui";
 import { METHODS, METHOD_LABELS, RELATIONSHIPS, RELATIONSHIP_LABELS, refsLabel, seconds } from "./planModel";
 import styles from "./plan.module.css";
 
-interface FormDialogProps {
+/** The props of FormDialog. */
+export interface FormDialogProps {
   open: boolean;
   onClose: () => void;
   title: string;
@@ -16,11 +17,30 @@ interface FormDialogProps {
   onConfirm: () => Promise<void>;
   testId: string;
   size?: "sm" | "md" | "lg" | "full";
+  /** The main action's colour; yellow by default. */
+  confirmVariant?: "primary" | "danger" | "impact";
+  /** Whether the dialog holds a form; a confirmation without one closes on a backdrop click. */
+  hasInput?: boolean;
   children: React.ReactNode;
 }
 
-/** The shell of every hand-edit dialog of step 9: Huỷ, the main action, and the server's reason when it refuses. */
-function FormDialog({ open, onClose, title, confirmLabel, confirmDisabled, onConfirm, testId, size, children }: FormDialogProps) {
+/**
+ * The shell of every hand-edit dialog of the visual steps: Huỷ, the main
+ * action, and the server's reason when it refuses.
+ */
+export function FormDialog({
+  open,
+  onClose,
+  title,
+  confirmLabel,
+  confirmDisabled,
+  onConfirm,
+  testId,
+  size,
+  confirmVariant = "primary",
+  hasInput = true,
+  children,
+}: FormDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   useEffect(() => {
@@ -43,7 +63,7 @@ function FormDialog({ open, onClose, title, confirmLabel, confirmDisabled, onCon
       open={open}
       onClose={onClose}
       title={title}
-      hasInput
+      hasInput={hasInput}
       size={size}
       testId={testId}
       footer={
@@ -52,7 +72,7 @@ function FormDialog({ open, onClose, title, confirmLabel, confirmDisabled, onCon
             Huỷ
           </Button>
           <Button
-            variant="primary"
+            variant={confirmVariant}
             onClick={() => void confirm()}
             disabled={saving || confirmDisabled}
             data-testid={`${testId}-confirm`}

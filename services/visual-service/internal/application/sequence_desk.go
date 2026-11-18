@@ -223,11 +223,16 @@ type SequenceState struct {
 	LockedVersion int                     `json:"locked_version"`
 	NextVersion   int                     `json:"next_version"`
 	Draft         []string                `json:"draft"`
+	// PendingUnits are the units whose item waits for review, in plan order.
+	PendingUnits []string `json:"pending_units"`
 	// Model is the model the video's step 10 runs on; "" is the step default.
 	Model        string        `json:"model"`
 	DefaultModel string        `json:"default_model"`
 	Models       []ModelOption `json:"models"`
 }
+
+// maxNamedUnits is how many units a blocker names before it counts the rest.
+const maxNamedUnits = 10
 
 // State returns the screen.
 func (d *SequenceDesk) State(ctx context.Context, projectID string) (*SequenceState, error) {
@@ -247,7 +252,8 @@ func (d *SequenceDesk) state(ctx context.Context, projectID string, data *sequen
 		Beats:    []SequenceBeatView{}, Blockers: []string{}, Draft: []string{},
 	}
 	st.Motifs = data.motifsView()
-	staleBeats, problemUnits, pendingItems := []string{}, []string{}, 0
+	staleBeats, problemUnits := []string{}, []string{}
+	st.PendingUnits = []string{}
 	for _, b := range in.Beats {
 		bv := data.beatView(b)
 		if bv.Stale {
@@ -260,7 +266,7 @@ func (d *SequenceDesk) state(ctx context.Context, projectID string, data *sequen
 			if uv.Item.Status == domain.UnitApproved {
 				st.ItemsApproved++
 			} else {
-				pendingItems++
+				st.PendingUnits = append(st.PendingUnits, uv.UnitID)
 			}
 			if len(uv.Problems) > 0 {
 				problemUnits = append(problemUnits, uv.UnitID)
@@ -315,8 +321,16 @@ func (d *SequenceDesk) state(ctx context.Context, projectID string, data *sequen
 	if len(staleBeats) > 0 {
 		st.Blockers = append(st.Blockers, "Đầu vào đã đổi ở "+strings.Join(staleBeats, ", ")+": viết lại hoặc xác nhận beat đó.")
 	}
-	if pendingItems > 0 {
-		st.Blockers = append(st.Blockers, fmt.Sprintf("Còn %d unit chưa duyệt.", pendingItems))
+	if n := len(st.PendingUnits); n > 0 {
+		names := st.PendingUnits
+		if n > maxNamedUnits {
+			names = names[:maxNamedUnits]
+		}
+		more := ""
+		if n > maxNamedUnits {
+			more = fmt.Sprintf(" và %d unit khác", n-maxNamedUnits)
+		}
+		st.Blockers = append(st.Blockers, fmt.Sprintf("Còn %d unit chưa duyệt: %s%s.", n, strings.Join(names, ", "), more))
 	}
 	if len(problemUnits) > 0 {
 		st.Blockers = append(st.Blockers, "Unit chưa đạt điều kiện kiểm: "+strings.Join(problemUnits, ", ")+".")

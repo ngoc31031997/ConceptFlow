@@ -128,43 +128,82 @@ func (data *sequenceData) motifsReady() error {
 	return nil
 }
 
-// beatIndex is the position of beat key in the sequence, or -1.
-func (data *sequenceData) beatIndex(key string) int {
-	for i, b := range data.in.Beats {
-		if b.Key == key {
-			return i
+// writeUnit has the AI write the item of one plan unit, reading the beat's
+// other items and the units on both sides, and stores it once the answer is in
+// and fits. The fields the Creator wrote in that item stay and the item goes
+// back to review. A beat's first item takes the hashes its inputs have now; a
+// beat that already had items keeps its hashes, so a stale beat stays stale
+// until it is confirmed or rewritten whole.
+func (d *SequenceDesk) writeUnit(ctx context.Context, projectID string, data *sequenceData, beatKey, unitID, note string) error {
+	b, ok := data.in.Beat(beatKey)
+	if !ok {
+		return domain.ErrUnknownPlanBeat
+	}
+	row := data.beatRow(projectID, beatKey)
+	var mine, others []string
+	for _, f := range row.CreatorFields {
+		if strings.HasPrefix(f, unitID+".") {
+			mine = append(mine, f)
+		} else {
+			others = append(others, f)
 		}
 	}
-	return -1
-}
-
-// writeBeat has the AI write the items of the beat at position at and stores
-// them once the answer is in and fits. The fields the Creator wrote stay; every
-// item goes back to review and the beat takes the hashes its inputs have now.
-func (d *SequenceDesk) writeBeat(ctx context.Context, projectID string, data *sequenceData, at int, note string) error {
-	b := data.in.Beats[at]
-	creatorFields := data.rows[b.Key].CreatorFields
-	reply, err := d.ask(ctx, projectID, domain.PromptRoleSequenceBeat, seqBeatVars(data, at, creatorFields, note))
+	reply, err := d.ask(ctx, projectID, domain.PromptRoleSequenceUnit, seqUnitVars(data, b, unitID, mine, note))
 	if err != nil {
 		return err
 	}
-	fresh, err := domain.ParseBeatSequenceReply(reply, b, at == 0, data.motifs.IDs())
+	first := unitPosition(data.in, unitID) == 0
+	fresh, err := domain.ParseUnitSequenceReply(reply, unitID, first, data.motifs.IDs())
 	if err != nil {
 		return err
 	}
-	items, kept := domain.MergeSequenceItems(fresh, data.beats[b.Key], creatorFields)
-	row := data.beatRow(projectID, b.Key)
-	row.InputHashes = data.in.BeatHashes(b.Key, data.motifs)
-	if len(data.beats[b.Key].Items) > 0 {
+	seq := data.beats[beatKey]
+	items, kept := domain.MergeSequenceItems([]domain.SeqItem{fresh}, seq, mine)
+	at := seq.Index(unitID)
+	if len(seq.Items) == 0 {
+		row.InputHashes = data.in.BeatHashes(beatKey, data.motifs)
+	}
+	if at >= 0 {
 		row.RedoCount++
 	}
-	data.rows[b.Key] = row
-	return d.saveBeat(ctx, data, projectID, b.Key, domain.BeatSequence{Items: items}, kept)
+	data.rows[beatKey] = row
+	return d.saveBeat(ctx, data, projectID, beatKey, putItem(seq, at, items[0]), append(others, kept...))
 }
 
-// GenerateBeat has the AI write or rewrite the sequence of one beat, with the
+// GenerateUnit has the AI write or rewrite the item of one unit, with the
 // Creator's note. It runs one model turn, so an AI outside the system can
 // answer it.
+func (d *SequenceDesk) GenerateUnit(ctx context.Context, projectID, unitID, note string) (*SequenceState, error) {
+	if err := d.aiReady(); err != nil {
+		return nil, err
+	}
+	data, err := d.load(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	beatKey, _, ok := data.in.LocateUnit(unitID)
+	if !ok {
+		return nil, domain.ErrUnknownPlanUnit
+	}
+	if err := data.motifsReady(); err != nil {
+		return nil, err
+	}
+	if d.running.has(projectID, unitID) || d.running.has(projectID, beatKey) {
+		return nil, domain.ErrUnitRunning
+	}
+	finish := d.running.start(projectID, unitID)
+	err = d.writeUnit(ctx, projectID, data, beatKey, unitID, note)
+	finish()
+	if err != nil {
+		return nil, err
+	}
+	return d.State(ctx, projectID)
+}
+
+// GenerateBeat has the AI rewrite every unit of one beat, one model turn per
+// unit in plan order, each reading the items written before it. Once every unit
+// is written the beat takes the hashes its inputs have now. A failure stops the
+// run; the units written before it stay.
 func (d *SequenceDesk) GenerateBeat(ctx context.Context, projectID, beatKey, note string) (*SequenceState, error) {
 	if err := d.aiReady(); err != nil {
 		return nil, err
@@ -173,8 +212,8 @@ func (d *SequenceDesk) GenerateBeat(ctx context.Context, projectID, beatKey, not
 	if err != nil {
 		return nil, err
 	}
-	at := data.beatIndex(beatKey)
-	if at < 0 {
+	b, ok := data.in.Beat(beatKey)
+	if !ok {
 		return nil, domain.ErrUnknownPlanBeat
 	}
 	if err := data.motifsReady(); err != nil {
@@ -183,18 +222,30 @@ func (d *SequenceDesk) GenerateBeat(ctx context.Context, projectID, beatKey, not
 	if d.running.has(projectID, beatKey) {
 		return nil, domain.ErrUnitRunning
 	}
+	for _, u := range b.Units {
+		if d.running.has(projectID, u.UnitID) {
+			return nil, domain.ErrUnitRunning
+		}
+	}
 	finish := d.running.start(projectID, beatKey)
-	err = d.writeBeat(ctx, projectID, data, at, note)
-	finish()
-	if err != nil {
+	defer finish()
+	for _, u := range b.Units {
+		if err := d.writeUnit(ctx, projectID, data, beatKey, u.UnitID, note); err != nil {
+			return nil, fmt.Errorf("%s: %w", u.UnitID, err)
+		}
+	}
+	row := data.rows[beatKey]
+	row.InputHashes = data.in.BeatHashes(beatKey, data.motifs)
+	data.rows[beatKey] = row
+	if err := d.saveBeat(ctx, data, projectID, beatKey, data.beats[beatKey], row.CreatorFields); err != nil {
 		return nil, err
 	}
 	return d.State(ctx, projectID)
 }
 
-// Generate has the AI write the beats that have no item yet, one after another
-// in plan order, each reading the beats written before it. A failure stops the
-// run; the beats written before it stay.
+// Generate has the AI write every unit that has no item yet, one model turn per
+// unit in plan order, each reading the items written before it. A failure stops
+// the run; the units written before it stay.
 func (d *SequenceDesk) Generate(ctx context.Context, projectID, note string) (*SequenceState, error) {
 	if err := d.aiReady(); err != nil {
 		return nil, err
@@ -206,24 +257,23 @@ func (d *SequenceDesk) Generate(ctx context.Context, projectID, note string) (*S
 	if err := data.motifsReady(); err != nil {
 		return nil, err
 	}
-	var todo []int
+	var todo []domain.DocumentUnit
 	var keys []string
-	for i, b := range data.in.Beats {
-		if d.running.has(projectID, b.Key) {
+	for _, u := range data.in.Plan.Units {
+		if d.running.has(projectID, u.UnitID) || d.running.has(projectID, u.BeatID) {
 			return nil, domain.ErrUnitRunning
 		}
-		if len(data.beats[b.Key].Items) == 0 {
-			todo, keys = append(todo, i), append(keys, b.Key)
+		if data.beats[u.BeatID].Index(u.UnitID) < 0 {
+			todo, keys = append(todo, u), append(keys, u.UnitID)
 		}
 	}
 	finish := d.running.start(projectID, keys...)
 	defer finish()
-	for _, at := range todo {
-		b := data.in.Beats[at]
-		if err := d.writeBeat(ctx, projectID, data, at, note); err != nil {
-			return nil, fmt.Errorf("beat %d: %w", b.Number, err)
+	for _, u := range todo {
+		if err := d.writeUnit(ctx, projectID, data, u.BeatID, u.UnitID, note); err != nil {
+			return nil, fmt.Errorf("%s: %w", u.UnitID, err)
 		}
-		d.running.done(projectID, b.Key)
+		d.running.done(projectID, u.UnitID)
 	}
 	return d.State(ctx, projectID)
 }
