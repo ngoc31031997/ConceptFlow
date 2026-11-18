@@ -381,7 +381,7 @@ func changedUnits(latest PlanVersionRecord, data *planData) []string {
 	if err := json.Unmarshal(latest.Document, &old); err != nil {
 		return []string{"Không đọc được bản chốt trước"}
 	}
-	var out []string
+	out := []string{}
 	if old.SourceVersions.Script != data.in.Script.ScriptVersion {
 		out = append(out, fmt.Sprintf("Kịch bản chốt v%d → v%d", old.SourceVersions.Script, data.in.Script.ScriptVersion))
 	}

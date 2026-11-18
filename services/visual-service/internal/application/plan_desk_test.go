@@ -444,6 +444,9 @@ func TestPlanDesk_LockNeedsEverythingAndVersionsAreImmutable(t *testing.T) {
 	if st.LockedVersion != 1 || st.NextVersion != 2 || st.CanLock || len(st.Draft) != 0 {
 		t.Fatalf("lock v1 wrong: locked %d next %d can %v draft %v", st.LockedVersion, st.NextVersion, st.CanLock, st.Draft)
 	}
+	if raw, _ := json.Marshal(st); !strings.Contains(string(raw), `"draft":[]`) {
+		t.Fatalf("a locked plan with no change must send draft as [], never null: %s", raw)
+	}
 	rec, err := f.desk.Version(ctx, project, 1)
 	if err != nil {
 		t.Fatal(err)
