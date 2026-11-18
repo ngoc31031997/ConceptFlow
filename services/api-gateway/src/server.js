@@ -24,6 +24,7 @@ const { progressRouter } = require('./routes/progress');
 const { healthRouter } = require('./routes/health');
 const { visualConceptRouter } = require('./routes/visualConcept');
 const { visualPlanRouter } = require('./routes/visualPlan');
+const { visualSequenceRouter } = require('./routes/visualSequence');
 
 const logger = pino({ level: 'warn' });
 
@@ -92,6 +93,7 @@ function main() {
   app.use(authRouter(publisherClient));
   app.use(visualConceptRouter(visualClient, visualAiClient));
   app.use(visualPlanRouter(visualClient, visualAiClient));
+  app.use(visualSequenceRouter(visualClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());
 

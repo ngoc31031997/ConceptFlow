@@ -55,6 +55,20 @@ CREATE TABLE IF NOT EXISTS visual_plan_versions (
     locked_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (project_id, version)
 );
+-- The locked versions of a video's visual sequence: an immutable document the
+-- later visual steps read, with the plan, visual-concept and script versions it
+-- was written from.
+CREATE TABLE IF NOT EXISTS visual_sequence_versions (
+    project_id      TEXT NOT NULL,
+    version         INTEGER NOT NULL,
+    plan_version    INTEGER NOT NULL,
+    concept_version INTEGER NOT NULL,
+    script_version  INTEGER NOT NULL,
+    document        JSONB NOT NULL,
+    note            TEXT NOT NULL DEFAULT '',
+    locked_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, version)
+);
 -- The next number of a video's visual-plan unit (VP-001, VP-002...); a number
 -- is handed out once and never reused.
 CREATE TABLE IF NOT EXISTS visual_plan_seq (
