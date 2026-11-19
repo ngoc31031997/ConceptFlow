@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS project_reference_picks (
     ref_id     TEXT NOT NULL REFERENCES reference_styles (id) ON DELETE CASCADE,
     PRIMARY KEY (project_id, ref_id)
 );
+-- A video picks at most one description.
+CREATE UNIQUE INDEX IF NOT EXISTS project_reference_picks_one_per_project ON project_reference_picks (project_id);
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

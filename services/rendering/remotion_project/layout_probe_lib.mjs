@@ -233,8 +233,8 @@ export async function probe(page, logs, source, opts) {
   const table = shotTable(source);
 
   t0 = performance.now();
-  if (!opts.kit) throw new ProbeError('load', 'thiếu kitKey: project chưa ghim ngôn ngữ hình');
-  const inputProps = {kitKey: opts.kit, ...(opts.font ? {videoFont: opts.font} : {})};
+  if (!opts.kit) throw new ProbeError('load', 'thiếu kit: lượt đo không nhận được bộ thông số vẽ');
+  const inputProps = {kit: opts.kit, ...(opts.font ? {videoFont: opts.font} : {})};
   let info;
   try {
     info = await page.evaluate(([code, props]) => window.cfProbe.load(code, props), [js, inputProps]);

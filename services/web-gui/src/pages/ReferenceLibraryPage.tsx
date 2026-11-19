@@ -15,6 +15,9 @@ import {
   createReferenceStyle,
   deleteReferenceStyle,
   getReferenceStyleUsage,
+  KIT_TRIAL_SCENES,
+  kitTrialStillUrl,
+  renderKitStill,
   listProjects,
   importReferenceStyle,
   listReferenceStyles,
@@ -24,6 +27,8 @@ import {
   type ReferenceStyle,
   type ReferenceStyleInput,
 } from "../api/client";
+import { KitFields } from "../components/reference/KitFields";
+import { draftToKit, kitDraftProblem, kitToDraft, type KitDraft } from "../components/reference/kitForm";
 import glass from "../styles/glass.module.css";
 import styles from "./ReferenceLibraryPage.module.css";
 
@@ -79,12 +84,15 @@ const SOURCE_KINDS = [
  */
 interface FormState extends Omit<
   ReferenceStyleInput,
-  "tags" | "core_rules" | "avoid" | "composition"
+  "tags" | "core_rules" | "avoid" | "composition" | "kit"
 > {
   tags: string;
   core_rules: string;
   avoid: string;
   composition: { structure: string; optional_devices: string; layering: string };
+  /** Whether the style has a kit; off sends no kit. */
+  kitOn: boolean;
+  kit: KitDraft;
 }
 
 const EMPTY_FORM: FormState = {
@@ -109,12 +117,16 @@ const EMPTY_FORM: FormState = {
   avoid: "",
   prompt_template: "",
   negative_prompt: "",
+  kitOn: false,
+  kit: kitToDraft(null),
 };
 
 function toForm(style: ReferenceStyleInput | null): FormState {
   if (!style) return EMPTY_FORM;
   return {
     ...style,
+    kitOn: style.kit !== null && style.kit !== undefined,
+    kit: kitToDraft(style.kit ?? null),
     tags: style.tags.join(", "),
     core_rules: style.core_rules.join("\n"),
     avoid: style.avoid.join("\n"),
@@ -142,8 +154,10 @@ function parseLines(text: string): string[] {
 }
 
 function fromForm(form: FormState): ReferenceStyleInput {
+  const { kitOn, kit, ...rest } = form;
   return {
-    ...form,
+    ...rest,
+    kit: kitOn ? draftToKit(kit) : null,
     tags: parseTags(form.tags),
     core_rules: parseLines(form.core_rules),
     avoid: parseLines(form.avoid),
@@ -306,6 +320,9 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
   const [pasted, setPasted] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
   const usage = useUsage(open && style ? style.id : null);
+  const [trying, setTrying] = useState(false);
+  const [trial, setTrial] = useState<{ label: string; url: string }[]>([]);
+  const [trialError, setTrialError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -314,9 +331,34 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
     setPasting(false);
     setPasted("");
     setPasteError(null);
+    setTrial([]);
+    setTrialError(null);
   }, [open, style]);
 
-  const incomplete = form.style_name.trim() === "" || form.intent.trim() === "";
+  const kitProblem = form.kitOn ? kitDraftProblem(form.kit) : null;
+  const incomplete =
+    form.style_name.trim() === "" || form.intent.trim() === "" || kitProblem !== null;
+
+  /** Draws a frame of each sample scene with the kit as it is in the form, without saving. */
+  async function tryKit() {
+    if (!form.kitOn || kitProblem !== null) return;
+    setTrying(true);
+    setTrialError(null);
+    setTrial([]);
+    try {
+      const kit = draftToKit(form.kit);
+      const made: { label: string; url: string }[] = [];
+      for (const scene of KIT_TRIAL_SCENES) {
+        made.push({ label: scene.label, url: kitTrialStillUrl(await renderKitStill(scene.composition, kit)) });
+      }
+      setTrial(made);
+    } catch (e) {
+      setTrialError(e instanceof Error && e.message ? e.message : "Chưa vẽ thử được.");
+    } finally {
+      setTrying(false);
+    }
+  }
+
   const waitingUsage = style !== null && !usageKnown(usage);
   const setSource = (key: "url" | "title" | "kind", value: string) =>
     setForm((f) => ({ ...f, source: { ...f.source, [key]: value } }));
@@ -578,6 +620,56 @@ function ReferenceStyleDialog({ style, open, onClose, onSaved }: EditDialogProps
             data-testid="reference-negative-prompt-input"
           />
         </FormField>
+      </fieldset>
+
+      <fieldset className={styles.group} data-testid="reference-kit-card">
+        <legend>Bộ thông số vẽ</legend>
+        <p className={glass.cardHint}>
+          Các số rendering dùng để vẽ phong cách này (độ dày ánh viền, bóng, hạt...). Một video chọn
+          phong cách chưa có bộ thông số sẽ không dựng hình được.
+        </p>
+        <label className={styles.rowActions}>
+          <input
+            type="checkbox"
+            checked={form.kitOn}
+            onChange={(e) => setForm((f) => ({ ...f, kitOn: e.target.checked }))}
+            data-testid="reference-kit-toggle"
+          />
+          Phong cách này có bộ thông số vẽ
+        </label>
+        {form.kitOn && (
+          <KitFields
+            draft={form.kit}
+            onChange={(path, value) =>
+              setForm((f) => ({ ...f, kit: { ...f.kit, [path]: value } }))
+            }
+          />
+        )}
+        {form.kitOn && (
+          <>
+            <div className={styles.rowActions}>
+              <Button
+                variant="ghost"
+                onClick={() => void tryKit()}
+                disabled={trying || kitProblem !== null}
+                data-testid="reference-kit-try"
+              >
+                {trying ? "Đang vẽ thử…" : "Vẽ thử"}
+              </Button>
+            </div>
+            {trialError && (
+              <p className={styles.error} role="alert" data-testid="reference-kit-try-error">
+                {trialError}
+              </p>
+            )}
+            {trial.map((t) => (
+              <figure key={t.url} data-testid="reference-kit-try-image">
+                <img src={t.url} alt={`Vẽ thử: ${t.label}`} className={styles.trialImage} />
+                <figcaption className={glass.cardHint}>{t.label}</figcaption>
+              </figure>
+            ))}
+          </>
+        )}
       </fieldset>
 
       {style && (

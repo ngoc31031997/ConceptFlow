@@ -565,7 +565,7 @@ func TestInternalGetProject_NotFoundIs404(t *testing.T) {
 }
 
 // stubAuthored answers flowFor's authoring summary with a fixed JSON body, so
-// the json tag of illustrations_ready is exercised as it is on the wire.
+// the json tags are exercised as they are on the wire.
 type stubAuthored struct{ body string }
 
 func (s stubAuthored) Summaries(_ context.Context, ids []string) (map[string]application.AuthoringSummary, error) {
@@ -576,34 +576,21 @@ func (s stubAuthored) Summaries(_ context.Context, ids []string) (map[string]app
 	return map[string]application.AuthoringSummary{ids[0]: sum}, nil
 }
 
-// GET /v1/projects/:id places a Remotion draft whose drawings are not
-// ready at Hình minh hoạ (5); ready drawings stay at Code (6).
-func TestHandleGetProject_PlacesTheIllustrationsStep(t *testing.T) {
-	cases := []struct {
-		name   string
-		engine domain.RenderEngine
-		body   string
-		want   int
-	}{
-		{"remotion, drawings not ready", domain.RenderEngineRemotion, `{"story":true,"storyboard":true,"illustrations_ready":false}`, domain.FlowIllustrations},
-		{"remotion, drawings ready", domain.RenderEngineRemotion, `{"story":true,"storyboard":true,"illustrations_ready":true}`, domain.FlowCode},
+// GET /v1/projects/:id places a Remotion draft with a storyboard at Code (6).
+func TestHandleGetProject_PlacesAStoryboardDraftAtCode(t *testing.T) {
+	p := &domain.Project{ProjectID: "p1", Status: domain.StatusDraft, WizardStep: domain.WizardStepScript, RenderEngine: domain.RenderEngineRemotion}
+	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
+		&fakeProjectReader{project: p}, nil, nil).WithAuthoredContent(stubAuthored{`{"story":true,"storyboard":true}`})
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/projects/p1", nil))
+	var got struct {
+		FlowStep int `json:"flow_step"`
 	}
-	for _, c := range cases {
-		p := &domain.Project{ProjectID: "p1", Status: domain.StatusDraft, WizardStep: domain.WizardStepScript, RenderEngine: c.engine}
-		router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-			&fakeProjectReader{project: p}, nil, nil).WithAuthoredContent(stubAuthored{c.body})
-
-		rec := httptest.NewRecorder()
-		router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/projects/p1", nil))
-		var got struct {
-			FlowStep int `json:"flow_step"`
-		}
-		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != 200 {
-			t.Fatalf("%s: status %d, body %s", c.name, rec.Code, rec.Body.String())
-		}
-		if got.FlowStep != c.want {
-			t.Errorf("%s: flow_step %d, want %d", c.name, got.FlowStep, c.want)
-		}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != 200 {
+		t.Fatalf("status %d, body %s", rec.Code, rec.Body.String())
+	}
+	if got.FlowStep != domain.FlowCode {
+		t.Errorf("flow_step %d, want %d", got.FlowStep, domain.FlowCode)
 	}
 }
 

@@ -36,3 +36,10 @@ var (
 var ErrProjectBusy = errors.New("project is rendering; cancel it before deleting")
 
 var ErrInvalidWizardInput = errors.New("invalid wizard input")
+
+// ErrNoReferenceStyle: the project has not picked a reference style at step 8,
+// so there is no drawing kit to render with.
+var ErrNoReferenceStyle = errors.New("project has no reference style picked")
+
+// ErrReferenceStyleHasNoKit: the picked reference style has no drawing kit.
+var ErrReferenceStyleHasNoKit = errors.New("reference style has no drawing kit")

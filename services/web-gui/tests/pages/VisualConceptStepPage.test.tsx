@@ -351,7 +351,7 @@ describe("VisualConceptStepPage", () => {
     expect(confirm).toHaveTextContent("Phần 2 · Bảng màu và tương phản");
     expect(setRefs).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("concept-refs-confirm-save"));
-    await waitFor(() => expect(setRefs).toHaveBeenCalledWith("p1", ["R01", "R02"]));
+    await waitFor(() => expect(setRefs).toHaveBeenCalledWith("p1", ["R02"]));
   });
 
   it("handles the review: open findings, a failing check, the criteria and the lock", async () => {

@@ -17,6 +17,8 @@ interface IllustrationTileProps {
   actions?: ReactNode;
   /** "Nhờ AI sửa các cảnh báo này": opens the redraw with this note filled in. */
   onFixWarnings?: (note: string) => void;
+  /** Phong cách tham chiếu dựng ảnh cho hình chưa có ảnh (hình có sẵn). */
+  refId: string;
 }
 
 function badgeClass(ill: Illustration): string {
@@ -28,11 +30,11 @@ function badgeClass(ill: Illustration): string {
  * One drawing of the library as a tile: the PNG still, which turns
  * into its GIF (the figure's own motion) while hovered or focused.
  */
-export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0, selected, onOpen, actions, onFixWarnings }: IllustrationTileProps) {
+export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0, selected, onOpen, actions, onFixWarnings, refId }: IllustrationTileProps) {
   const [moving, setMoving] = useState(false);
   const [broken, setBroken] = useState(false);
   const [warningsOpen, setWarningsOpen] = useState(false);
-  const src = `${illustrationPreviewUrl(ill, moving ? "gif" : "png")}&b=${bust}`;
+  const src = `${illustrationPreviewUrl(ill, moving ? "gif" : "png", refId)}&b=${bust}`;
   return (
     <li
       className={`${styles.tile} ${selected ? styles.selected : ""} ${warningsOpen ? styles.wide : ""}`}

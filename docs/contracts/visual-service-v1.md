@@ -10,6 +10,8 @@ visual-service giữ các bước tiền kỳ hình ảnh (bước 8–14) và D
 | bước sau bước 8 | GET | `/internal/v1/visual/{id}/concept` | Tài liệu ngôn ngữ hình ảnh của phiên bản chốt mới nhất ([`visual-concept-v1.md`](visual-concept-v1.md)). `404` khi chưa chốt. `?step=` dành cho các bước 9–14 khi chúng có; hiện chưa bước nào đọc theo tên nên mọi `step` khác rỗng trả `400` |
 | bước sau bước 9 | GET | `/internal/v1/visual/{id}/plan` | Tài liệu kế hoạch hình của phiên bản chốt mới nhất ([`visual-plan-v1.md`](visual-plan-v1.md)). `404` khi chưa chốt |
 | bước sau bước 10 | GET | `/internal/v1/visual/{id}/sequence` | Tài liệu chuỗi hình của phiên bản chốt mới nhất ([`visual-sequence-v1.md`](visual-sequence-v1.md)). `404` khi chưa chốt |
+| orchestrator (lệnh `render_scenes`) | GET | `/internal/v1/visual/{id}/kit` | Bộ thông số vẽ của phong cách mà dự án đã chọn: `200 {"ref_id":"R12","kit":ReferenceKit}`. Mỗi dự án chỉ chọn một phong cách (`project_reference_picks` có chỉ mục duy nhất theo `project_id`), nên đây là phong cách duy nhất đó. `404` khi dự án chưa chọn phong cách nào; `409` khi phong cách đó chưa có kit (lỗi `{"error":"…"}`) |
+| rendering | GET | `/internal/v1/reference-styles/{id}/kit` | Bộ thông số vẽ của một phong cách: `200 {"ref_id":"R12","kit":ReferenceKit}`. `404` khi không có phong cách `{id}`; `409` khi phong cách chưa có kit |
 | compose healthcheck | GET | `/health` | `{"status":"ok"}` |
 
 Orchestrator gọi route xoá ở cuối saga xoá dự án, sau khi mọi service giữ file (`PurgeTargets`) đã báo xong và dòng dự án đã xoá. Giống cách xoá authoring: cố gắng một lần, lỗi thì ghi log, không chặn saga. visual-service không giữ file nên không phải một `PurgeTarget`.
@@ -49,7 +51,26 @@ Luật (đếm theo ký tự, sau khi cắt khoảng trắng hai đầu):
 
 `/import` nhận thân `{"error":"…"}` (AI ngoài báo không xem được link) và trả `400` đúng lý do đó.
 
-Lưu trữ: cột `description` giữ `summary`; cột `detail JSONB` giữ `source`, `drawing`, `layout`.
+Lưu trữ: cột `description` giữ `summary`; cột `detail JSONB` giữ `source`, `drawing`, `layout` và `kit`.
+
+#### Bộ thông số vẽ (`kit`)
+
+`ReferenceStyleInput.kit` là `null` (phong cách chưa có kit, vẫn lưu được; dự án chọn nó sẽ không dựng hình được, xem route `/kit` ở trên) hoặc một `ReferenceKit` có hình dạng của `KitTokens` trong `services/rendering/remotion_project/src/conceptflow-mini/kits.ts` (ADR-0050). POST/PUT/`/import` nhận và trả `kit`; PUT thay cả kit (gửi `null` để bỏ).
+
+```json
+{ "outline": 0, "radius": 0.18, "rimWidth": 0.035, "rimStrength": 0.7, "shadowStrength": 0.35, "aoStrength": 0.25,
+  "specular": { "glossy": 0.5, "metal": 0.8, "glass": 0.9 },
+  "texture": { "fur": 0.25, "fabric": 0.12, "wood": 0.2, "stone": 0.22, "organic": 0.15, "leaf": 0.12 },
+  "sss": 0.4, "glowBlur": 0.08, "bloom": 0.5,
+  "haze": { "far": 0.35, "mid": 0.15 },
+  "dof": { "sky": 6, "far": 3, "mid": 1, "near": 10 },
+  "grain": 0, "vignette": 0, "ink": "#2B2118",
+  "previewLook": { "light": { "x": 0.3, "y": 0.2, "color": "#FFE7B0", "intensity": 0.8 }, "ambient": "#8899AA",
+                   "atmosphere": { "color": "#CCDDEE", "density": 0.2 }, "focus": "figures",
+                   "grade": { "warmth": 0.2, "contrast": -0.1, "saturation": 0.3 } } }
+```
+
+Luật kit: đủ mọi trường, không thừa trường; mọi số trong khoảng 0..1 trừ `previewLook.grade.*` (`warmth`, `contrast`, `saturation`: -1..1) và `dof.*` (px, từ 0 trở lên); `ink`, `previewLook.light.color`, `previewLook.ambient`, `previewLook.atmosphere.color` là `#RRGGBB`; `previewLook.focus` ∈ `sky`, `far`, `mid`, `near`, `figures`. Sai thì `400` nêu trường sai, ví dụ `kit.grain: cần là số từ 0 đến 1`, `kit.haze.mid: thiếu`.
 
 Lỗi `{"error":"…"}`: `400` khi sai luật (thông báo nêu trường sai, ví dụ `drawing.shape: dài quá 300 ký tự`) hoặc thân không phải JSON, `404` khi không có mô tả `{id}` (PUT, DELETE, usage), `500` khi lỗi DB. api-gateway trả `502 {"error":"upstream_unavailable","service":"visual-service"}` khi không gọi được visual-service.
 
@@ -72,7 +93,7 @@ Lỗi `{"error":"…"}`: `400` khi sai luật (thông báo nêu trường sai, v
 | `visual_plan_seq` | `project_id` | Số kế tiếp của mã unit `VP-…`, không dùng lại |
 | `visual_sequence_versions` | `(project_id, version)` | Bản chốt bất biến của bước 10 ([`visual-sequence-v1.md`](visual-sequence-v1.md)) |
 | `project_visual` | `project_id` | Thiết lập riêng từng video: `concept_model`, `plan_model` (`''` = mặc định của bước) |
-| `reference_styles` | `id` (`R01`…) | Thư viện mô tả phong cách dùng chung (tên, `description` = tóm tắt, `detail` JSONB: `source`, `drawing`, `layout`); `seq` không dùng lại. Bước 8 chỉ đọc |
+| `reference_styles` | `id` (`R01`…) | Thư viện mô tả phong cách dùng chung (tên, `description` = tóm tắt, `detail` JSONB: `source`, `drawing`, `layout`, `kit`); `seq` không dùng lại. Bước 8 chỉ đọc |
 | `project_reference_picks` | `(project_id, ref_id)` | Mô tả video chọn; xoá mô tả thì xoá theo (`ON DELETE CASCADE`) |
 
 Route công khai của bước 8: [`visual-concept-v1.md`](visual-concept-v1.md); bước 9: [`visual-plan-v1.md`](visual-plan-v1.md); bước 10: [`visual-sequence-v1.md`](visual-sequence-v1.md).

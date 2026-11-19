@@ -10,7 +10,7 @@
  * Protocol: one JSON object per line on stdin, one per line on stdout.
  *   at start:  {"ready": true, "browser": {"version"}}
  *          or: {"fatal": "..."}                         (then it exits 1)
- *   in:        {"id": "...", "code": "<tsx>", "font": "Be Vietnam Pro", "kit": "phatsang"}
+ *   in:        {"id": "...", "code": "<tsx>", "font": "Be Vietnam Pro", "kit": {drawing tokens}}
  *   out:       {"id": "...", "result": {...probe JSON, version 1...}}
  *          or: {"id": "...", "error": "...", "stage": "compile|load|measure|browser"}
  * A request whose browser has died is answered with stage "browser" and the

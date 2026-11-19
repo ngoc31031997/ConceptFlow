@@ -12,16 +12,21 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 	repo := newFakeRepo()
 	pub := &fakePublisher{}
 	prog := &fakeProgress{}
-	return NewHandleStepEventUseCase(repo, pub, prog, nil, nil).WithKitKeys(fakeKits{kit: "phatsang"}), repo, pub, prog
+	return NewHandleStepEventUseCase(repo, pub, prog, nil, nil).WithKits(fakeKits{kit: testKit}), repo, pub, prog
 }
 
-// fakeKits answers the same kit for every project.
+// testKit is the drawing kit fakeKits answers by default.
+var testKit = map[string]interface{}{"focus": "mid", "grain": 0.2}
+
+// fakeKits answers the same kit (or error) for every project.
 type fakeKits struct {
-	kit string
+	kit map[string]interface{}
 	err error
 }
 
-func (f fakeKits) KitKey(context.Context, string) (string, error) { return f.kit, f.err }
+func (f fakeKits) ProjectKit(context.Context, string) (map[string]interface{}, error) {
+	return f.kit, f.err
+}
 
 // renderScenesProject is a narration-free project about to be rendered.
 func renderScenesProject(repo *fakeRepo) {
@@ -42,7 +47,7 @@ func scriptValidated() StepEvent {
 	}
 }
 
-// The render command carries the kit of the visual language the project is pinned to.
+// The render command carries the drawing kit of the project's reference style.
 func TestRenderScenesCarriesTheProjectsKit(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	renderScenesProject(repo)
@@ -53,34 +58,60 @@ func TestRenderScenesCarriesTheProjectsKit(t *testing.T) {
 	if last == nil || last.routingKey != "rendering" {
 		t.Fatalf("expected render_scenes dispatched to rendering, got %+v", last)
 	}
-	if got := last.envelope.Payload["kit_key"]; got != "phatsang" {
-		t.Fatalf("render_scenes kit_key = %v, want phatsang", got)
+	got, _ := last.envelope.Payload["kit"].(map[string]interface{})
+	if got["focus"] != "mid" || got["grain"] != 0.2 {
+		t.Fatalf("render_scenes kit = %v, want %v", last.envelope.Payload["kit"], testKit)
+	}
+	if _, ok := last.envelope.Payload["kit_key"]; ok {
+		t.Fatal("render_scenes must not carry kit_key")
 	}
 }
 
-// A project with no pinned language is not rendered: the step fails and says why.
-func TestRenderScenesFailsClearlyWhenTheProjectHasNoPinnedLanguage(t *testing.T) {
-	uc, repo, pub, prog := newTestUseCase()
-	uc = uc.WithKitKeys(fakeKits{kit: ""})
+// A project with no kit to draw with is not rendered: the step fails and says why.
+func TestRenderScenesFailsClearlyWithoutAKit(t *testing.T) {
+	cases := map[string]struct {
+		kits KitPort
+		want string
+	}{
+		"no reference style": {fakeKits{err: domain.ErrNoReferenceStyle}, errNoReferenceStyle},
+		"style has no kit":   {fakeKits{err: domain.ErrReferenceStyleHasNoKit}, errReferenceStyleNoKit},
+		"no kit source":      {nil, errNoKitSource},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			uc, repo, pub, prog := newTestUseCase()
+			uc.kits = tc.kits
+			renderScenesProject(repo)
+			if err := uc.Execute(context.Background(), scriptValidated()); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, cmd := range pub.published {
+				if cmd.routingKey == "rendering" {
+					t.Fatalf("a project with no kit must not be rendered, got %+v", cmd)
+				}
+			}
+			project, _ := repo.Get(context.Background(), "proj-1")
+			if project.Status != domain.StatusFailedRenderScenes {
+				t.Fatalf("status = %s, want %s", project.Status, domain.StatusFailedRenderScenes)
+			}
+			step, _ := repo.GetStep(context.Background(), "saga-1", domain.StepRenderScenes)
+			if step.ErrorMessage == nil || *step.ErrorMessage != tc.want {
+				t.Fatalf("step error = %v, want %q", step.ErrorMessage, tc.want)
+			}
+			if len(prog.messages) == 0 {
+				t.Fatal("the failure was not reported as progress")
+			}
+		})
+	}
+}
+
+// A transient visual-service failure is returned, so the event is retried.
+func TestRenderScenesReturnsATransientKitError(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	uc.kits = fakeKits{err: errors.New("connection refused")}
 	renderScenesProject(repo)
-	if err := uc.Execute(context.Background(), scriptValidated()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	for _, cmd := range pub.published {
-		if cmd.routingKey == "rendering" {
-			t.Fatalf("a project with no pinned language must not be rendered, got %+v", cmd)
-		}
-	}
-	project, _ := repo.Get(context.Background(), "proj-1")
-	if project.Status != domain.StatusFailedRenderScenes {
-		t.Fatalf("status = %s, want %s", project.Status, domain.StatusFailedRenderScenes)
-	}
-	step, _ := repo.GetStep(context.Background(), "saga-1", domain.StepRenderScenes)
-	if step.ErrorMessage == nil || *step.ErrorMessage != errNoPinnedLanguage {
-		t.Fatalf("step error = %v, want %q", step.ErrorMessage, errNoPinnedLanguage)
-	}
-	if len(prog.messages) == 0 {
-		t.Fatal("the failure was not reported as progress")
+	if err := uc.Execute(context.Background(), scriptValidated()); err == nil {
+		t.Fatal("a transient kit read failure must be returned")
 	}
 }
 

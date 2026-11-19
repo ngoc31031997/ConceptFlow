@@ -20,6 +20,7 @@ Mount tại `/shared` (`/shared:ro` với publisher).
 | `/shared/{project_id}/music/` | api-gateway | upload của Creator |
 | `/shared/channel-assets/{kind}/{quality}/normalized.mp4`, `with_music_v{n}.mp4` | video-assembly | không thuộc project nào |
 | `/shared/channel-assets/{kind}/…` (file upload gốc) | api-gateway | không thuộc project nào |
+| `/shared/illustrations/{id}/v{version}.png`, `v{version}.gif` | rendering | ảnh xem trước của một hình trong thư viện hình minh hoạ (`illustrations.id`); chỉ giữ phiên bản hiện tại, ghi file tạm rồi đổi tên; xoá hình thì xoá cả thư mục; api-gateway phát qua `GET /v1/illustrations/{id}/preview.png|.gif` ([`illustration-library-v1.md`](illustration-library-v1.md)) |
 | `/shared/stills/{hash}.png` | rendering | ảnh mẫu của ngôn ngữ hình, tên theo hash nội dung; `POST /v1/stills/prune` dọn ảnh không còn ai trỏ tới; api-gateway phát qua `/v1/stills/{file}` |
 
 Publisher chỉ đọc.

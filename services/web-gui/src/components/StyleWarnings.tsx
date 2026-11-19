@@ -1,20 +1,19 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CodeDiagnostic } from "../api/client";
 import { usePresence } from "../hooks/usePresence";
-import { useStyleWarnings } from "../hooks/useStyleRuleNames";
-import { fixWarningsNote, warningText, type StyleWarning } from "../utils/styleRules";
+import { describeWarning, fixWarningsNote, warningText, type StyleWarning } from "../utils/styleRules";
 import { Button } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./StyleWarnings.module.css";
 
-/** Danh sách cảnh báo, mỗi dòng: mã · tên luật — dòng N: chi tiết. */
+/** Danh sách cảnh báo, mỗi dòng: mã — dòng N: chi tiết. */
 export function StyleWarningList({ items, testId }: { items: StyleWarning[]; testId?: string }) {
   return (
     <ul className={styles.list} data-testid={testId}>
       {items.map((w, i) => (
         <li key={i}>
-          {(w.code || w.rule) && <b className={styles.rule}>{[w.code, w.rule].filter(Boolean).join(" · ")}</b>}
-          {(w.code || w.rule) && " — "}
+          {w.code && <b className={styles.rule}>{w.code}</b>}
+          {w.code && " — "}
           {w.line != null && <span className={styles.line}>dòng {w.line}</span>}
           {w.line != null && ": "}
           {w.detail}
@@ -43,7 +42,7 @@ interface StyleWarningsProps {
  * được trên màn hình cảm ứng), kèm nút sao chép và nút nhờ AI sửa.
  */
 export function StyleWarnings({ warnings, name, onFix, onToggle }: StyleWarningsProps) {
-  const items = useStyleWarnings(warnings);
+  const items = useMemo(() => warnings.map(describeWarning), [warnings]);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<"" | "ok" | "fail">("");
   const { mounted, closing } = usePresence(open);

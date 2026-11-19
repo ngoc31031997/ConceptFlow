@@ -2,9 +2,9 @@
 /**
  * Preview the illustration kit without running the pipeline.
  *
- *   node render_gallery.mjs sheets <outDir> [--kit key]   two PNG sheets: every pose/mood of
+ *   node render_gallery.mjs sheets <outDir> --kit <file>   two PNG sheets: every pose/mood of
  *                                                         <Person>, and every other figure
- *   node render_gallery.mjs sample <outDir> [--kit key]   the sample scenes of the visual
+ *   node render_gallery.mjs sample <outDir> --kit <file>   the sample scenes of the visual
  *                                                         language (fig interior, outer space),
  *                                                         landscape and portrait, as PNG stills
  *
@@ -13,15 +13,15 @@
  */
 import {bundle} from '@remotion/bundler';
 import {renderStill, selectComposition} from '@remotion/renderer';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 
 const args = process.argv.slice(2);
 const kitAt = args.indexOf('--kit');
-const kitKey = kitAt >= 0 ? args.splice(kitAt, 2)[1] : 'phatsang';
+const kitFile = kitAt >= 0 ? args.splice(kitAt, 2)[1] : null;
 const [mode, out] = args;
-if (!['sheets', 'sample'].includes(mode) || !out) {
-  console.error('usage: node render_gallery.mjs sheets|sample <outDir> [--kit key]');
+if (!['sheets', 'sample'].includes(mode) || !out || !kitFile) {
+  console.error('usage: node render_gallery.mjs sheets|sample <outDir> --kit <kit.json>');
   process.exit(2);
 }
 const browserExecutable = process.env.REMOTION_BROWSER || null;
@@ -29,7 +29,7 @@ const ENTRIES = {sheets: './src/gallery/index.tsx', sample: './src/gallery/langu
 const IDS = {sheets: ['people', 'things'], sample: ['sample-fig-wide', 'sample-fig-tall', 'sample-space-wide', 'sample-space-tall']};
 const entry = fileURLToPath(new URL(ENTRIES[mode], import.meta.url));
 const serveUrl = await bundle({entryPoint: entry, publicDir: fileURLToPath(new URL('./public', import.meta.url))});
-const inputProps = {kitKey};
+const inputProps = {kit: JSON.parse(readFileSync(kitFile, 'utf8'))};
 
 mkdirSync(out, {recursive: true});
 for (const id of IDS[mode]) {

@@ -15,6 +15,7 @@ import {
   drawIllustration,
   EXEMPLAR_FOLDER_ID,
   getIllustrationStyle,
+  listReferenceStyles,
   listIllustrationFolders,
   listIllustrations,
   makeExemplar,
@@ -25,6 +26,7 @@ import {
   type Illustration,
   type IllustrationFolder,
   type IllustrationInput,
+  type ReferenceStyle,
 } from "../api/client";
 import { componentNameFromFile, svgToComponent } from "../utils/svgToComponent";
 import glass from "../styles/glass.module.css";
@@ -34,6 +36,9 @@ const ALL = "";
 
 const DETAIL_LEVELS: DetailLevel[] = ["rich", "medium", "silhouette"];
 const NEW = "new";
+
+/** Phong cách tham chiếu mới mở trang chọn sẵn. */
+const DEFAULT_REF_ID = "R12";
 
 /**
  * Thư viện hình minh hoạ. Mỗi hình nằm trong đúng một thư mục; Kỹ sư
@@ -57,7 +62,8 @@ export function IllustrationLibraryPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [newFolderId, setNewFolderId] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
-  const [rules, setRules] = useState("");
+  const [styleList, setStyleList] = useState<ReferenceStyle[]>([]);
+  const [refId, setRefId] = useState(DEFAULT_REF_ID);
   const [exemplarIds, setExemplarIds] = useState<string[]>([]);
   const [maxExemplars, setMaxExemplars] = useState(5);
   const [draft, setDraft] = useState<Partial<IllustrationInput> | undefined>(undefined);
@@ -85,11 +91,17 @@ export function IllustrationLibraryPage() {
     void reload();
     getIllustrationStyle()
       .then((st) => {
-        setRules(st.rules);
         setExemplarIds(st.exemplar_ids);
         setMaxExemplars(st.max_exemplars);
       })
-      .catch(() => setRules(""));
+      .catch((e) => setStatus(e instanceof Error && e.message ? e.message : "Không tải được Hình mẫu."));
+    listReferenceStyles()
+      .then((list) => {
+        setStyleList(list);
+        // Keep the default only when the library really has it; otherwise start on the first style.
+        setRefId((cur) => (list.some((s) => s.id === cur) ? cur : (list[0]?.id ?? cur)));
+      })
+      .catch((e) => setStatus(e instanceof Error && e.message ? e.message : "Không tải được danh sách phong cách tham chiếu."));
   }, [reload]);
 
   // 2.1 — viết code: mở trình sửa với khung code mẫu.
@@ -127,7 +139,7 @@ export function IllustrationLibraryPage() {
     setDrawing(true);
     setStatus(null);
     try {
-      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawTarget, model: aiModel || undefined, detail_level: drawDetail });
+      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawTarget, model: aiModel || undefined, detail_level: drawDetail, ref_id: refId });
       setItems((list) => [...list, made]);
       setDrawText("");
       setDrawOpen(false);
@@ -144,6 +156,13 @@ export function IllustrationLibraryPage() {
   const writableFolders = folders.filter((f) => f.id !== EXEMPLAR_FOLDER_ID);
   const writableFolder = folder && folder !== EXEMPLAR_FOLDER_ID ? folder : undefined;
   const drawTarget = drawFolder || writableFolder || writableFolders[0]?.id || "";
+  const selectedStyle = styleList.find((s) => s.id === refId);
+  const styleRules = selectedStyle ? [selectedStyle.intent, ...selectedStyle.core_rules.map((r) => `- ${r}`)].join("\n") : "";
+  const styleOptions = styleList.map((s) => ({
+    value: s.id,
+    label: `${s.id} · ${s.style_name}${s.kit ? "" : " (chưa có bộ thông số vẽ)"}`,
+    hint: s.intent,
+  }));
   const exemplars = exemplarIds.map((id) => items.find((i) => i.id === id)).filter((i): i is Illustration => !!i);
   const copied = new Set(items.map((i) => i.source_id).filter(Boolean));
 
@@ -185,7 +204,7 @@ export function IllustrationLibraryPage() {
 
   const rerender = (ill: Illustration) =>
     onTile(ill.id, async () => {
-      await rerenderIllustration(ill.id);
+      await rerenderIllustration(ill.id, ill.ref_id || refId);
       setBust((b) => ({ ...b, [ill.id]: (b[ill.id] ?? 0) + 1 }));
     });
 
@@ -293,7 +312,7 @@ export function IllustrationLibraryPage() {
                 </Button>
               )}
             </Card>
-            <IllustrationBackupCard onImported={() => void reload()} />
+            <IllustrationBackupCard onImported={() => void reload()} refId={refId} />
           </aside>
 
           <section className={styles.main}>
@@ -322,9 +341,14 @@ export function IllustrationLibraryPage() {
               </div>
             </div>
             <div className={glass.mtSm}>
+              <FormField label="Phong cách tham chiếu">
+                <Dropdown value={refId} options={styleOptions} onChange={setRefId} data-testid="illustration-ref-style" />
+              </FormField>
+            </div>
+            <div className={glass.mtSm}>
               <Disclosure
-                title="Luật style của kênh"
-                hint="AI vẽ phải theo đúng luật này; hình tải lên hay tự viết code được kiểm tra theo nó. Vi phạm nặng chặn lưu, vi phạm nhẹ chỉ cảnh báo."
+                title="Phong cách tham chiếu và Hình mẫu"
+                hint="Hình được dựng bằng bộ thông số vẽ của phong cách tham chiếu bạn chọn; hình đã vẽ giữ phong cách của lần vẽ đầu."
                 testId="illustration-style"
               >
                 <p className={styles.exemplarHead} data-testid="illustration-exemplar-count">
@@ -339,6 +363,7 @@ export function IllustrationLibraryPage() {
                       key={ill.id}
                       illustration={ill}
                       busy={busyIds[ill.id]}
+                      refId={ill.ref_id || refId}
                       onOpen={() => setOpenId(ill.id)}
                       actions={
                         <Button variant="ghost" onClick={() => unmakeSample(ill)} disabled={busyIds[ill.id]} data-testid={`unmake-exemplar-${ill.name}`}>
@@ -348,16 +373,18 @@ export function IllustrationLibraryPage() {
                     />
                   ))}
                 </ul>
-                <CopyBox text={rules} what="luật style" copyTestId="illustration-style-rules-copy">
-                  <pre className={styles.rules} data-testid="illustration-style-rules">{rules}</pre>
-                </CopyBox>
+                {selectedStyle && (
+                  <CopyBox text={styleRules} what="luật phong cách" copyTestId="illustration-style-rules-copy">
+                    <pre className={styles.rules} data-testid="illustration-style-rules">{styleRules}</pre>
+                  </CopyBox>
+                )}
               </Disclosure>
             </div>
             {drawOpen && (
               <Card
                 className={glass.mtSm}
                 title="AI vẽ hình mới"
-                hint="Mô tả vật cần vẽ. AI theo luật style và học theo hình mẫu cùng hình bạn đã duyệt trong thư mục; hình vẽ xong nằm ở 'Chờ duyệt'."
+                hint="Mô tả vật cần vẽ. AI theo phong cách tham chiếu đã chọn và học theo hình mẫu cùng hình bạn đã duyệt trong thư mục; hình vẽ xong nằm ở 'Chờ duyệt'."
                 data-testid="illustration-draw-card"
               >
                 <FormField label="Vẽ gì">
@@ -420,6 +447,7 @@ export function IllustrationLibraryPage() {
                   }}
                   onClose={() => setOpenId(null)}
                   redrawNote={fixNote && fixNote.id === openId ? fixNote : undefined}
+                  refId={refId}
                 />
               </div>
             )}
@@ -452,6 +480,7 @@ export function IllustrationLibraryPage() {
                   illustration={ill}
                   folderName={folder === ALL ? folderName[ill.folder_id] : undefined}
                   busy={busyIds[ill.id]}
+                  refId={ill.ref_id || refId}
                   bust={bust[ill.id]}
                   selected={ill.id === openId}
                   onOpen={() => setOpenId(ill.id)}

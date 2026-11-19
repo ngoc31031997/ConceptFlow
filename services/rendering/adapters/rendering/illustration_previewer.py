@@ -97,7 +97,7 @@ class IllustrationPreviewer:
                 return reply
 
     def preview(
-        self, kit_key: str, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+        self, kit: dict, name: str, code: str = "", props: dict | None = None, gif: bool = True,
         kind: str = "figure",
     ) -> PreviewResult:
         with self._lock:
@@ -105,7 +105,7 @@ class IllustrationPreviewer:
                 self._start()
             assert self._proc is not None and self._proc.stdin is not None
             rid = uuid.uuid4().hex
-            msg = {"id": rid, "kit_key": kit_key, "name": name, "props": props or {}, "gif": gif, "kind": kind}
+            msg = {"id": rid, "kit": kit, "name": name, "props": props or {}, "gif": gif, "kind": kind}
             if code:
                 msg["code"] = code
             try:
@@ -119,7 +119,9 @@ class IllustrationPreviewer:
             return PreviewResult(True, png=reply.get("png", ""), gif=reply.get("gif", ""))
         return PreviewResult(False, error=str(reply.get("error", "lỗi không rõ")))
 
-    def still(self, kit_key: str, composition: str, output: str, frame: int = 10, props: dict | None = None) -> None:
+    def still(
+        self, kit: dict, composition: str, output: str, frame: int = 10, props: dict | None = None,
+    ) -> None:
         """Dựng một khung của composition mẫu `composition` ra file `output` (PNG)."""
         with self._lock:
             if self._proc is None or self._proc.poll() is not None:
@@ -127,7 +129,7 @@ class IllustrationPreviewer:
             assert self._proc is not None and self._proc.stdin is not None
             rid = uuid.uuid4().hex
             msg = {
-                "id": rid, "op": "still", "kit_key": kit_key, "composition": composition,
+                "id": rid, "op": "still", "kit": kit, "composition": composition,
                 "frame": frame, "props": props or {}, "output": output,
             }
             try:

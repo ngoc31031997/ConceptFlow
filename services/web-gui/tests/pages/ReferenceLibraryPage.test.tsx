@@ -34,6 +34,7 @@ const R01: apiClient.ReferenceStyle = {
   avoid: ["pastel"],
   prompt_template: "{subject} in {setting}, 16:9",
   negative_prompt: "outline, sketch",
+  kit: null,
   created_at: "2026-11-01T00:00:00Z",
   updated_at: "2026-11-01T00:00:00Z",
 };
@@ -208,6 +209,7 @@ describe("ReferenceLibraryPage", () => {
         avoid: [],
         prompt_template: "",
         negative_prompt: "",
+        kit: null,
       }),
     );
     expect(await screen.findByTestId("reference-status")).toHaveTextContent("Đã thêm R03.");
@@ -241,6 +243,81 @@ describe("ReferenceLibraryPage", () => {
     fireEvent.change(screen.getByTestId("reference-name-input"), { target: { value: "Đổi tên" } });
     fireEvent.click(screen.getByTestId("reference-edit-save"));
     await waitFor(() => expect(update).toHaveBeenCalledWith("R01", { ...R01, style_name: "Đổi tên" }));
+  });
+
+  it("saves the drawing kit the Creator turns on and edits", async () => {
+    const update = vi.spyOn(apiClient, "updateReferenceStyle").mockResolvedValue(R01);
+    renderPage();
+    fireEvent.click(await screen.findByTestId("reference-edit-R01"));
+    await screen.findByTestId("reference-name-input");
+    expect(screen.queryByTestId("reference-kit-grain")).toBeNull();
+    fireEvent.click(screen.getByTestId("reference-kit-toggle"));
+    fireEvent.change(screen.getByTestId("reference-kit-grain"), { target: { value: "0.25" } });
+    fireEvent.change(screen.getByTestId("reference-kit-dof.near"), { target: { value: "10" } });
+    fireEvent.change(screen.getByTestId("reference-kit-previewLook.focus"), {
+      target: { value: "mid" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("reference-edit-save")).toHaveTextContent(/^Lưu$/),
+    );
+    fireEvent.click(screen.getByTestId("reference-edit-save"));
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const kit = update.mock.calls[0][1].kit;
+    expect(kit?.grain).toBe(0.25);
+    expect(kit?.dof.near).toBe(10);
+    expect(kit?.previewLook.focus).toBe("mid");
+  });
+
+  it("draws a trial of both sample scenes with the kit being edited, without saving", async () => {
+    const still = vi
+      .spyOn(apiClient, "renderKitStill")
+      .mockResolvedValueOnce({ file: "a".repeat(64) + ".png", cache_hit: false })
+      .mockResolvedValueOnce({ file: "b".repeat(64) + ".png", cache_hit: true });
+    const update = vi.spyOn(apiClient, "updateReferenceStyle");
+    renderPage();
+    fireEvent.click(await screen.findByTestId("reference-edit-R01"));
+    await screen.findByTestId("reference-name-input");
+    expect(screen.queryByTestId("reference-kit-try")).toBeNull();
+    fireEvent.click(screen.getByTestId("reference-kit-toggle"));
+    fireEvent.change(screen.getByTestId("reference-kit-grain"), { target: { value: "0.25" } });
+    fireEvent.click(screen.getByTestId("reference-kit-try"));
+    const images = await screen.findAllByTestId("reference-kit-try-image");
+    expect(images).toHaveLength(2);
+    expect(still.mock.calls.map((c) => c[0])).toEqual(["sample-fig-wide", "sample-space-wide"]);
+    expect(still.mock.calls[0][1].grain).toBe(0.25);
+    expect(images[0].querySelector("img")?.getAttribute("src")).toContain(`/v1/stills/${"a".repeat(64)}.png`);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("shows why a trial could not be drawn", async () => {
+    vi.spyOn(apiClient, "renderKitStill").mockRejectedValue(new apiClient.ApiError("bộ dựng chưa chạy"));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("reference-edit-R01"));
+    await screen.findByTestId("reference-name-input");
+    fireEvent.click(screen.getByTestId("reference-kit-toggle"));
+    fireEvent.click(screen.getByTestId("reference-kit-try"));
+    expect(await screen.findByTestId("reference-kit-try-error")).toHaveTextContent("bộ dựng chưa chạy");
+  });
+
+  it("disables the trial while a kit number is out of range", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("reference-edit-R01"));
+    await screen.findByTestId("reference-name-input");
+    fireEvent.click(screen.getByTestId("reference-kit-toggle"));
+    fireEvent.change(screen.getByTestId("reference-kit-grain"), { target: { value: "1.5" } });
+    expect(screen.getByTestId("reference-kit-try")).toBeDisabled();
+  });
+
+  it("blocks saving while a kit number is out of range", async () => {
+    const update = vi.spyOn(apiClient, "updateReferenceStyle").mockResolvedValue(R01);
+    renderPage();
+    fireEvent.click(await screen.findByTestId("reference-edit-R01"));
+    await screen.findByTestId("reference-name-input");
+    fireEvent.click(screen.getByTestId("reference-kit-toggle"));
+    fireEvent.change(screen.getByTestId("reference-kit-grain"), { target: { value: "1.5" } });
+    expect(await screen.findByTestId("reference-kit-grain-problem")).toHaveTextContent("0 đến 1");
+    expect(screen.getByTestId("reference-edit-save")).toBeDisabled();
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("lists, by topic, the videos that picked a description before saving an edit", async () => {

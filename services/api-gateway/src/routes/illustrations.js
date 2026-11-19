@@ -1,26 +1,33 @@
 'use strict';
 
 const express = require('express');
+const path = require('path');
 const { proxyHandler } = require('../handlers/proxyHandler');
+const { sharedFileHandler } = require('../handlers/sharedFileHandler');
 
-// Same cap as authoring-service's maxLibraryBackupBytes.
+// Same cap as rendering's backup upload limit.
+
 const BACKUP_LIMIT = '256mb';
 
+// A still is named by the sha-256 of what it shows.
+const STILL_NAME = /^[0-9a-f]{64}\.png$/;
+
 /**
- * The illustration library, served by authoring-service.
+ * The illustration library and the sample stills, served by rendering.
  *
  * Reads and folder edits use the ordinary client. Anything that renders a
  * preview (create, edit, try, rerender, and the first view of a preview image)
  * waits on the rendering service, and drawing waits on a model, so it goes through the
  * client without a timeout.
  *
- * @param {import('../clients/httpClient').HttpClient} authoringClient
- * @param {import('../clients/httpClient').HttpClient} authoringSlowClient
+ * @param {import('../clients/httpClient').HttpClient} renderingClient
+ * @param {import('../clients/httpClient').HttpClient} renderingSlowClient
+ * @param {string} sharedDir - absolute path the shared_artifacts volume is mounted at
  */
-function illustrationsRouter(authoringClient, authoringSlowClient) {
+function illustrationsRouter(renderingClient, renderingSlowClient, sharedDir) {
   const router = express.Router();
-  const fast = proxyHandler(authoringClient, 'authoring-service');
-  const slow = proxyHandler(authoringSlowClient, 'authoring-service');
+  const fast = proxyHandler(renderingClient, 'rendering');
+  const slow = proxyHandler(renderingSlowClient, 'rendering');
   router.get('/v1/illustration-style', fast);
   router.get('/v1/illustration-folders', fast);
   router.post('/v1/admin/illustration-folders', fast);
@@ -45,20 +52,20 @@ function illustrationsRouter(authoringClient, authoringSlowClient) {
     express.raw({ type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'], limit: BACKUP_LIMIT }),
     slow,
   );
-  // Refused (409) while a video before its result screen uses the drawing.
-  router.delete('/v1/admin/illustrations/:id', fast);
+    router.delete('/v1/admin/illustrations/:id', fast);
   // Hình mẫu: making one copies and renders the drawing; undoing is a database change.
   router.post('/v1/admin/illustrations/:id/exemplar', slow);
   router.delete('/v1/admin/illustrations/:id/exemplar', fast);
-  // A video's own drawing list: planning and drawing call a model.
-  router.get('/v1/projects/:id/illustrations', fast);
-  router.post('/v1/projects/:id/illustrations/plan', slow);
-  router.post('/v1/projects/:id/illustrations/:rowId/draw', slow);
-  router.post('/v1/projects/:id/illustrations/:rowId/skip', fast);
-  // The role of a drawing in this video (hero, support, background).
-  router.put('/v1/projects/:id/illustrations/:rowId/tier', fast);
-  // Delete the row's unapproved AI drawing from the library.
-  router.delete('/v1/projects/:id/illustrations/:rowId/drawing', fast);
+  // One frame of a sample composition drawn with a kit; the PNG is then fetched by name.
+  router.post('/v1/stills', slow);
+  router.get(
+    '/v1/stills/:file',
+    sharedFileHandler(path.join(sharedDir, 'stills'), {
+      param: 'file',
+      namePattern: STILL_NAME,
+      contentType: 'image/png',
+    }),
+  );
   return router;
 }
 

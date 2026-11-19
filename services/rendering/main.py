@@ -18,6 +18,8 @@ import uvicorn
 
 from adapters.http.check_metrics import CheckMetrics
 from adapters.http.check_server import create_check_app
+from adapters.http.illustrations import create_illustration_router
+from adapters.llm.client import LLMServiceClient, push_system_prompts_until_accepted
 from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import (
     RenderingCommandDispatcher,
@@ -28,11 +30,13 @@ from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
 from adapters.persistence.db import create_pool
+from adapters.persistence.illustration_repository import IllustrationRepository
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from adapters.rendering.illustration_previewer import IllustrationPreviewer
 from adapters.rendering.layout_checker import LayoutChecker
+from adapters.rendering.library_renderer import InProcessIllustrationRenderer
 from adapters.rendering.remotion_renderer import (
     CACHE_ROOT,
     DEFAULT_RENDER_TIMEOUT_SECONDS,
@@ -40,13 +44,19 @@ from adapters.rendering.remotion_renderer import (
 )
 from adapters.rendering.typescript_checker import TypeScriptChecker
 from adapters.storage.artifact_paths import purge_project_artifacts
+from adapters.storage.illustration_files import ILLUSTRATIONS_ROOT, IllustrationFiles
+from adapters.visual.client import VisualServiceClient
 from application.check_script import CheckScriptUseCase
+from application.illustration_backup import IllustrationBackup
+from application.illustration_drawer import IllustrationDrawer
+from application.illustration_library import IllustrationLibrary
 from application.preview_illustration import PreviewIllustrationUseCase
-from application.stills import StillsUseCase
-from domain.kits import load_kits, load_skeletons
 from application.render_script import RenderScriptUseCase
+from application.stills import StillsUseCase
 from application.validate_script import ValidateScriptUseCase
 from domain import lottie_catalog
+from domain.drawer_prompts import load_system_prompts
+from domain.kits import load_skeletons
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -158,13 +168,37 @@ async def run() -> None:
         timeout_seconds=int(os.environ.get("ILLUSTRATION_PREVIEW_TIMEOUT_SECONDS", "180")),
     )
     remotion_dir = Path(__file__).parent / "remotion_project"
-    kits = load_kits(remotion_dir)
-    stills = StillsUseCase(previewer, kits, os.environ.get("STILLS_DIR", "/shared/stills"))
+    stills = StillsUseCase(previewer, os.environ.get("STILLS_DIR", "/shared/stills"))
+    preview = PreviewIllustrationUseCase(typescript, previewer, load_skeletons(remotion_dir))
+
+    # Thư viện hình minh hoạ và bộ vẽ AI. Hình vẽ theo bộ thông số của một phong cách tham chiếu
+    # (visual-service); bộ vẽ gọi model qua llm-service và đọc prompt của nó ở đó.
+    visual = VisualServiceClient(os.environ.get("VISUAL_SERVICE_URL", "http://visual-service:8000"))
+    llm = LLMServiceClient(
+        os.environ.get("LLM_SERVICE_URL", "http://llm-service:8000"),
+        float(os.environ.get("LLM_SERVICE_TIMEOUT_SECONDS", "0")))
+    illustration_repo = IllustrationRepository(pool)
+    await illustration_repo.seed()
+    illustration_files = IllustrationFiles(os.environ.get("ILLUSTRATIONS_DIR", ILLUSTRATIONS_ROOT))
+    preview_gate = asyncio.Semaphore(1)
+    library = IllustrationLibrary(
+        illustration_repo, illustration_files, InProcessIllustrationRenderer(preview, preview_gate), visual)
+    drawer = IllustrationDrawer(
+        library, llm, llm, visual, int(os.environ.get("ILLUSTRATION_MAX_OUTPUT_TOKENS", "128000")))
+    library_router = create_illustration_router(
+        library, drawer, IllustrationBackup(library, illustration_files.read), visual)
+    system_prompts, missing_prompts = load_system_prompts(Path(__file__).parent / "domain" / "system_prompts")
+    if missing_prompts:
+        logger.error(
+            "no system prompt shipped for %s — the AI drawer cannot draw until llm-service has it",
+            ", ".join(missing_prompts))
+    push_prompts = None
+    if system_prompts:
+        push_prompts = asyncio.create_task(push_system_prompts_until_accepted(llm, system_prompts))
     check_server = uvicorn.Server(uvicorn.Config(
         create_check_app(
             check_use_case, concurrency=int(os.environ.get("CHECK_CONCURRENCY", "2")), metrics=check_metrics,
-            illustrations=PreviewIllustrationUseCase(typescript, previewer, kits, load_skeletons(remotion_dir)),
-            stills=stills, kits=kits,
+            illustrations=preview, stills=stills, library_router=library_router, preview_gate=preview_gate,
         ),
         host="0.0.0.0", port=int(os.environ.get("CHECK_HTTP_PORT", "8000")), log_level="warning",
     ))
@@ -189,6 +223,10 @@ async def run() -> None:
     finally:
         check_server.should_exit = True
         await check_server_task
+        if push_prompts is not None:
+            push_prompts.cancel()
+        await llm.close()
+        await visual.close()
         await warm_typescript
         typescript.close()
         if layout is not None:

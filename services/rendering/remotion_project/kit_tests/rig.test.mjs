@@ -123,8 +123,40 @@ test('the elbow keeps both bone lengths and bends to the chosen side', async () 
   assert.ok(up[1] * down[1] < 0, 'the two bends are on opposite sides');
 });
 
-test('every kit has a version in kits.json', async () => {
-  const {KITS, KIT_VERSIONS} = await load('kits.ts');
-  assert.deepEqual(Object.keys(KITS).sort(), Object.keys(KIT_VERSIONS).sort());
-  for (const v of Object.values(KIT_VERSIONS)) assert.ok(Number.isInteger(v.version) && v.version >= 1);
+const GOOD_KIT = {
+  outline: 0, radius: 0.18, rimWidth: 0.035, rimStrength: 0.7, shadowStrength: 0.35, aoStrength: 0.25,
+  specular: {glossy: 0.5, metal: 0.8, glass: 0.9},
+  texture: {fur: 0.25, fabric: 0.12, wood: 0.2, stone: 0.22, organic: 0.15, leaf: 0.12},
+  sss: 0.4, glowBlur: 0.08, bloom: 0.5,
+  haze: {far: 0.35, mid: 0.15},
+  dof: {sky: 6, far: 3, mid: 1, near: 10},
+  grain: 0.05, vignette: 0.3, ink: '#141A3A',
+  previewLook: {
+    light: {x: 0.7, y: 0.2, color: '#FFF4D6', intensity: 0.8},
+    ambient: '#8A93B8',
+    atmosphere: {color: '#B8C0DC', density: 0.2},
+    focus: 'figures',
+    grade: {warmth: 0, contrast: 0, saturation: 0},
+  },
+};
+
+test('a complete kit is accepted as given', async () => {
+  const {parseKit} = await load('kits.ts');
+  assert.equal(parseKit(GOOD_KIT), GOOD_KIT);
+});
+
+test('a missing kit or a bad field is an error that names the field', async () => {
+  const {parseKit} = await load('kits.ts');
+  assert.throws(() => parseKit(undefined), /Thiếu kit/);
+  const without = structuredClone(GOOD_KIT);
+  delete without.haze.mid;
+  assert.throws(() => parseKit(without), /thiếu trường haze\.mid/);
+  assert.throws(() => parseKit({...GOOD_KIT, grain: 1.5}), /kit\.grain phải trong khoảng 0\.\.1/);
+  assert.throws(() => parseKit({...GOOD_KIT, dof: {...GOOD_KIT.dof, near: -1}}), /kit\.dof\.near/);
+  assert.throws(() => parseKit({...GOOD_KIT, ink: 'red'}), /kit\.ink phải là màu #RRGGBB/);
+  assert.throws(() => parseKit({...GOOD_KIT, previewLook: {...GOOD_KIT.previewLook, focus: 'back'}}), /kit\.previewLook\.focus/);
+  assert.throws(() => parseKit({...GOOD_KIT, extra: 1}), /trường lạ: extra/);
+  const grade = (g) => ({...GOOD_KIT, previewLook: {...GOOD_KIT.previewLook, grade: {...GOOD_KIT.previewLook.grade, ...g}}});
+  assert.ok(parseKit(grade({warmth: -0.5})));
+  assert.throws(() => parseKit(grade({warmth: 1.5})), /kit\.previewLook\.grade\.warmth phải trong khoảng -1\.\.1/);
 });

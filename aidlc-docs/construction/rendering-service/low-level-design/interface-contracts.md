@@ -138,3 +138,18 @@ class AnimationTemplatePort(ABC):
 
 ### Ràng buộc bắt buộc (FR10.5)
 Số phần tử `wait_offsets` PHẢI bằng số scene. Orchestrator validate và **fail saga** khi lệch, thay vì dựng video lệch tiếng. Nguyên nhân thường gặp: `self.wait(AUTO)` nằm trong vòng lặp hoặc `if` nên chạy số lần khác với số marker `# NARRATION:`.
+
+## Bộ thông số vẽ (`kit`) — mọi lượt vẽ nhận một object `kit`
+Rendering không còn bảng kit dựng sẵn (`kits.json`, `KITS`, `GET /v1/kits`, `load_kits`/`require_kit` đã bỏ). Mọi lượt vẽ nhận `kit` là object, lấy từ phong cách tham chiếu của dự án ở visual-service (`GET /internal/v1/visual/{project_id}/kit`).
+
+**Hình dạng `kit`** (khớp `KitTokens` trong `remotion_project/src/conceptflow-mini/kits.ts`; kiểm ở `services/rendering/domain/kit.py` và ở Remotion `currentKit()`):
+`{outline, radius, rimWidth, rimStrength, shadowStrength, aoStrength, specular{glossy,metal,glass}, texture{fur,fabric,wood,stone,organic,leaf}, sss, glowBlur, bloom, haze{far,mid}, dof{sky,far,mid,near}, grain, vignette, ink, previewLook{light{x,y,color,intensity}, ambient, atmosphere{color,density}, focus, grade{warmth,contrast,saturation}}}`
+- Đủ mọi trường, không thừa trường; số trong 0..1 trừ `dof.*` (bán kính làm mờ px, >= 0) và `previewLook.grade.*` (có dấu, -1..1); màu `#RRGGBB`; `previewLook.focus` ∈ `sky|far|mid|near|figures`.
+- Thiếu hoặc sai: HTTP trả `400 {"error": "kit.<trường> ..."}`; lệnh `render_scenes` thất bại với `AnimationEngineError` nêu trường sai; Remotion ném lỗi nêu trường.
+
+**Nơi nhận `kit`** (thay cho `kit_key`):
+- AMQP `render_scenes`: `payload.kit` (object, bắt buộc), truyền cho Remotion qua input prop `kit`.
+- `POST /v1/check/remotion`: `{"code", "kit", "scene_class_name"?, "subtitle_band"?, "video_font"?}`.
+- `POST /v1/illustrations/preview`: `{"kit", "name", "code"?, "props"?, "gif"?, "kind"?, "tier"?}`.
+- `POST /v1/stills`: `{"composition", "kit", "props"?, "frame"?}` → `{"file", "cache_hit"}`. Tên file = SHA-256 của `composition`, nội dung `kit`, `props`, `frame` (đổi một con số của kit ra ảnh mới).
+- `GET /v1/kits` không còn (404).

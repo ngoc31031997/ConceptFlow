@@ -27,12 +27,13 @@ type referenceDetail struct {
 	Avoid          []string                    `json:"avoid"`
 	PromptTemplate string                      `json:"prompt_template"`
 	NegativePrompt string                      `json:"negative_prompt"`
+	Kit            *domain.ReferenceKit        `json:"kit,omitempty"`
 }
 
 func detailJSON(in domain.ReferenceStyleInput) ([]byte, error) {
 	return json.Marshal(referenceDetail{
 		Source: in.Source, CoreRules: in.CoreRules, Drawing: in.Drawing, ColorRules: in.ColorRules,
-		Composition: in.Composition, Avoid: in.Avoid, PromptTemplate: in.PromptTemplate, NegativePrompt: in.NegativePrompt,
+		Composition: in.Composition, Avoid: in.Avoid, PromptTemplate: in.PromptTemplate, NegativePrompt: in.NegativePrompt, Kit: in.Kit,
 	})
 }
 
@@ -47,6 +48,7 @@ func applyDetail(raw []byte, in *domain.ReferenceStyleInput) error {
 	}
 	in.Source, in.CoreRules, in.Drawing, in.ColorRules = d.Source, nonNil(d.CoreRules), d.Drawing, d.ColorRules
 	in.Composition, in.Avoid, in.PromptTemplate, in.NegativePrompt = d.Composition, nonNil(d.Avoid), d.PromptTemplate, d.NegativePrompt
+	in.Kit = d.Kit
 	in.Composition.OptionalDevices = nonNil(in.Composition.OptionalDevices)
 	if in.Tags == nil {
 		in.Tags = []string{}
@@ -176,4 +178,42 @@ func (r *ReferenceStyleRepository) ReferenceStyleUsers(ctx context.Context, id s
 		projects = append(projects, p)
 	}
 	return projects, rows.Err()
+}
+
+// ReferenceStyleKit returns the kit of id, nil when the style has none, or
+// ErrReferenceStyleNotFound.
+func (r *ReferenceStyleRepository) ReferenceStyleKit(ctx context.Context, id string) (*domain.ReferenceKit, error) {
+	var detail []byte
+	err := r.pool.QueryRow(ctx, "SELECT detail FROM reference_styles WHERE id = $1", id).Scan(&detail)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, application.ErrReferenceStyleNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read reference style kit: %w", err)
+	}
+	var in domain.ReferenceStyleInput
+	if err := applyDetail(detail, &in); err != nil {
+		return nil, fmt.Errorf("decode reference style detail: %w", err)
+	}
+	return in.Kit, nil
+}
+
+// ProjectKit returns the style the video picked, with its kit (nil when it
+// has none), or ErrNoReferencePicked.
+func (r *ReferenceStyleRepository) ProjectKit(ctx context.Context, projectID string) (string, *domain.ReferenceKit, error) {
+	var id string
+	var detail []byte
+	err := r.pool.QueryRow(ctx, `SELECT s.id, s.detail FROM project_reference_picks p
+		JOIN reference_styles s ON s.id = p.ref_id WHERE p.project_id = $1 `, projectID).Scan(&id, &detail)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, application.ErrNoReferencePicked
+	}
+	if err != nil {
+		return "", nil, fmt.Errorf("read project kit: %w", err)
+	}
+	var in domain.ReferenceStyleInput
+	if err := applyDetail(detail, &in); err != nil {
+		return "", nil, fmt.Errorf("decode reference style detail: %w", err)
+	}
+	return id, in.Kit, nil
 }

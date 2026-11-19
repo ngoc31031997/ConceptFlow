@@ -20,7 +20,6 @@ import (
 	"authoring/internal/adapters/llm"
 	"authoring/internal/adapters/orchestrator"
 	"authoring/internal/adapters/postgres"
-	"authoring/internal/adapters/rendering"
 	"authoring/internal/adapters/sourcefetch"
 	"authoring/internal/application"
 	"authoring/internal/config"
@@ -65,33 +64,6 @@ func main() {
 		logger.Warn("could not seed system video archetypes", "error", err)
 	}
 	archetypes := application.NewVideoArchetypesUseCase(authoringRepo)
-
-	// The visual languages: how the channel's videos are drawn. Seeded before
-	// anything can create a project, so every authoring row pins a language.
-	if err := authoringRepo.SeedVisualLanguages(ctx); err != nil {
-		logger.Error("could not seed the visual languages", "error", err)
-		os.Exit(1)
-	}
-	renderingClient := rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)
-	visualLanguages := application.NewVisualLanguagesUseCase(authoringRepo, renderingClient)
-	go keepLanguageSamples(ctx, logger, visualLanguages)
-
-	// The illustration library, previews rendered by the rendering service.
-	if err := authoringRepo.SeedIllustrations(ctx); err != nil {
-		logger.Warn("could not seed the illustration library", "error", err)
-	}
-	illustrations := application.NewIllustrationsUseCase(authoringRepo, renderingClient).
-		WithDrawer(llmProvider, cfg.HiveMaxOutputTokens).
-		// A drawing a video still working uses cannot be deleted.
-		WithProjectStatus(projects).
-		// The rules and the kit a drawing is made under are its language's.
-		WithLanguages(visualLanguages).
-		// A drawing that names no model runs on the model saved for the drawings.
-		WithStepDefaults(llmClient)
-	// Each Remotion video's drawings, gated before the code step.
-	projectIllustrations := application.NewProjectIllustrationsUseCase(
-		authoringRepo, illustrations, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens).
-		WithDrawConcurrency(cfg.IllustrationDrawConcurrency)
 
 	// Every authoring save shares the same lock check (the project
 	// must still be a draft, read from the orchestrator), and clears the steps
@@ -159,14 +131,10 @@ func main() {
 	// The renderer behind the Copy button.
 	renderPrompt := application.NewRenderPromptUseCase(llmClient, renderContext, projects, projects).
 		WithArchetypes(authoringRepo).
-		WithBrief(projectBrief).
-		WithLanguages(visualLanguages)
+		WithBrief(projectBrief)
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithOperations(application.NewOperations()).
 		WithArchetypes(archetypes).
-		WithVisualLanguages(visualLanguages).
-		WithIllustrations(illustrations).
-		WithProjectIllustrations(projectIllustrations).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).
@@ -200,49 +168,6 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown error", "error", err)
-	}
-}
-
-const (
-	// languageSampleRetryDelay is how long to wait before trying to render the
-	// language samples again after rendering was not reachable.
-	languageSampleRetryDelay = 30 * time.Second
-	// stillPruneInterval and stillMinAge: stills no language page shows are
-	// deleted daily once they are a day old.
-	stillPruneInterval = 24 * time.Hour
-	stillMinAge        = 24 * time.Hour
-)
-
-// keepLanguageSamples renders the sample scenes of every language that has
-// none (or whose kit changed), retrying while rendering is not up, then prunes
-// the shared stills once a day.
-func keepLanguageSamples(ctx context.Context, logger *slog.Logger, languages *application.VisualLanguagesUseCase) {
-	for {
-		err := languages.EnsureSamples(ctx)
-		if err == nil {
-			break
-		}
-		logger.Warn("could not render the visual language samples yet", "error", err)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(languageSampleRetryDelay):
-		}
-	}
-	ticker := time.NewTicker(stillPruneInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			removed, err := languages.PruneStills(ctx, stillMinAge)
-			if err != nil {
-				logger.Warn("could not prune the shared stills", "error", err)
-				continue
-			}
-			logger.Info("pruned the shared stills", "removed", len(removed))
-		}
 	}
 }
 

@@ -37,6 +37,8 @@ function saveBlob(blob: Blob, name: string) {
 interface Props {
   /** Gọi sau khi nhập xong, để trang tải lại thư mục và hình. */
   onImported: () => void;
+  /** Phong cách tham chiếu dùng cho hình trong file chưa ghi phong cách. */
+  refId: string;
 }
 
 /**
@@ -45,7 +47,7 @@ interface Props {
  * hình về đúng thư mục của nó; thư mục thiếu được tạo lại. Hình có sẵn của hệ
  * thống không nằm trong file: chúng đi kèm phần mềm.
  */
-export function IllustrationBackupCard({ onImported }: Props) {
+export function IllustrationBackupCard({ onImported, refId }: Props) {
   const [exporting, setExporting] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [replace, setReplace] = useState(false);
@@ -85,7 +87,7 @@ export function IllustrationBackupCard({ onImported }: Props) {
     setError(null);
     setReport(null);
     try {
-      const out = await importIllustrationLibrary(file, replace);
+      const out = await importIllustrationLibrary(file, replace, refId);
       setReport(out);
       setFile(null);
       onImported();

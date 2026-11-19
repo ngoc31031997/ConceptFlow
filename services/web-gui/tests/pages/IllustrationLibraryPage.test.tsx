@@ -28,6 +28,20 @@ const VAN: apiClient.Illustration = {
   ...BUS, id: "v1", name: "Van", title: "Xe tải", code: "export function Van() {}", warnings: [], status: "approved", version: 1,
 };
 
+const EMPTY_DRAWING: apiClient.ReferenceDrawing = {
+  medium: "", shape: "", outline: "", fill: "", shading: "", light: "", depth: "", perspective: "", texture: "",
+};
+const KIT = { ink: "#1a1a1a" } as unknown as apiClient.ReferenceKit;
+const R12: apiClient.ReferenceStyle = {
+  id: "R12", style_name: "Phát sáng", intent: "Nền tối ấm.", tags: [], source: { url: "", title: "", kind: "video" },
+  drawing: EMPTY_DRAWING, core_rules: ["phẳng, không gradient"],
+  color_rules: { background: "", subject: "", accents: "", note: "" },
+  composition: { structure: "", optional_devices: [], layering: "" },
+  avoid: [], prompt_template: "", negative_prompt: "", kit: KIT,
+  created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z",
+};
+const R01: apiClient.ReferenceStyle = { ...R12, id: "R01", style_name: "Tối giản", kit: null };
+
 function renderPage() {
   return render(
     <ThemeProvider>
@@ -42,7 +56,8 @@ describe("IllustrationLibraryPage", () => {
   beforeEach(() => {
     vi.spyOn(apiClient, "listIllustrationFolders").mockResolvedValue(FOLDERS);
     vi.spyOn(apiClient, "listIllustrations").mockResolvedValue([TOOTH, BUS, CAT]);
-    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "[S1] PHẲNG: không gradient", exemplar_ids: ["exemplar-Cat"], max_exemplars: 5 });
+    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ exemplar_ids: ["exemplar-Cat"], max_exemplars: 5 });
+    vi.spyOn(apiClient, "listReferenceStyles").mockResolvedValue([R01, R12]);
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -54,6 +69,8 @@ describe("IllustrationLibraryPage", () => {
     // The tile image is the versioned preview URL.
     const img = within(screen.getByTestId("illustration-tile-Bus")).getByRole("img");
     expect(img.getAttribute("src")).toContain("/v1/illustrations/b1/preview.png?v=2");
+    // A built-in has no stored style, so its tile asks for the picked one.
+    expect(within(screen.getByTestId("illustration-tile-Tooth")).getByRole("img").getAttribute("src")).toContain("ref_id=R12");
 
     fireEvent.click(screen.getByTestId("illustration-folder-phuong-tien"));
     expect(screen.queryByTestId("illustration-tile-Tooth")).toBeNull();
@@ -75,7 +92,7 @@ describe("IllustrationLibraryPage", () => {
     const rerender = vi.spyOn(apiClient, "rerenderIllustration").mockResolvedValue({ png: "", gif: "" });
     renderPage();
     fireEvent.click(await screen.findByTestId("rerender-Tooth"));
-    await waitFor(() => expect(rerender).toHaveBeenCalledWith("builtin-Tooth"));
+    await waitFor(() => expect(rerender).toHaveBeenCalledWith("builtin-Tooth", "R12"));
     expect(rerender).toHaveBeenCalledTimes(1);
   });
 
@@ -109,7 +126,7 @@ describe("IllustrationLibraryPage", () => {
     fireEvent.click(await screen.findByLabelText("Mở Xe buýt"));
     fireEvent.click(screen.getByTestId("illustration-try-button"));
     await screen.findByTestId("illustration-tried");
-    expect(tryIt).toHaveBeenCalledWith("Bus", "export function Bus() {}");
+    expect(tryIt).toHaveBeenCalledWith("Bus", "export function Bus() {}", "R12");
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -124,8 +141,19 @@ describe("IllustrationLibraryPage", () => {
   it("shows the style rules with the exemplar drawings", async () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("illustration-style-toggle"));
-    expect(await screen.findByTestId("illustration-style-rules")).toHaveTextContent("[S1] PHẲNG");
+    expect(await screen.findByTestId("illustration-style-rules")).toHaveTextContent("phẳng, không gradient");
     expect(within(screen.getByTestId("illustration-style")).getByTestId("illustration-tile-Cat")).toHaveTextContent("Hình mẫu");
+  });
+
+  it("draws with the style picked in the list, and marks a style that has no kit", async () => {
+    const draw = vi.spyOn(apiClient, "drawIllustration").mockResolvedValue({ ...BUS, id: "m1", name: "Motorbike", title: "Xe máy" });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("illustration-ref-style"));
+    fireEvent.click(await screen.findByText("R01 · Tối giản (chưa có bộ thông số vẽ)"));
+    fireEvent.click(screen.getByTestId("illustration-draw-open"));
+    fireEvent.change(screen.getByTestId("illustration-draw-text"), { target: { value: "xe máy" } });
+    fireEvent.click(screen.getByTestId("illustration-draw-button"));
+    await waitFor(() => expect(draw).toHaveBeenCalledWith(expect.objectContaining({ ref_id: "R01" })));
   });
 
   it("turns an uploaded SVG into code in the editor, named after the file", async () => {
@@ -150,7 +178,7 @@ describe("IllustrationLibraryPage", () => {
     expect(screen.getByTestId("illustration-draw-button")).toBeDisabled();
     fireEvent.change(screen.getByTestId("illustration-draw-text"), { target: { value: "xe máy đỏ" } });
     fireEvent.click(screen.getByTestId("illustration-draw-button"));
-    await waitFor(() => expect(draw).toHaveBeenCalledWith({ description: "xe máy đỏ", folder_id: "co-the-suc-khoe", detail_level: "medium" }));
+    await waitFor(() => expect(draw).toHaveBeenCalledWith({ description: "xe máy đỏ", folder_id: "co-the-suc-khoe", detail_level: "medium", ref_id: "R12" }));
     expect(await screen.findByTestId("illustration-tile-Motorbike")).toBeInTheDocument();
     expect(screen.getByTestId("illustration-editor")).toHaveTextContent("Sửa: Xe máy");
   });
@@ -161,7 +189,7 @@ describe("IllustrationLibraryPage", () => {
     fireEvent.click(await screen.findByTestId("edit-Bus"));
     fireEvent.change(screen.getByTestId("illustration-redraw-note"), { target: { value: "bánh to hơn" } });
     fireEvent.click(screen.getByTestId("illustration-redraw-button"));
-    await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "bánh to hơn", undefined));
+    await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "bánh to hơn", "R12", undefined));
   });
 
   it("redraws on the model chosen next to the button, and remembers it", async () => {
@@ -179,7 +207,7 @@ describe("IllustrationLibraryPage", () => {
     fireEvent.click(await screen.findByTestId("illustration-redraw-model"));
     fireEvent.click(await screen.findByTestId("illustration-redraw-model-option-ollama"));
     fireEvent.click(screen.getByTestId("illustration-redraw-button"));
-    await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "", "ollama"));
+    await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "", "R12", "ollama"));
     expect(window.localStorage.getItem("conceptflow.libraryAiModel")).toBe("ollama");
   });
 
@@ -229,7 +257,7 @@ describe("IllustrationLibraryPage", () => {
     fireEvent.click(screen.getByTestId("illustration-import-button"));
 
     const report = await screen.findByTestId("illustration-import-report");
-    expect(importIt).toHaveBeenCalledWith(file, true);
+    expect(importIt).toHaveBeenCalledWith(file, true, "R12");
     expect(report).toHaveTextContent("Đã thêm 1 · Ghi đè 1 · Bỏ qua 0 · Lỗi 1");
     expect(report).toHaveTextContent("do-choi");
     expect(report).toHaveTextContent("Kite — Lỗi: dòng 3: TS2304");
@@ -327,7 +355,7 @@ describe("IllustrationLibraryPage", () => {
 
   it("cannot add a sixth Hình mẫu", async () => {
     vi.spyOn(apiClient, "listIllustrations").mockResolvedValue([TOOTH, BUS, CAT, VAN]);
-    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "", exemplar_ids: ["exemplar-Cat"], max_exemplars: 1 });
+    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ exemplar_ids: ["exemplar-Cat"], max_exemplars: 1 });
     renderPage();
     expect(await screen.findByTestId("make-exemplar-Van")).toBeDisabled();
   });

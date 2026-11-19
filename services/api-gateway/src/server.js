@@ -17,7 +17,6 @@ const { promptsRouter } = require('./routes/prompts');
 const { llmCallsRouter } = require('./routes/llmCalls');
 const { fontsRouter } = require('./routes/fonts');
 const { illustrationsRouter } = require('./routes/illustrations');
-const { visualLanguagesRouter } = require('./routes/visualLanguages');
 const { referenceStylesRouter } = require('./routes/referenceStyles');
 const { authRouter } = require('./routes/auth');
 const { progressRouter } = require('./routes/progress');
@@ -58,6 +57,8 @@ function main() {
   const llmClient = createHttpClient(config.llmServiceUrl);
   // The fonts videos can use are listed by rendering; a quick lookup, short timeout.
   const renderingClient = createHttpClient(config.renderingUrl, { timeoutMs: 5_000 });
+  // Drawing, previews and stills wait on a render or a model: no gateway timeout.
+  const renderingAiClient = createHttpClient(config.renderingUrl, { timeoutMs: 0 });
   const publisherClient = createHttpClient(config.publisherUrl);
   // The visual pre-production steps and the reference library are visual-service's; its AI routes wait
   // on the model like authoring-service's.
@@ -87,8 +88,7 @@ function main() {
   app.use(promptsRouter(authoringClient, llmClient));
   app.use(llmCallsRouter(llmClient));
   app.use(fontsRouter(renderingClient));
-  app.use(illustrationsRouter(authoringClient, authoringAiClient));
-  app.use(visualLanguagesRouter(authoringClient, authoringAiClient, config.sharedDir));
+  app.use(illustrationsRouter(renderingClient, renderingAiClient, config.sharedDir));
   app.use(referenceStylesRouter(visualClient));
   app.use(authRouter(publisherClient));
   app.use(visualConceptRouter(visualClient, visualAiClient));

@@ -3,6 +3,7 @@ import httpx
 from adapters.http.check_server import create_check_app
 from adapters.rendering.typescript_checker import TypeScriptCheckError
 from application.check_script import CheckDiagnostic, CheckOutcome
+from tests.kit_fixtures import phatsang_kit
 
 
 class Fake:
@@ -23,7 +24,8 @@ def client(fake):
 
 async def test_returns_diagnostics():
     fake = Fake(CheckOutcome(False, [CheckDiagnostic("boom", 4)]))
-    r = await client(fake).post("/v1/check/remotion", json={"kit_key": "phatsang", "code": "c", "scene_class_name": "creator"})
+    body = {"kit": phatsang_kit(), "code": "c", "scene_class_name": "creator"}
+    r = await client(fake).post("/v1/check/remotion", json=body)
     assert r.status_code == 200
     assert r.json() == {
         "ok": False,
@@ -32,7 +34,7 @@ async def test_returns_diagnostics():
     }
     assert fake.calls == [("remotion", "c", "creator")]
     assert fake.layouts[0].subtitle_band is None and fake.layouts[0].video_font == ""
-    assert fake.layouts[0].kit_key == "phatsang"
+    assert fake.layouts[0].kit == phatsang_kit()
 
 
 async def test_layout_diagnostics_warnings_and_context_cross_the_wire():
@@ -41,7 +43,7 @@ async def test_layout_diagnostics_warnings_and_context_cross_the_wire():
     overflow = CheckDiagnostic("Shot 1.2, frame 85%: nhãn tràn", 62, "layout", "text_overflow")
     fake = Fake(CheckOutcome(False, [overflow], ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]))
     r = await client(fake).post("/v1/check/remotion", json={
-        "kit_key": "phatsang", "code": "c", "scene_class_name": "creator",
+        "kit": phatsang_kit(), "code": "c", "scene_class_name": "creator",
         "subtitle_band": {"edge": "bottom", "px": 240}, "video_font": "Montserrat"})
     assert r.json()["diagnostics"] == [
         {"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout", "rule": "text_overflow"}
@@ -54,26 +56,30 @@ async def test_layout_diagnostics_warnings_and_context_cross_the_wire():
 async def test_a_nonsense_subtitle_band_is_rejected():
     fake = Fake(CheckOutcome(True))
     r = await client(fake).post(
-        "/v1/check/remotion", json={"kit_key": "phatsang", "code": "c", "subtitle_band": {"edge": "bottom", "px": 0}}
+        "/v1/check/remotion",
+        json={"kit": phatsang_kit(), "code": "c", "subtitle_band": {"edge": "bottom", "px": 0}},
     )
     assert r.status_code == 400 and fake.calls == []
     r = await client(fake).post(
-        "/v1/check/remotion", json={"kit_key": "phatsang", "code": "c", "subtitle_band": {"edge": "left", "px": 9}}
+        "/v1/check/remotion",
+        json={"kit": phatsang_kit(), "code": "c", "subtitle_band": {"edge": "left", "px": 9}},
     )
     assert r.status_code == 422
 
 
 async def test_there_is_no_manim_route():
     fake = Fake(CheckOutcome(True))
-    r = await client(fake).post("/v1/check/manim", json={"kit_key": "phatsang", "code": "c", "scene_class_name": "XScene"})
+    body = {"kit": phatsang_kit(), "code": "c", "scene_class_name": "XScene"}
+    r = await client(fake).post("/v1/check/manim", json=body)
     assert r.status_code == 404 and fake.calls == []
 
 
 async def test_bad_input_is_400_and_a_broken_checker_is_503_never_ok():
-    r = await client(Fake(raises=ValueError("code is empty"))).post("/v1/check/remotion", json={"kit_key": "phatsang", "code": ""})
+    c = client(Fake(raises=ValueError("code is empty")))
+    r = await c.post("/v1/check/remotion", json={"kit": phatsang_kit(), "code": ""})
     assert r.status_code == 400
     r = await client(Fake(raises=TypeScriptCheckError("tsc not found"))).post(
-        "/v1/check/remotion", json={"kit_key": "phatsang", "code": "c"}
+        "/v1/check/remotion", json={"kit": phatsang_kit(), "code": "c"}
     )
     assert r.status_code == 503 and "ok" not in r.json()
 
@@ -85,14 +91,14 @@ async def test_metrics_report_wait_run_timeouts_and_overlap_with_render():
     app = create_check_app(Fake(CheckOutcome(True)), metrics=metrics)
     c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://r")
 
-    await c.post("/v1/check/remotion", json={"kit_key": "phatsang", "code": "c"})
+    await c.post("/v1/check/remotion", json={"kit": phatsang_kit(), "code": "c"})
     with metrics.command_running():
-        await c.post("/v1/check/remotion", json={"kit_key": "phatsang", "code": "c"})
+        await c.post("/v1/check/remotion", json={"kit": phatsang_kit(), "code": "c"})
     app_broken = create_check_app(
         Fake(raises=TypeScriptCheckError("tsc timed out after 90s")), metrics=metrics
     )
     cb = httpx.AsyncClient(transport=httpx.ASGITransport(app=app_broken), base_url="http://r")
-    await cb.post("/v1/check/remotion", json={"kit_key": "phatsang", "code": "c"})
+    await cb.post("/v1/check/remotion", json={"kit": phatsang_kit(), "code": "c"})
 
     snap = (await c.get("/metrics/checks")).json()
     assert snap["checks_total"] == 3
@@ -119,40 +125,46 @@ class StillWriter:
     def __init__(self):
         self.calls = []
 
-    def still(self, kit_key, composition, output, frame=10, props=None):
-        self.calls.append((kit_key, composition))
+    def still(self, kit, composition, output, frame=10, props=None):
+        self.calls.append((kit, composition))
         with open(output, "wb") as f:
             f.write(b"png")
 
 
 def app_with_stills(tmp_path, writer=None):
     writer = writer or StillWriter()
-    kits = {"phatsang": 2}
-    use_case = StillsUseCase(writer, kits, tmp_path)
-    app = create_check_app(Fake(CheckOutcome(True)), stills=use_case, kits=kits)
+    use_case = StillsUseCase(writer, tmp_path)
+    app = create_check_app(Fake(CheckOutcome(True)), stills=use_case)
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://r"), writer
-
-
-async def test_the_kits_endpoint_lists_every_kit_with_its_version(tmp_path):
-    c, _ = app_with_stills(tmp_path)
-    r = await c.get("/v1/kits")
-    assert r.status_code == 200 and r.json() == {"kits": [{"key": "phatsang", "version": 2}]}
 
 
 async def test_a_still_is_rendered_once_then_reported_as_a_cache_hit(tmp_path):
     c, writer = app_with_stills(tmp_path)
-    body = {"composition": "sample-fig-wide", "kit_key": "phatsang"}
+    body = {"composition": "sample-fig-wide", "kit": phatsang_kit()}
     first = (await c.post("/v1/stills", json=body)).json()
     second = (await c.post("/v1/stills", json=body)).json()
     assert first["cache_hit"] is False and second["cache_hit"] is True and first["file"] == second["file"]
     assert len(writer.calls) == 1 and (tmp_path / first["file"]).exists()
 
 
-@pytest.mark.parametrize("kit", ["", "nope"])
-async def test_a_still_needs_a_known_kit(tmp_path, kit):
+@pytest.mark.parametrize("kit", [{}, "nope", {"grain": 0.1}])
+async def test_a_still_needs_a_valid_kit(tmp_path, kit):
     c, writer = app_with_stills(tmp_path)
-    r = await c.post("/v1/stills", json={"composition": "sample-fig-wide", "kit_key": kit})
-    assert r.status_code == 400 and "kit_key" in r.json()["error"] and writer.calls == []
+    r = await c.post("/v1/stills", json={"composition": "sample-fig-wide", "kit": kit})
+    assert r.status_code in (400, 422) and writer.calls == []
+
+
+async def test_a_still_with_an_out_of_range_number_names_the_field(tmp_path):
+    c, writer = app_with_stills(tmp_path)
+    kit = phatsang_kit()
+    kit["grain"] = 3
+    r = await c.post("/v1/stills", json={"composition": "sample-fig-wide", "kit": kit})
+    assert r.status_code == 400 and "kit.grain" in r.json()["error"] and writer.calls == []
+
+
+async def test_the_kits_endpoint_is_gone(tmp_path):
+    c, _ = app_with_stills(tmp_path)
+    assert (await c.get("/v1/kits")).status_code == 404
 
 
 async def test_a_renderer_that_cannot_run_is_a_503_never_a_file(tmp_path):
@@ -163,7 +175,7 @@ async def test_a_renderer_that_cannot_run_is_a_503_never_a_file(tmp_path):
             raise IllustrationPreviewError("browser down")
 
     c, _ = app_with_stills(tmp_path, Down())
-    r = await c.post("/v1/stills", json={"composition": "sample-fig-wide", "kit_key": "phatsang"})
+    r = await c.post("/v1/stills", json={"composition": "sample-fig-wide", "kit": phatsang_kit()})
     assert r.status_code == 503 and "browser down" in r.json()["error"]
     assert list(tmp_path.iterdir()) == []
 
@@ -178,8 +190,7 @@ async def test_pruning_reports_what_it_removed_and_refuses_a_negative_age(tmp_pa
 
 async def test_stills_are_off_when_not_configured():
     c = client(Fake(CheckOutcome(True)))
-    assert (await c.post("/v1/stills", json={"composition": "x", "kit_key": "phatsang"})).status_code == 404
-    assert (await c.get("/v1/kits")).json() == {"kits": []}
+    assert (await c.post("/v1/stills", json={"composition": "x", "kit": phatsang_kit()})).status_code == 404
 
 
 async def test_a_preview_without_a_pinned_kit_is_refused_before_it_runs():
@@ -194,12 +205,14 @@ async def test_the_fonts_endpoint_lists_the_installed_fonts_and_the_default():
     c = client(Fake(CheckOutcome(True)))
     r = await c.get("/v1/fonts")
     assert r.status_code == 200
-    assert r.json() == {"fonts": ["Be Vietnam Pro", "Montserrat", "Cormorant Garamond"], "default": "Be Vietnam Pro"}
+    assert r.json() == {
+        "fonts": ["Be Vietnam Pro", "Montserrat", "Cormorant Garamond"], "default": "Be Vietnam Pro",
+    }
 
 
 @pytest.mark.parametrize("content", [None, "{not json", "[]", '{"fonts": [], "default": "A"}',
                                      '{"fonts": ["A"], "default": "B"}', '{"fonts": [1], "default": 1}'])
-async def test_the_fonts_endpoint_fails_loudly_when_the_list_is_missing_or_malformed(tmp_path, monkeypatch, content):
+async def test_the_fonts_endpoint_fails_loudly_when_the_list_is_bad(tmp_path, monkeypatch, content):
     path = tmp_path / "fonts.json"
     if content is not None:
         path.write_text(content)

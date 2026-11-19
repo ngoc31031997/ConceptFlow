@@ -138,6 +138,12 @@ services:
       # Trần thời gian một lượt đo (kể cả mở trình duyệt nếu phải mở lại).
       # Quá giờ → cảnh báo "không kiểm tra được bố cục", giữ kết quả tsc.
       LAYOUT_CHECK_TIMEOUT_SECONDS: "${LAYOUT_CHECK_TIMEOUT_SECONDS:-60}"
+      # Thư viện hình minh hoạ và bộ vẽ AI: bộ thông số vẽ của phong cách tham chiếu lấy từ
+      # visual-service; bộ vẽ gọi model và đọc prompt của nó ở llm-service.
+      VISUAL_SERVICE_URL: http://visual-service:8000
+      LLM_SERVICE_URL: http://llm-service:8000
+      LLM_SERVICE_TIMEOUT_SECONDS: ${LLM_SERVICE_TIMEOUT_SECONDS:-0} # 0 = no timeout
+      ILLUSTRATION_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-128000}
     # Remotion renders on every core it can get, so without a cap a long
     # render starves RabbitMQ and the Postgres instances on the same host.
     # Override per-host via .env — e.g. a 4-thread CPU gets no benefit from
@@ -393,11 +399,6 @@ services:
       HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
       HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
       HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-128000}
-      # Library drawings are checked and previewed by rendering.
-      RENDERING_URL: http://rendering:8000
-      RENDERING_TIMEOUT_SECONDS: ${RENDERING_TIMEOUT_SECONDS:-240}
-      # Drawings the illustrations step draws at once.
-      ILLUSTRATION_DRAW_CONCURRENCY: ${ILLUSTRATION_DRAW_CONCURRENCY:-4}
     deploy:
       resources:
         limits:

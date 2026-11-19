@@ -22,7 +22,7 @@
  */
 import React from 'react';
 import {useCurrentFrame, useVideoConfig} from 'remotion';
-import {useKit} from './kits';
+import {currentKit} from './kits';
 import skeletonTable from './skeletons.json';
 
 // --- skeletons ----------------------------------------------------------------
@@ -531,7 +531,7 @@ export function isBlinking(frame: number, phase: number, still: boolean): boolea
 export function Eyes({cx, cy, gap, size = 5, mood, phase, still}: FaceProps & {cx: number; cy: number; gap: number; size?: number}) {
   const rig = useFace(mood, phase, still);
   const frame = useCurrentFrame();
-  const ink = useKit().ink;
+  const ink = currentKit().ink;
   const closed = isBlinking(frame, rig.blinkPhase, rig.still);
   const happy = rig.mood === 'happy';
   const surprised = rig.mood === 'surprised';
@@ -554,7 +554,7 @@ export function Eyes({cx, cy, gap, size = 5, mood, phase, still}: FaceProps & {c
 /** Eyebrows over eyes at (`cx`, `cy`), `gap` apart, tilted by mood. */
 export function Brows({cx, cy, gap, size = 7, mood}: FaceProps & {cx: number; cy: number; gap: number; size?: number}) {
   const rig = useFace(mood, undefined, undefined);
-  const ink = useKit().ink;
+  const ink = currentKit().ink;
   // Positive tilt lifts the inner ends (sad, worried), negative lowers them (angry); `lift` raises both brows.
   const tilt: Record<Mood, number> = {neutral: 0, happy: 2, sad: 5, worried: 6, surprised: 2, pain: 5, angry: -6};
   const lift: Partial<Record<Mood, number>> = {surprised: -7, happy: -3};
@@ -572,7 +572,7 @@ export function Brows({cx, cy, gap, size = 7, mood}: FaceProps & {cx: number; cy
 export function Mouth({cx, cy, width = 18, talking = false, mood}: FaceProps & {cx: number; cy: number; width?: number; talking?: boolean}) {
   const rig = useFace(mood, undefined, undefined);
   const frame = useCurrentFrame();
-  const ink = useKit().ink;
+  const ink = currentKit().ink;
   const open = talking ? Math.abs(Math.sin(frame / 3)) : 0;
   const curve: Record<Mood, number> = {neutral: 0, happy: 0.5, sad: -0.4, worried: -0.2, surprised: 0, pain: -0.5, angry: -0.3};
   if (talking || rig.mood === 'surprised') {

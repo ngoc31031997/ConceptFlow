@@ -321,11 +321,6 @@ func (r *PromptTemplateRepository) GetChosenAuthoringModels(ctx context.Context,
 
 // Summaries returns the topic and content flags for each project that has an
 // authoring row; projects without one are simply absent from the map.
-//
-// illustrations_ready is ProjectIllustrationsUseCase.Gate in SQL — the
-// list was planned (planned_at set, or rows exist) and no row is still short of
-// ProjectIllustration.Ready (skipped, or reused/drawn with a builtin or approved
-// drawing). One query, so the project list stays one round trip.
 func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []string) (map[string]application.AuthoringSummary, error) {
 	out := map[string]application.AuthoringSummary{}
 	if len(projectIDs) == 0 {
@@ -333,15 +328,6 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT pa.project_id, pa.topic, pa.story_content <> '', pa.storyboard_content <> '', pa.code_content <> '',
-		       (pa.illustrations_planned_at IS NOT NULL
-		        OR EXISTS (SELECT 1 FROM project_illustrations pi WHERE pi.project_id = pa.project_id))
-		       AND NOT EXISTS (
-		           SELECT 1 FROM project_illustrations pi
-		           LEFT JOIN illustrations i ON i.id = pi.illustration_id
-		           WHERE pi.project_id = pa.project_id
-		             AND NOT (pi.state = 'skipped'
-		                      OR (pi.state IN ('reused', 'drawn') AND i.id IS NOT NULL
-		                          AND (i.builtin OR i.status = 'approved')))),
 		       EXISTS (SELECT 1 FROM review_units ru
 		               WHERE ru.project_id = pa.project_id AND ru.kind = 'brief' AND ru.unit_key = 'main'
 		                 AND ru.status = 'approved')
@@ -353,7 +339,7 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 	for rows.Next() {
 		var id string
 		var s application.AuthoringSummary
-		if err := rows.Scan(&id, &s.Topic, &s.Story, &s.Storyboard, &s.Code, &s.IllustrationsReady, &s.BriefApproved); err != nil {
+		if err := rows.Scan(&id, &s.Topic, &s.Story, &s.Storyboard, &s.Code, &s.BriefApproved); err != nil {
 			return nil, err
 		}
 		out[id] = s
@@ -363,10 +349,6 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 
 // DeleteAuthoring removes a deleted project's authoring row. Idempotent.
 func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectID string) error {
-	// The video's drawing list goes with it (the drawings stay in the library).
-	if err := r.DeleteProjectIllustrations(ctx, projectID); err != nil {
-		return err
-	}
 	// And its stored code segments.
 	if _, err := r.pool.Exec(ctx, `DELETE FROM authoring_segments WHERE project_id = $1`, projectID); err != nil {
 		return err

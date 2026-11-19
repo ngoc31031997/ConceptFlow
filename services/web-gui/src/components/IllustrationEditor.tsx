@@ -17,8 +17,7 @@ import {
 } from "../api/client";
 import { Button, Card, CtaRow, Dropdown, FormField, TextArea, TextInput } from "./ui";
 import { StyleWarningList } from "./StyleWarnings";
-import { useStyleWarnings } from "../hooks/useStyleRuleNames";
-import { fixWarningsNote } from "../utils/styleRules";
+import { describeWarning, fixWarningsNote } from "../utils/styleRules";
 import glass from "../styles/glass.module.css";
 import styles from "./IllustrationEditor.module.css";
 
@@ -59,6 +58,8 @@ interface IllustrationEditorProps {
    * filled in again after the Creator cleared it.
    */
   redrawNote?: { text: string; n: number };
+  /** Phong cách tham chiếu đang chọn; hình đã có phong cách thì dùng phong cách của nó. */
+  refId: string;
 }
 
 function toInput(ill: Illustration | null, folderId: string, draft?: Partial<IllustrationInput>): IllustrationInput {
@@ -79,7 +80,7 @@ function toInput(ill: Illustration | null, folderId: string, draft?: Partial<Ill
  * it again and keeps the preview. Code the renderer refuses comes back with
  * line numbers, listed under the box.
  */
-export function IllustrationEditor({ illustration, draft, folders, defaultFolderId, onSaved, onDeleted, onClose, redrawNote }: IllustrationEditorProps) {
+export function IllustrationEditor({ illustration, draft, folders, defaultFolderId, onSaved, onDeleted, onClose, redrawNote, refId }: IllustrationEditorProps) {
   const creating = illustration === null;
   // A Hình mẫu is read-only like the kit; it changes by picking another one.
   const exemplar = illustration?.exemplar === true;
@@ -96,7 +97,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
   const [message, setMessage] = useState<string | null>(null);
   const [tried, setTried] = useState<IllustrationTry | null>(null);
   const noteBox = useRef<HTMLTextAreaElement>(null);
-  const shownWarnings = useStyleWarnings(tried?.warnings ?? illustration?.warnings ?? []);
+  const shownWarnings = (tried?.warnings ?? illustration?.warnings ?? []).map(describeWarning);
 
   useEffect(() => {
     const next = toInput(illustration, startFolder, draft);
@@ -115,11 +116,14 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
     noteBox.current?.focus();
   }, [redrawNote]);
 
+  const effectiveRef = illustration?.ref_id || refId;
+
   const set = <K extends keyof IllustrationInput>(key: K, value: IllustrationInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   const input = (): IllustrationInput => ({
     ...form,
+    ref_id: effectiveRef,
     tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
   });
 
@@ -139,7 +143,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
 
   const handleTry = () =>
     run("try", async () => {
-      setTried(await tryIllustration(form.name, form.code));
+      setTried(await tryIllustration(form.name, form.code, effectiveRef));
     });
 
   const handleSave = () =>
@@ -152,7 +156,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
   const handleRedraw = () =>
     run("redraw", async () => {
       if (!illustration) return;
-      const saved = await redrawIllustration(illustration.id, note, aiModel || undefined);
+      const saved = await redrawIllustration(illustration.id, note, effectiveRef, aiModel || undefined);
       setNote("");
       onSaved(saved);
       setMessage("AI đã vẽ lại — phiên bản mới đang chờ duyệt.");

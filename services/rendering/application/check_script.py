@@ -24,6 +24,7 @@ from adapters.rendering.layout_checker import LayoutChecker, LayoutCheckError
 from adapters.rendering.typescript_checker import TypeScriptChecker
 from application.validate_script import ScriptValidationError, ValidateScriptUseCase
 from domain.errors import AnimationEngineError
+from domain.kit import validate_kit
 from domain.layout_rules import SubtitleBand, evaluate
 from domain.models import ScriptRenderRequest
 
@@ -60,7 +61,7 @@ class LayoutContext:
 
     subtitle_band: SubtitleBand | None = None  # None = nothing burned into the frame
     video_font: str = ""  # "" = the Stage's default (Be Vietnam Pro)
-    kit_key: str = ""  # the visual language the project is pinned to; "" is refused
+    kit: dict | None = None  # the drawing tokens of the project's reference style; None is refused
 
 
 class CheckScriptUseCase:
@@ -86,8 +87,7 @@ class CheckScriptUseCase:
             raise ValueError(f"unknown engine {engine!r}")
         if not code.strip():
             raise ValueError("code is empty")
-        if not (layout and layout.kit_key):
-            raise ValueError("thiếu kit_key: project chưa ghim ngôn ngữ hình")
+        validate_kit(layout.kit if layout else None)
         diags: list[CheckDiagnostic] = []
         try:
             self._validate.validate(self._request(engine, code, scene_class_name))
@@ -114,7 +114,7 @@ class CheckScriptUseCase:
             return [], [LAYOUT_DISABLED_WARNING]
         began = time.monotonic()
         try:
-            probe = self._layout.measure(code, ctx.kit_key, ctx.video_font)
+            probe = self._layout.measure(code, ctx.kit, ctx.video_font)
         except LayoutCheckError as exc:
             logger.warning("layout check could not run: %s", exc)
             return [], [f"Bố cục: KHÔNG kiểm tra được — {exc}. Kết quả biên dịch vẫn giữ nguyên."]

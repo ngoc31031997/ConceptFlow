@@ -157,8 +157,6 @@ export function AppShell({ currentStep, viewStep, title, subtitle, wide, headerA
           <NavLink to="/settings/ai-model" className={navCls}>Model AI mặc định</NavLink>
           {/* The table of video kinds the Story Architect chooses from. */}
           <NavLink to="/settings/video-archetypes" className={navCls}>Kiểu video</NavLink>
-          {/* How the channel's videos are drawn: the kit and its rules. */}
-          <NavLink to="/settings/visual-languages" className={navCls}>Ngôn ngữ hình</NavLink>
           {/* The illustration library the Remotion Engineer draws from. */}
           <NavLink to="/settings/illustrations" className={navCls}>Thư viện hình</NavLink>
           {/* Text descriptions of a visual style the Ngôn ngữ hình ảnh step lets a video pick. */}

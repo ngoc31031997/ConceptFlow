@@ -767,8 +767,8 @@ export interface Illustration {
   status: IllustrationStatus;
   version: number;
   has_preview: boolean;
-  /** Kit (ngôn ngữ hình) hình được vẽ cho: video chỉ dùng hình cùng kit. */
-  kit_key?: string;
+  /** Phong cách tham chiếu (R12…) hình được vẽ theo; hình có sẵn không có. */
+  ref_id?: string;
   /** Mức chi tiết của bản vẽ: kỹ, vừa hay bóng. Hạng chính/phụ/phông là vai trong từng video nên không lưu ở đây. */
   detail_level?: DetailLevel;
 }
@@ -803,6 +803,8 @@ export interface IllustrationInput {
   description: string;
   usage: string;
   code: string;
+  /** Phong cách tham chiếu hình được vẽ theo; chỉ nhận khi hình chưa có phong cách. */
+  ref_id?: string;
 }
 
 /** Ảnh xem trước dạng base64, cho nút "Xem trước" trong trình sửa (chưa lưu gì). */
@@ -815,9 +817,8 @@ export interface IllustrationTry {
 /** Thư mục chỉ nhận hình qua "Đặt làm mẫu". */
 export const EXEMPLAR_FOLDER_ID = "hinh-mau";
 
-/** Luật style của kênh và id các Hình mẫu, cũ nhất trước. */
+/** Id các Hình mẫu (cũ nhất trước) và số Hình mẫu tối đa. */
 export interface IllustrationStyle {
-  rules: string;
   exemplar_ids: string[];
   max_exemplars: number;
 }
@@ -834,6 +835,8 @@ export function drawIllustration(input: {
   model?: string;
   /** Mức chi tiết: "rich" vẽ như vật chính, "silhouette" như phông (mặc định "medium"). */
   detail_level?: DetailLevel;
+  /** Phong cách tham chiếu có bộ thông số vẽ mà hình được vẽ theo. */
+  ref_id: string;
 }): Promise<Illustration> {
   return apiFetch<Illustration>("/v1/admin/illustrations/draw", {
     method: "POST",
@@ -843,11 +846,11 @@ export function drawIllustration(input: {
 }
 
 /** AI vẽ lại một hình của bạn theo ghi chú; giữ tên, ra phiên bản mới ở "Chờ duyệt". */
-export function redrawIllustration(id: string, note: string, model?: string): Promise<Illustration> {
+export function redrawIllustration(id: string, note: string, refId: string, model?: string): Promise<Illustration> {
   return apiFetch<Illustration>(`/v1/admin/illustrations/${id}/redraw`, {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ note, ...(model ? { model } : {}) }),
+    body: JSON.stringify({ note, ref_id: refId, ...(model ? { model } : {}) }),
   });
 }
 
@@ -874,17 +877,21 @@ export async function listIllustrations(filter: { folder?: string; q?: string; s
   return (await apiFetch<{ illustrations: Illustration[] }>(`/v1/illustrations${qs ? `?${qs}` : ""}`)).illustrations;
 }
 
-/** URL ảnh xem trước; có số phiên bản để trình duyệt cache đúng bản. */
-export function illustrationPreviewUrl(ill: Pick<Illustration, "id" | "version">, kind: "png" | "gif" = "png"): string {
-  return `${GATEWAY_URL}/v1/illustrations/${ill.id}/preview.${kind}?v=${ill.version}`;
+/**
+ * URL ảnh xem trước; có số phiên bản để trình duyệt cache đúng bản. Hình có sẵn
+ * chưa có ảnh được dựng theo phong cách `refId`, nên luôn gửi kèm.
+ */
+export function illustrationPreviewUrl(ill: Pick<Illustration, "id" | "version">, kind: "png" | "gif" = "png", refId = ""): string {
+  const ref = refId ? `&ref_id=${encodeURIComponent(refId)}` : "";
+  return `${GATEWAY_URL}/v1/illustrations/${ill.id}/preview.${kind}?v=${ill.version}${ref}`;
 }
 
 /** Dựng thử code mà không lưu. Code hỏng → ApiError có `diagnostics`. */
-export function tryIllustration(name: string, code: string): Promise<IllustrationTry> {
+export function tryIllustration(name: string, code: string, refId: string): Promise<IllustrationTry> {
   return apiFetch<IllustrationTry>("/v1/illustration-tries", {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ name, code }),
+    body: JSON.stringify({ name, code, ref_id: refId }),
   });
 }
 
@@ -913,11 +920,11 @@ export function setIllustrationStatus(id: string, status: IllustrationStatus): P
   });
 }
 
-export function rerenderIllustration(id: string): Promise<IllustrationTry> {
-  return apiFetch<IllustrationTry>(`/v1/admin/illustrations/${id}/rerender`, { method: "POST" });
+export function rerenderIllustration(id: string, refId: string): Promise<IllustrationTry> {
+  return apiFetch<IllustrationTry>(`/v1/admin/illustrations/${id}/rerender?ref_id=${encodeURIComponent(refId)}`, { method: "POST" });
 }
 
-/** Xoá hình. Hình một dự án chưa tới bước Kết quả đang dùng → ApiError 409 nêu tên dự án. */
+/** Xoá hình (không phải hình có sẵn hay Hình mẫu). */
 export async function deleteIllustration(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/illustrations/${id}`, { method: "DELETE" });
 }
@@ -956,7 +963,7 @@ export interface IllustrationImportReport {
   not_processed: number;
 }
 
-/** Giới hạn file sao lưu, khớp với api-gateway và authoring-service. */
+/** Giới hạn file sao lưu, khớp với api-gateway và rendering. */
 export const ILLUSTRATION_BACKUP_MAX_BYTES = 256 * 1024 * 1024;
 
 /** Tải toàn bộ thư viện hình (thư mục, code, ảnh PNG/GIF) về một file ZIP. */
@@ -978,98 +985,13 @@ export async function exportIllustrationLibrary(): Promise<Blob> {
  * Khôi phục thư viện hình từ file ZIP đã xuất. Mỗi hình được kiểm tra và dựng
  * lại, nên có thể mất vài phút. `replace`: ghi đè hình cùng tên đang có.
  */
-export function importIllustrationLibrary(file: Blob, replace: boolean): Promise<IllustrationImportReport> {
+export function importIllustrationLibrary(file: Blob, replace: boolean, refId: string): Promise<IllustrationImportReport> {
   return apiFetch<IllustrationImportReport>(
-    `/v1/admin/illustrations/import?on_conflict=${replace ? "replace" : "skip"}`,
+    `/v1/admin/illustrations/import?on_conflict=${replace ? "replace" : "skip"}&ref_id=${encodeURIComponent(refId)}`,
     { method: "POST", headers: { "Content-Type": "application/zip" }, body: file },
   );
 }
 
-/** Một hình mà video cần: lập từ storyboard, rồi dùng lại hoặc vẽ mới. */
-export type ProjectIllustrationState = "planned" | "drawing" | "drawn" | "reused" | "failed" | "skipped";
-
-export interface ProjectIllustration {
-  id: string;
-  /** "backdrop": the place of the scenes its shots belong to. */
-  kind?: IllustrationKind;
-  position: number;
-  name: string;
-  description: string;
-  folder_id: string;
-  shots: string[];
-  state: ProjectIllustrationState;
-  error?: string;
-  illustration_id?: string;
-  illustration?: Illustration;
-  /** Vai của hình trong video này; nền không có hạng. */
-  tier?: IllustrationTier;
-  /** Một câu AI giải thích vì sao đề xuất hạng đó. */
-  tier_reason?: string;
-  /** Tiến độ sống khi hình đang được vẽ; không có khi không vẽ. */
-  progress?: DrawProgress;
-}
-
-/** AI vẽ một hình tới đâu: lượt thử thứ mấy, đang làm gì trong lượt đó. */
-export interface DrawProgress {
-  attempt: number;
-  max_attempts: number;
-  /** "waiting" đã gửi · "reasoning" AI đang nghĩ · "writing" AI đang viết code · "checking" đang kiểm tra và dựng ảnh. */
-  phase: "waiting" | "reasoning" | "writing" | "checking";
-  reasoning_chars: number;
-  content_chars: number;
-  elapsed_seconds: number;
-}
-
-export interface ProjectIllustrations {
-  illustrations: ProjectIllustration[];
-  /** Mọi hình đã duyệt hoặc bỏ qua, và danh sách không cũ — bước Code được chạy. */
-  ready: boolean;
-  /** Danh sách lập từ storyboard cũ hơn storyboard đang lưu. */
-  stale?: boolean;
-}
-
-export function listProjectIllustrations(projectId: string): Promise<ProjectIllustrations> {
-  return apiFetch<ProjectIllustrations>(`/v1/projects/${projectId}/illustrations`);
-}
-
-/** Lập lại danh sách từ storyboard (thay danh sách cũ; hình đã vẽ vẫn ở thư viện). */
-export function planProjectIllustrations(projectId: string): Promise<ProjectIllustrations> {
-  return apiFetch<ProjectIllustrations>(`/v1/projects/${projectId}/illustrations/plan`, { method: "POST" });
-}
-
-export function drawProjectIllustration(projectId: string, rowId: string): Promise<ProjectIllustration> {
-  return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/draw`, { method: "POST" });
-}
-
-/**
- * Xoá hình nháp AI vẽ cho video này khỏi thư viện (tránh rác) và bỏ
- * qua hình đó cho video. Hình đã duyệt hoặc dùng lại từ thư viện không xoá được.
- */
-export function deleteProjectIllustrationDrawing(projectId: string, rowId: string): Promise<ProjectIllustration> {
-  return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/drawing`, { method: "DELETE" });
-}
-
-/** Đổi hạng của một hình trong video này. Hình đã vẽ không đủ chi tiết cho hạng mới thì quay về "planned" dưới tên mới. */
-export function setProjectIllustrationTier(projectId: string, rowId: string, tier: IllustrationTier): Promise<ProjectIllustration> {
-  return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/tier`, {
-    method: "PUT",
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ tier }),
-  });
-}
-
-export function skipProjectIllustration(projectId: string, rowId: string, skipped: boolean): Promise<ProjectIllustration> {
-  return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/skip`, {
-    method: "POST",
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ skipped }),
-  });
-}
-
-/**
- * Nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
- * vẽ nút: một nút bấm vào là lỗi tệ hơn một nút không có kèm lời giải thích.
- */
 /**
  * Một model trong danh mục Hive máy chủ cho phép chọn (mỗi bước một model)
  * — `id` là chuỗi gửi thẳng cho Hive, `label` là tên hiển thị.
@@ -2018,99 +1940,6 @@ export async function reviewProjectBrief(projectId: string, operation?: AiCall):
     body: operationBody(undefined, operation),
   });
   return fromWireBriefReview(wire);
-}
-
-// --- Ngôn ngữ hình -------------------------------------------------------------
-
-/** Ba văn bản luật của một phiên bản ngôn ngữ hình. */
-export interface VisualLanguageRules {
-  illustration_rules: string;
-  backdrop_rules: string;
-  scene_rules: string;
-}
-
-export interface VisualLanguage {
-  id: string;
-  name: string;
-  /** Ghi chú tham khảo cho người xem, không đưa vào prompt. */
-  note: string;
-  description: string;
-  kit_key: string;
-  is_system: boolean;
-  is_active: boolean;
-  /** Phiên bản mới nhất và luật của nó. */
-  version: number;
-  rules: VisualLanguageRules;
-  created_at: string;
-}
-
-/** Ngôn ngữ (và phiên bản) một project đã ghim lúc tạo. */
-export interface PinnedVisualLanguage {
-  visual_language_id: string;
-  visual_language_version: number;
-  kit_key: string;
-  name: string;
-  rules: VisualLanguageRules;
-}
-
-/** Một ảnh mẫu của kit: cảnh "fig" (lòng quả sung) hoặc "space" (vũ trụ), khung "wide" 16:9 hoặc "tall" 9:16. */
-export interface LanguageSample {
-  kit_key: string;
-  kit_version: number;
-  scene: "fig" | "space";
-  frame: "wide" | "tall";
-  file: string;
-}
-
-export type VisualLanguageInput = {
-  name: string;
-  note: string;
-  description: string;
-  rules: VisualLanguageRules;
-};
-
-export function listVisualLanguages(): Promise<VisualLanguage[]> {
-  return apiFetch<VisualLanguage[]>("/v1/visual-languages");
-}
-
-export function activateVisualLanguage(id: string): Promise<void> {
-  return apiFetch<void>(`/v1/admin/visual-languages/${id}/activate`, { method: "POST" });
-}
-
-/** Sao chép một ngôn ngữ (kể cả của hệ thống) thành bản của Creator. */
-export function copyVisualLanguage(id: string): Promise<VisualLanguage> {
-  return apiFetch<VisualLanguage>(`/v1/admin/visual-languages/${id}/copy`, { method: "POST" });
-}
-
-/** Sửa một ngôn ngữ của Creator: tạo phiên bản mới; video đã ghim giữ bản cũ. Ngôn ngữ hệ thống trả 403. */
-export function updateVisualLanguage(id: string, input: VisualLanguageInput): Promise<VisualLanguage> {
-  return apiFetch<VisualLanguage>(`/v1/admin/visual-languages/${id}`, {
-    method: "PUT",
-    headers: JSON_HEADERS,
-    body: JSON.stringify(input),
-  });
-}
-
-export function deleteVisualLanguage(id: string): Promise<void> {
-  return apiFetch<void>(`/v1/admin/visual-languages/${id}`, { method: "DELETE" });
-}
-
-export function listLanguageSamples(id: string): Promise<LanguageSample[]> {
-  return apiFetch<LanguageSample[]>(`/v1/visual-languages/${id}/samples`);
-}
-
-/** Dựng lại ảnh mẫu của kit (rendering cache theo nội dung nên cái không đổi trả về ngay). */
-export function rebuildLanguageSamples(id: string): Promise<LanguageSample[]> {
-  return apiFetch<LanguageSample[]>(`/v1/admin/visual-languages/${id}/samples`, { method: "POST" });
-}
-
-export function getProjectVisualLanguage(projectId: string): Promise<PinnedVisualLanguage> {
-  return apiFetch<PinnedVisualLanguage>(`/v1/projects/${projectId}/visual-language`);
-}
-
-/** Đường dẫn ảnh mẫu do gateway phát từ thư mục ảnh tĩnh dùng chung. */
-export function languageSampleUrl(sample: Pick<LanguageSample, "file">): string {
-  return `${GATEWAY_URL}/v1/stills/${sample.file}`;
 }
 
 /** What a fact is worth: settled, still argued, not known, or a common mistaken belief. */
@@ -3686,6 +3515,75 @@ export interface ReferenceComposition {
   layering: string;
 }
 
+/** Depth layer a kit's preview look keeps sharp. */
+export type KitFocus = "sky" | "far" | "mid" | "near" | "figures";
+
+/** The neutral look a kit previews one illustration with; a video brings its own look per scene. */
+export interface ReferenceKitLook {
+  light: { x: number; y: number; color: string; intensity: number };
+  ambient: string;
+  atmosphere: { color: string; density: number };
+  focus: KitFocus;
+  grade: { warmth: number; contrast: number; saturation: number };
+}
+
+/**
+ * The drawing numbers rendering paints a style with. Every number is 0..1
+ * except dof (a blur radius in px, 0 or more); colours are #RRGGBB.
+ */
+export interface ReferenceKit {
+  outline: number;
+  radius: number;
+  rimWidth: number;
+  rimStrength: number;
+  shadowStrength: number;
+  aoStrength: number;
+  specular: { glossy: number; metal: number; glass: number };
+  texture: {
+    fur: number;
+    fabric: number;
+    wood: number;
+    stone: number;
+    organic: number;
+    leaf: number;
+  };
+  sss: number;
+  glowBlur: number;
+  bloom: number;
+  haze: { far: number; mid: number };
+  dof: { sky: number; far: number; mid: number; near: number };
+  grain: number;
+  vignette: number;
+  ink: string;
+  previewLook: ReferenceKitLook;
+}
+
+/** Hai cảnh mẫu dựng một khung bằng bộ thông số vẽ, khung ngang 16:9. */
+export const KIT_TRIAL_SCENES = [
+  { composition: "sample-fig-wide", label: "Trong lòng quả sung" },
+  { composition: "sample-space-wide", label: "Vũ trụ" },
+] as const;
+
+/** Một khung mẫu đã dựng: tên file trong thư mục ảnh tĩnh dùng chung. */
+export interface KitTrialStill {
+  file: string;
+  cache_hit: boolean;
+}
+
+/** Dựng thử một khung của cảnh mẫu bằng bộ thông số `kit` đang sửa (chưa lưu). */
+export function renderKitStill(composition: string, kit: ReferenceKit): Promise<KitTrialStill> {
+  return apiFetch<KitTrialStill>("/v1/stills", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ composition, kit }),
+  });
+}
+
+/** Đường dẫn ảnh mẫu do gateway phát từ thư mục ảnh tĩnh dùng chung. */
+export function kitTrialStillUrl(still: Pick<KitTrialStill, "file">): string {
+  return `${GATEWAY_URL}/v1/stills/${still.file}`;
+}
+
 /** What the Creator writes when adding or editing a description; only style_name and intent are required. */
 export interface ReferenceStyleInput {
   style_name: string;
@@ -3702,6 +3600,8 @@ export interface ReferenceStyleInput {
   /** An image-generation prompt with {subject} and {setting} slots. */
   prompt_template: string;
   negative_prompt: string;
+  /** The drawing numbers rendering paints the style with; null while the style has none. */
+  kit?: ReferenceKit | null;
 }
 
 /** A structured description of a visual style in the shared reference library. */

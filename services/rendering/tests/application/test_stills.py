@@ -6,7 +6,8 @@ import time
 import pytest
 
 from application.stills import StillsUseCase
-from domain.kits import UnknownKitError
+from domain.kit import InvalidKitError
+from tests.kit_fixtures import phatsang_kit
 
 
 class FakeRenderer:
@@ -15,8 +16,8 @@ class FakeRenderer:
     def __init__(self):
         self.calls = []
 
-    def still(self, kit_key, composition, output, frame=10, props=None):
-        self.calls.append((kit_key, composition, frame, props))
+    def still(self, kit, composition, output, frame=10, props=None):
+        self.calls.append((kit, composition, frame, props))
         with open(output, "wb") as f:
             f.write(b"\x89PNG-" + composition.encode())
 
@@ -24,13 +25,13 @@ class FakeRenderer:
 @pytest.fixture
 def stills(tmp_path):
     renderer = FakeRenderer()
-    return StillsUseCase(renderer, {"phatsang": 1}, tmp_path / "stills"), renderer, tmp_path / "stills"
+    return StillsUseCase(renderer, tmp_path / "stills"), renderer, tmp_path / "stills"
 
 
 def test_the_same_content_is_rendered_once_and_then_served_from_the_cache(stills):
     use_case, renderer, directory = stills
-    first = use_case.render("sample-fig-wide", "phatsang")
-    second = use_case.render("sample-fig-wide", "phatsang")
+    first = use_case.render("sample-fig-wide", phatsang_kit())
+    second = use_case.render("sample-fig-wide", phatsang_kit())
     assert first.cache_hit is False and second.cache_hit is True
     assert first.file == second.file and len(renderer.calls) == 1
     assert (directory / first.file).read_bytes().startswith(b"\x89PNG")
@@ -39,46 +40,56 @@ def test_the_same_content_is_rendered_once_and_then_served_from_the_cache(stills
 
 def test_anything_that_changes_the_picture_changes_the_file(stills):
     use_case, _, _ = stills
-    base = use_case.render("sample-fig-wide", "phatsang").file
-    assert use_case.render("sample-fig-tall", "phatsang").file != base
-    assert use_case.render("sample-fig-wide", "phatsang", frame=20).file != base
-    assert use_case.render("sample-fig-wide", "phatsang", {"x": 1}).file != base
+    base = use_case.render("sample-fig-wide", phatsang_kit()).file
+    assert use_case.render("sample-fig-tall", phatsang_kit()).file != base
+    assert use_case.render("sample-fig-wide", phatsang_kit(), frame=20).file != base
+    assert use_case.render("sample-fig-wide", phatsang_kit(), {"x": 1}).file != base
 
 
-def test_a_new_kit_version_never_reuses_an_old_still(tmp_path):
+def test_a_kit_with_one_number_changed_never_reuses_an_old_still(tmp_path):
     renderer = FakeRenderer()
-    v1 = StillsUseCase(renderer, {"phatsang": 1}, tmp_path)
-    v2 = StillsUseCase(renderer, {"phatsang": 2}, tmp_path)
-    assert v1.render("sample-fig-wide", "phatsang").file != v2.render("sample-fig-wide", "phatsang").file
+    use_case = StillsUseCase(renderer, tmp_path)
+    tweaked = phatsang_kit()
+    tweaked["grain"] = 0.06
+    original = use_case.render("sample-fig-wide", phatsang_kit()).file
+    assert original != use_case.render("sample-fig-wide", tweaked).file
     assert len(renderer.calls) == 2
 
 
-@pytest.mark.parametrize("kit", ["", "nope"])
-def test_a_missing_or_unknown_kit_is_refused_before_anything_is_rendered(stills, kit):
+def test_the_same_kit_content_hits_the_cache_whatever_the_key_order(stills):
     use_case, renderer, _ = stills
-    with pytest.raises(UnknownKitError):
+    kit = phatsang_kit()
+    reordered = dict(reversed(list(kit.items())))
+    assert use_case.render("sample-fig-wide", kit).file == use_case.render("sample-fig-wide", reordered).file
+    assert len(renderer.calls) == 1
+
+
+@pytest.mark.parametrize("kit", [None, {}, "phatsang"])
+def test_a_missing_or_invalid_kit_is_refused_before_anything_is_rendered(stills, kit):
+    use_case, renderer, _ = stills
+    with pytest.raises(InvalidKitError):
         use_case.render("sample-fig-wide", kit)
     assert renderer.calls == []
 
 
 def test_a_failed_render_leaves_no_half_written_file(tmp_path):
     class Broken(FakeRenderer):
-        def still(self, kit_key, composition, output, frame=10, props=None):
+        def still(self, kit, composition, output, frame=10, props=None):
             with open(output, "wb") as f:
                 f.write(b"partial")
             raise RuntimeError("browser died")
 
-    use_case = StillsUseCase(Broken(), {"phatsang": 1}, tmp_path)
+    use_case = StillsUseCase(Broken(), tmp_path)
     with pytest.raises(RuntimeError):
-        use_case.render("sample-fig-wide", "phatsang")
+        use_case.render("sample-fig-wide", phatsang_kit())
     assert list(tmp_path.iterdir()) == []
 
 
 def test_pruning_deletes_only_old_stills_nobody_keeps(stills):
     use_case, _, directory = stills
-    kept = use_case.render("sample-fig-wide", "phatsang").file
-    old = use_case.render("sample-fig-tall", "phatsang").file
-    fresh = use_case.render("sample-space-wide", "phatsang").file
+    kept = use_case.render("sample-fig-wide", phatsang_kit()).file
+    old = use_case.render("sample-fig-tall", phatsang_kit()).file
+    fresh = use_case.render("sample-space-wide", phatsang_kit()).file
     foreign = directory / "notes.txt"
     foreign.write_text("not a still")
     long_ago = time.time() - 48 * 3600
@@ -91,7 +102,7 @@ def test_pruning_deletes_only_old_stills_nobody_keeps(stills):
 
 
 def test_pruning_with_a_negative_age_is_an_error_and_an_empty_directory_is_fine(tmp_path):
-    use_case = StillsUseCase(FakeRenderer(), {"phatsang": 1}, tmp_path / "missing")
+    use_case = StillsUseCase(FakeRenderer(), tmp_path / "missing")
     assert use_case.prune([], 24) == []
     with pytest.raises(ValueError):
         use_case.prune([], -1)

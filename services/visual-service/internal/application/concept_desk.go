@@ -664,7 +664,8 @@ func (d *ConceptDesk) ApproveAll(ctx context.Context, projectID string) (*Concep
 	return d.State(ctx, projectID)
 }
 
-// SetRefs replaces the descriptions the video picked.
+// SetRefs replaces the description the video picked: one id, or none to
+// unpick. A second id is domain.ErrOneReferenceOnly.
 func (d *ConceptDesk) SetRefs(ctx context.Context, projectID string, refIDs []string) (*ConceptState, error) {
 	if strings.TrimSpace(projectID) == "" {
 		return nil, ErrNoProjectID
@@ -676,6 +677,9 @@ func (d *ConceptDesk) SetRefs(ctx context.Context, projectID string, refIDs []st
 			seen[id] = true
 			ids = append(ids, id)
 		}
+	}
+	if len(ids) > 1 {
+		return nil, domain.ErrOneReferenceOnly
 	}
 	if err := d.store.SetPicks(ctx, projectID, ids); err != nil {
 		return nil, err

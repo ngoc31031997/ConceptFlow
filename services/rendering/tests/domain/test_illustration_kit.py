@@ -3,7 +3,7 @@ của Code Merger phải khớp nhau.
 
 Ba nơi cùng mô tả một bộ component:
   - remotion_project/src/conceptflow-mini/illustration.tsx và scene.tsx — code thật;
-  - authoring-service/.../prompts/illustration_kit_vi.txt — thứ Kỹ sư Remotion đọc;
+  - rendering/domain/illustration_kit_vi.txt — thứ Kỹ sư Remotion đọc;
   - llm-service/app/pipeline/merger.py ILLUSTRATION_KIT — thứ khung code import sẵn.
 Lệch một trong ba là: model gọi một component không tồn tại (build lỗi), hoặc có
 component mà không ai biết để dùng (vẽ tay lại thứ đã có).
@@ -22,7 +22,7 @@ SERVICES = RENDERING.parent
 KIT = RENDERING / "remotion_project" / "src" / "conceptflow-mini" / "illustration.tsx"
 SCENE = KIT.with_name("scene.tsx")
 BACKDROPS = KIT.with_name("backdrops.tsx")
-DOC = SERVICES / "authoring-service" / "internal" / "domain" / "prompts" / "illustration_kit_vi.txt"
+DOC = Path(__file__).resolve().parents[2] / "domain" / "illustration_kit_vi.txt"
 MERGER = SERVICES / "llm-service" / "app" / "pipeline" / "merger.py"
 
 # Tên thẻ JSX hợp lệ trong tài liệu mà không thuộc bộ minh hoạ.

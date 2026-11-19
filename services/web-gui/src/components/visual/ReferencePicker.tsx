@@ -10,10 +10,10 @@ import styles from "./visual.module.css";
 export const REFERENCE_LIBRARY_ROUTE = "/settings/reference-styles";
 
 /**
- * The reference descriptions of the shared library, each with a tick: the
- * ticked ones are what the AI reads when it writes the parts. Changing the
- * ticks once a part that reads them is written asks first, since those parts
- * then need redoing.
+ * The reference descriptions of the shared library, one to choose (a video
+ * has a single style): the chosen one is what the AI reads when it writes the
+ * parts and what rendering draws with. Changing the choice once a part that
+ * reads it is written asks first, since those parts then need redoing.
  */
 export function ReferencePicker({
   state,
@@ -29,8 +29,7 @@ export function ReferencePicker({
   const picked = state.refs.filter((r) => r.picked).map((r) => r.ref_id);
   const affected = state.units.filter((u) => u.written && u.reads.includes("Mô tả tham chiếu"));
 
-  function toggle(id: string) {
-    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+  function choose(next: string[]) {
     if (affected.length > 0) setPending(next);
     else void concept.setRefs(next);
   }
@@ -41,7 +40,7 @@ export function ReferencePicker({
         <div className={researchStyles.head}>
           <h3>Tham chiếu phong cách</h3>
           <span className={researchStyles.hint}>
-            Chọn mô tả trong thư viện để AI đọc khi viết quy tắc.
+            Chọn một mô tả trong thư viện để AI đọc khi viết quy tắc.
           </span>
           <span className={researchStyles.grow} />
           <Button
@@ -62,9 +61,10 @@ export function ReferencePicker({
               <div key={r.ref_id} className={`${styles.ref} ${r.picked ? styles.refOn : ""}`}>
                 <label className={styles.refLabel}>
                   <input
-                    type="checkbox"
+                    type="radio"
+                    name="concept-ref"
                     checked={r.picked}
-                    onChange={() => toggle(r.ref_id)}
+                    onChange={() => choose([r.ref_id])}
                     disabled={readOnly || concept.busy || concept.running !== null}
                     data-testid={`concept-ref-${r.ref_id}`}
                   />
@@ -82,8 +82,19 @@ export function ReferencePicker({
             ))}
           </div>
         )}
+        {picked.length > 0 && (
+          <Button
+            variant="ghost"
+            onClick={() => choose([])}
+            disabled={readOnly || concept.busy || concept.running !== null}
+            data-testid="concept-refs-clear"
+          >
+            Bỏ chọn
+          </Button>
+        )}
         <span className={researchStyles.hint}>
-          {picked.length} mô tả đang được chọn. Đổi lựa chọn sau khi AI đã viết thì các phần đọc
+          {picked.length === 0 ? "Chưa chọn phong cách nào." : `Đang chọn ${picked[0]}.`} Mỗi video chỉ
+          chọn một phong cách. Đổi lựa chọn sau khi AI đã viết thì các phần đọc
           tham chiếu hiện nhãn “cần làm lại”.
         </span>
       </div>

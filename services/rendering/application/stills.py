@@ -1,8 +1,8 @@
 """Ảnh tĩnh dùng chung: một khung của composition mẫu, dựng một lần và cache.
 
-Tên file là SHA-256 của mọi thứ làm ảnh đổi: composition, kit, phiên bản kit,
-props và khung hình. Cùng nội dung thì trả lại file cũ (`cache_hit`), kit đổi
-phiên bản thì ra ảnh mới. Dọn theo danh sách giữ lại: file không có trong
+Tên file là SHA-256 của mọi thứ làm ảnh đổi: composition, nội dung kit, props
+và khung hình. Cùng nội dung thì trả lại file cũ (`cache_hit`), kit đổi một
+con số thì ra ảnh mới. Dọn theo danh sách giữ lại: file không có trong
 `keep` và đủ cũ thì xoá.
 """
 
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from domain.kits import require_kit
+from domain.kit import validate_kit
 
 HASH_LENGTH = 64
 SECONDS_PER_HOUR = 3600
@@ -25,7 +25,9 @@ SECONDS_PER_HOUR = 3600
 class StillRenderer(Protocol):
     """Dựng một khung của composition mẫu ra file."""
 
-    def still(self, kit_key: str, composition: str, output: str, frame: int = ..., props: dict | None = ...) -> None: ...
+    def still(
+        self, kit: dict, composition: str, output: str, frame: int = ..., props: dict | None = ...,
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -37,23 +39,22 @@ class StillResult:
 
 
 class StillsUseCase:
-    def __init__(self, renderer: StillRenderer, kits: dict[str, int], directory: str | Path) -> None:
+    def __init__(self, renderer: StillRenderer, directory: str | Path) -> None:
         self._renderer = renderer
-        self._kits = kits
         self._dir = Path(directory)
 
-    def still_hash(self, composition: str, kit_key: str, props: dict, frame: int) -> str:
+    def still_hash(self, composition: str, kit: dict, props: dict, frame: int) -> str:
         """Hash của một ảnh: đổi bất kỳ thành phần nào cũng ra hash khác."""
-        version = require_kit(self._kits, kit_key)
         payload = json.dumps(
-            {"composition": composition, "kit": kit_key, "kit_version": version, "props": props, "frame": frame},
+            {"composition": composition, "kit": kit, "props": props, "frame": frame},
             sort_keys=True, separators=(",", ":"), ensure_ascii=False,
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def render(self, composition: str, kit_key: str, props: dict | None = None, frame: int = 10) -> StillResult:
+    def render(self, composition: str, kit: dict, props: dict | None = None, frame: int = 10) -> StillResult:
+        validate_kit(kit)
         props = props or {}
-        name = f"{self.still_hash(composition, kit_key, props, frame)}.png"
+        name = f"{self.still_hash(composition, kit, props, frame)}.png"
         target = self._dir / name
         if target.exists():
             return StillResult(name, True)
@@ -61,7 +62,7 @@ class StillsUseCase:
         # Dựng ra file tạm rồi đổi tên: một yêu cầu khác không bao giờ thấy ảnh dang dở.
         partial = self._dir / f"{name}.{os.getpid()}.part"
         try:
-            self._renderer.still(kit_key, composition, str(partial), frame, props)
+            self._renderer.still(kit, composition, str(partial), frame, props)
             os.replace(partial, target)
         finally:
             partial.unlink(missing_ok=True)
