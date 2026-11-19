@@ -3790,3 +3790,11 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **User Input**: Trả lời câu 1–8: 1A, 2A, 3A, 4A, 5A, 6A, 7 "default là đưa vào, user có thể bỏ bằng cách untick checkbox", 8A.
 **AI Response**: Viết cr-117-storyboard.md (FR-1..10). Nêu hai điểm cần xác nhận: bản tài sản mang vai trò riêng khi đưa vào thư viện; ai điều phối bước 11 (visual-service hay rendering). Chưa commit, chưa code.
 **Context**: Inception/Requirements CR-117, chờ Creator duyệt.
+
+---
+
+## CR-117 · Thiết kế
+**Timestamp**: 2026-11-20
+**User Input**: "ok" (duyệt yêu cầu) / "tiếp"
+**AI Response**: Commit yêu cầu (24dd453). Viết ADR-0051 (Proposed) và cr-117-storyboard-design.md: visual-service điều phối bản nháp + AI, rendering giữ project_assets / storyboard_shots / storyboard_versions và dựng khung; từ vựng đóng cho vị trí/góc máy; spike dựng khung nhiều tài sản trước; mockup phải duyệt trước khi code giao diện. Chưa code, chưa commit thiết kế.
+**Context**: Application Design CR-117, chờ Creator duyệt.
