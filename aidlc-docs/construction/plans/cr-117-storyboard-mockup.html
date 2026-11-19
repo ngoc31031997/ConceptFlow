@@ -1,0 +1,305 @@
+<title>Mockup Storyboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=Space+Mono&display=swap">
+<style>
+:root{
+  /* Neubrutalism, same tokens as services/web-gui/src/styles/theme.css */
+  --bg:#f7f1df; --card:#ffffff; --ink:#0a0a0a; --muted:#5b564a;
+  --accent:#e1ad01; --accent-soft:#f5e3a3; --accent-ink:#0a0a0a;
+  --pink:#ff7aa8; --run:#8b5cf6; --run-soft:#e6dcff;
+  --ok:#1f9d55; --ok-soft:#d6f1e0; --warn:#9c5a12; --warn-soft:#fbe3c5; --bad:#c62828; --bad-soft:#fadbd8;
+  --frame-bg:#1b2142; --frame-fg:#f5f0e6;
+  --border:2px solid var(--ink); --shadow:4px 4px 0 var(--ink); --shadow-sm:2px 2px 0 var(--ink);
+  --font-display:"Space Grotesk",system-ui,sans-serif; --font-body:"Inter",system-ui,sans-serif; --font-mono:"Space Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141310; --card:#1c1b18; --ink:#f5f0e6; --muted:#b4ad9b; --accent-soft:#3d3005; --run-soft:#2d2350;
+  --ok-soft:#16331f; --warn:#f2b45c; --warn-soft:#4a3510; --bad:#ff8a80; --bad-soft:#4a1d1a; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#141310; --card:#1c1b18; --ink:#f5f0e6; --muted:#b4ad9b; --accent-soft:#3d3005; --run-soft:#2d2350;
+  --ok-soft:#16331f; --warn:#f2b45c; --warn-soft:#4a3510; --bad:#ff8a80; --bad-soft:#4a1d1a; color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
+h1{font-size:26px} h2{font-size:18px} h3{font-size:15px}
+.muted{color:var(--muted)} .mono{font-family:var(--font-mono);font-size:12px}
+.card{background:var(--card);border:var(--border);box-shadow:var(--shadow);border-radius:4px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+button,.btn{font:inherit;font-weight:600;background:var(--card);color:var(--ink);border:var(--border);box-shadow:var(--shadow-sm);border-radius:4px;padding:6px 12px;cursor:pointer}
+button:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--run);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink)} button.run{background:var(--run);color:#fff}
+button.ghost{box-shadow:none;background:transparent} button[disabled]{opacity:.45;cursor:not-allowed;transform:none;box-shadow:var(--shadow-sm)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;border:var(--border);border-radius:99px;padding:1px 8px;background:var(--card)}
+.chip.ok{background:var(--ok-soft)} .chip.warn{background:var(--warn-soft)} .chip.bad{background:var(--bad-soft)} .chip.run{background:var(--run-soft)} .chip.acc{background:var(--accent-soft)}
+.banner{border:var(--border);border-radius:4px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+.banner.warn{background:var(--warn-soft)} .banner.run{background:var(--run-soft)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{background:var(--card)} .tab[aria-selected="true"]{background:var(--accent);box-shadow:var(--shadow)}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
+.thumb{aspect-ratio:16/9;width:100%;border:var(--border);border-radius:4px;background:var(--frame-bg);display:block}
+.thumb.sq{aspect-ratio:1/1}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:4px 10px;font-size:13px;min-width:0} .kv dt{color:var(--muted)} .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.beat{display:flex;flex-direction:column;gap:12px}
+.beathead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-bottom:var(--border);padding-bottom:6px}
+.unit{display:flex;flex-direction:column;gap:10px;border-left:var(--border);padding-left:12px;margin-left:4px}
+.shot{display:flex;flex-direction:column;gap:8px;min-width:0}
+.shot.stale .thumb{outline:3px dashed var(--warn);outline-offset:-3px}
+.sheet{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.sheet figure{margin:0;display:flex;flex-direction:column;gap:4px} .sheet figcaption{font-size:12px}
+.lib{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.lib select{font:inherit;background:var(--card);color:var(--ink);border:var(--border);border-radius:4px;padding:3px 6px}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+dialog{border:var(--border);box-shadow:var(--shadow);border-radius:4px;background:var(--card);color:var(--ink);padding:0;width:min(640px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg{padding:16px;display:flex;flex-direction:column;gap:12px} .dlg label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px}
+.dlg input,.dlg textarea,.dlg select{font:inherit;font-weight:400;background:var(--bg);color:var(--ink);border:var(--border);border-radius:4px;padding:6px 8px}
+.foot{display:flex;justify-content:flex-end;gap:8px}
+.folded{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:var(--border);border-radius:4px;background:var(--card);padding:8px 12px;min-width:0}.folded .sum{flex:1;min-width:140px;overflow-wrap:anywhere}article.folded{box-shadow:none}
+.note{font-size:12px;color:var(--muted)}
+.mock{font-size:12px;border:2px dashed var(--muted);border-radius:4px;padding:6px 10px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.panel{animation:rise .2s ease-out}@keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+</style>
+
+<div class="wrap">
+  <div class="mock">MOCKUP dữ liệu ví dụ (chủ đề hố đen). Chưa nối hệ thống. Các nút chỉ minh hoạ bố cục và trạng thái. Chủ đề sáng/tối theo hệ điều hành.</div>
+
+  <header class="card row between">
+    <div>
+      <div class="note">Tiền kỳ · Hình ảnh · Bước 11</div>
+      <h1>Storyboard</h1>
+      <div class="muted">Tài sản dùng lại và các shot của từng unit. Dựa trên Chuỗi hình bản <span class="mono">v1</span> · Kit <span class="mono">R12 Glowing Flat Vector</span></div>
+    </div>
+    <div class="row">
+      <span class="chip run" id="stepChip">Đang rà soát</span>
+    </div>
+  </header>
+
+  <section class="card" style="display:flex;flex-direction:column;gap:10px" aria-labelledby="runTitle">
+    <div class="row between"><h2 id="runTitle">Chạy AI</h2><span class="note">AI viết từng unit, mỗi unit một lượt, đọc shot của unit liền trước để giữ nhất quán</span></div>
+    <div class="row">
+      <label class="row" style="gap:6px">Model của bước <select id="model" style="font:inherit;background:var(--card);color:var(--ink);border:var(--border);border-radius:4px;padding:3px 6px"><option>Theo mặc định của bước (deepseek-chat)</option><option>qwen2.5-coder (chạy trên máy)</option></select></label>
+      <button class="run">Viết shot cho 1 unit còn trống</button>
+      <button class="run" id="dsAll">Chạy tất cả bằng DeepSeek (3)</button>
+    </div>
+    <p class="note" style="margin:0" role="status" id="queueNote">Hàng đợi DeepSeek: 1 đang chạy · 2 chờ · 0 lỗi. Extension chạy lần lượt, mỗi unit một prompt.</p>
+    <p class="note" style="margin:0">Vẽ tài sản và dựng khung chạy trên hệ thống (bộ vẽ AI và Remotion), không đi qua AI ngoài. Chỉ các lượt AI viết chữ (lập tài sản, viết shot, rà soát) dùng được AI ngoài và DeepSeek.</p>
+  </section>
+
+  <div class="banner warn" role="status"><strong>Chưa chốt được:</strong>
+    <span>1 tài sản chưa duyệt, 2 shot chưa duyệt, 1 khung cần vẽ lại, chưa rà soát lần nào.</span></div>
+
+  <nav class="tabs" role="tablist" aria-label="Bước 11">
+    <button class="tab" role="tab" id="t-assets" aria-selected="true" data-tab="assets">1 · Tài sản <span class="chip acc" id="cAssets">3/5 đã duyệt</span></button>
+    <button class="tab" role="tab" id="t-shots" aria-selected="false" data-tab="shots">2 · Shot <span class="chip acc" id="cShots">2/4 đã duyệt</span></button>
+    <button class="tab" role="tab" id="t-lock" aria-selected="false" data-tab="lock">3 · Rà soát và chốt</button>
+  </nav>
+
+  <!-- Tab tài sản -->
+  <section class="panel" id="p-assets" role="tabpanel" aria-labelledby="t-assets">
+    <div class="card" style="margin-bottom:16px">
+      <div class="row between">
+        <div><h2>Danh sách tài sản</h2><div class="muted">Mỗi tài sản vẽ một lần, dùng lại ở nhiều shot. Mô tả lấy từ ngôn ngữ hình ảnh của bước 8.</div></div>
+        <div class="row"><button>+ Thêm tài sản</button><button class="run">AI lập danh sách</button><button data-ext="Lập danh sách tài sản">Dùng AI ngoài</button><button class="ds">Chạy bằng DeepSeek</button><button class="primary">Duyệt cả danh sách</button></div>
+      </div>
+    </div>
+    <div class="grid" id="assetGrid"></div>
+  </section>
+
+  <!-- Tab shot -->
+  <section class="panel" id="p-shots" role="tabpanel" aria-labelledby="t-shots" hidden>
+    <div class="card" style="margin-bottom:16px">
+      <div class="row between">
+        <div class="row"><h2>Shot theo beat và unit</h2>
+          <span class="chip" id="viewChip">Xem theo danh sách</span></div>
+        <div class="row">
+          <button id="viewBtn">Xem dạng lưới</button>
+          <button class="primary">Duyệt tất cả còn lại</button>
+        </div>
+      </div>
+    </div>
+    <div class="beat" id="shotList"></div>
+    <div id="sheet" class="card" hidden>
+      <div class="row between" style="margin-bottom:10px"><h2>Cả phim một lượt</h2><span class="note">Chỉ xem. Bấm một khung để mở shot.</span></div>
+      <div class="sheet" id="sheetGrid"></div>
+    </div>
+  </section>
+
+  <!-- Tab rà soát và chốt -->
+  <section class="panel" id="p-lock" role="tabpanel" aria-labelledby="t-lock" hidden>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="row between"><h2>Rà soát</h2><div class="row"><button class="run">Rà soát bằng AI</button><button data-ext="Rà soát storyboard">Dùng AI ngoài</button><button class="ds">Chạy bằng DeepSeek</button></div></div>
+      <div class="note">Máy luôn kiểm: shot thuộc unit có thật, mã tài sản đã duyệt, vị trí và góc máy hợp lệ, số dòng chữ, ảnh khung còn mới.</div>
+      <div class="banner warn"><strong>Máy kiểm</strong><span>2 mục chặn duyệt · 1 cảnh báo (tài sản <span class="mono">AST-DISK-001</span> chưa shot nào dùng)</span></div>
+      <div class="banner run"><strong>AI · lần 1</strong><span>SH-003 · consistency: nhân vật AST-OBSERVER-001 được tả khác SH-002 (áo trắng và áo xanh). <button class="ghost">Áp dụng gợi ý</button> <button class="ghost">Chấp nhận kèm lý do</button></span></div>
+    </div>
+    <div class="card" style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+      <h2>Chốt storyboard</h2>
+      <div class="note">Điều kiện: bước 10 đã chốt, mọi tài sản và shot đã duyệt, khung còn mới, đã rà soát, không còn vấn đề mở.</div>
+      <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px">
+        <li>✔ Chuỗi hình bước 10 đã chốt (v1)</li><li>✘ 1 tài sản chưa duyệt</li><li>✘ 2 shot chưa duyệt</li><li>✘ 1 khung cần vẽ lại</li><li>✘ Chưa rà soát</li>
+      </ul>
+      <div class="foot"><button class="primary" disabled>Chốt storyboard-v1</button></div>
+      <div class="note">Khi chốt: ghi <span class="mono">storyboard.json</span> và ảnh khung của phiên bản vào <span class="mono">/shared/{dự án}/storyboard/v1/</span>.</div>
+    </div>
+  </section>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle"><form method="dialog" class="dlg" id="dlgForm">
+  <h2 id="dlgTitle">Sửa shot SH-003</h2>
+  <label>Mục đích<input id="fPurpose" value="So sánh hai góc nhìn."></label>
+  <div class="row" style="gap:12px">
+    <label style="flex:1;min-width:160px">Chủ thể<select id="fSubject"><option>AST-OBSERVER-001</option><option>AST-ASTRONAUT-001</option></select></label>
+    <label style="flex:1;min-width:160px">Vị trí chủ thể<select><option>split_left</option><option>lower_left</option><option>center</option></select></label>
+  </div>
+  <div class="row" style="gap:12px">
+    <label style="flex:1;min-width:160px">Vật chính<select><option>AST-BH-001</option><option>(không có)</option></select></label>
+    <label style="flex:1;min-width:160px">Góc máy<select><option>comparison</option><option>wide</option><option>medium</option><option>close</option></select></label>
+  </div>
+  <label>Hành động<textarea rows="2">Hai góc nhìn được đặt cạnh nhau.</textarea></label>
+  <label>Chữ trên màn hình (mỗi dòng một mục, tối đa theo luật chữ của bước 8)<textarea rows="2">Góc nhìn A
+Góc nhìn B</textarea></label>
+  <div class="banner warn">Sửa shot này đưa shot về «chưa duyệt», khung sẽ vẽ lại và unit VP-002 mất trạng thái đã duyệt.</div>
+  <div class="foot"><button value="cancel">Huỷ</button><button class="primary" value="ok">Lưu và vẽ lại khung</button></div>
+</form></dialog>
+
+<dialog id="ext" aria-labelledby="extTitle"><form method="dialog" class="dlg">
+  <h2 id="extTitle">Dùng AI ngoài</h2>
+  <p class="note" style="margin:0">Hệ thống không gọi AI. Bạn chép prompt sang AI ngoài, rồi dán kết quả trả về. Hệ thống đọc kết quả như khi tự chạy và báo nếu không đọc được.</p>
+  <label>1. Chép prompt sang AI ngoài
+    <textarea rows="4" readonly>Bạn là ĐẠO DIỄN STORYBOARD của một kênh video phổ biến kiến thức… (prompt đầy đủ đã điền đầu vào của unit VP-002)</textarea></label>
+  <div class="row"><button type="button">Chép prompt</button></div>
+  <label>2. Dán kết quả AI ngoài trả về
+    <textarea rows="4" placeholder='{"shots":[…]}'></textarea></label>
+  <div class="foot"><button value="cancel">Huỷ</button><button class="run" value="ok">Dùng kết quả này</button></div>
+</form></dialog>
+
+<script>
+const ASSETS=[
+ {id:"AST-ASTRONAUT-001",name:"Astronaut",kind:"figure",tier:"hero",st:"approved",concept:"characters.astronaut",portray:"Nhà thám hiểm nhỏ bé, bình tĩnh, tò mò trước thứ khổng lồ.",not:["không gợi sự hoảng loạn"],tokens:["accent","text"],expr:["trôi","ngước nhìn"],base:"Người (thư viện)",lib:true,shape:"person"},
+ {id:"AST-BH-001",name:"BlackHole",kind:"figure",tier:"hero",st:"approved",concept:"scientific_concepts.black_hole",portray:"Vùng tối nuốt ánh sáng, uy nghi nhưng không đe doạ như quái vật.",not:["không vẽ như cái hố có đáy","không có miệng hay mắt"],tokens:["bg","accent"],expr:["xoáy chậm"],base:"Chưa có hình gốc phù hợp",lib:true,shape:"hole"},
+ {id:"AST-SPACE-001",name:"DeepSpace",kind:"backdrop",tier:"background",st:"approved",concept:"",portray:"Không gian sâu, thưa sao, tạo cảm giác rộng và tĩnh.",not:[],tokens:["bg"],expr:[],base:"Không gian (thư viện)",lib:false,shape:"space"},
+ {id:"AST-OBSERVER-001",name:"Observer",kind:"figure",tier:"support",st:"drawn",concept:"characters.observer",portray:"Người quan sát đứng yên, đại diện góc nhìn bên ngoài.",not:[],tokens:["text","accent"],expr:["đứng yên"],base:"Người (thư viện)",lib:true,shape:"person2"},
+ {id:"AST-DISK-001",name:"AccretionDisk",kind:"figure",tier:"support",st:"planned",concept:"objects.accretion_disk",portray:"Vành sáng quanh hố đen, ấm và rực.",not:["không như nhẫn kim loại"],tokens:["accent"],expr:[],base:"Chưa có hình gốc phù hợp",lib:true,shape:"ring"}
+];
+const UNITS=[
+ {beat:"B01",title:"Mở bài",units:[{id:"VP-001",goal:"Thiết lập quy mô và hướng chuyển động.",shots:[
+   {id:"SH-001",purpose:"Thiết lập quy mô và hướng chuyển động.",st:"approved",stale:false,cam:"wide",subj:"AST-ASTRONAUT-001",sp:"lower_left",obj:"AST-BH-001",op:"upper_right",act:"Nhân vật trôi về phía hố đen.",txt:[],refs:["AST-ASTRONAUT-001","AST-BH-001","AST-SPACE-001"],scene:"a"}]}]},
+ {beat:"B02",title:"So sánh góc nhìn",units:[
+  {id:"VP-002",goal:"Đối chiếu hai góc nhìn.",shots:[
+   {id:"SH-002",purpose:"So sánh hai góc nhìn.",st:"approved",stale:false,cam:"comparison",subj:"AST-OBSERVER-001",sp:"split_left",obj:"AST-BH-001",op:"split_right",act:"Hai góc nhìn được đặt cạnh nhau.",txt:["Góc nhìn A","Góc nhìn B"],refs:["AST-OBSERVER-001","AST-BH-001"],scene:"b"},
+   {id:"SH-003",purpose:"Nhấn vào góc nhìn người quan sát.",st:"pending",stale:true,cam:"medium",subj:"AST-OBSERVER-001",sp:"center",obj:"",op:"",act:"Người quan sát nhìn hố đen từ xa.",txt:[],refs:["AST-OBSERVER-001"],scene:"c"}]},
+  {id:"VP-003",goal:"Cho thấy vành sáng quanh hố đen.",shots:[
+   {id:"SH-004",purpose:"Cho thấy vành sáng.",st:"missing",stale:false,cam:"close",subj:"AST-BH-001",sp:"center",obj:"AST-DISK-001",op:"center",act:"Cận cảnh vành sáng xoáy quanh hố đen.",txt:[],refs:["AST-BH-001","AST-DISK-001"],scene:"d"}]}]}
+];
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const STCHIP={approved:["ok","Đã duyệt"],drawn:["run","Đã vẽ, chờ duyệt"],planned:["warn","Chưa vẽ"],pending:["warn","Chưa duyệt"],missing:["bad","Thiếu tài sản"]};
+const chip=k=>{const [c,t]=STCHIP[k];return `<span class="chip ${c}">${t}</span>`};
+function art(shape,sz){ // placeholder drawing in the frame palette
+  const f="var(--frame-fg)",a="var(--accent)";
+  const m={
+   person:`<circle cx="50" cy="26" r="9" fill="${f}"/><rect x="40" y="38" width="20" height="34" rx="8" fill="${a}"/>`,
+   person2:`<circle cx="50" cy="26" r="9" fill="${f}"/><rect x="41" y="38" width="18" height="34" rx="4" fill="#7aa2ff"/>`,
+   hole:`<circle cx="50" cy="50" r="30" fill="#05060f" stroke="${a}" stroke-width="3"/>`,
+   ring:`<ellipse cx="50" cy="50" rx="38" ry="12" fill="none" stroke="${a}" stroke-width="6"/>`,
+   space:`<circle cx="18" cy="20" r="1.6" fill="${f}"/><circle cx="70" cy="14" r="1.2" fill="${f}"/><circle cx="84" cy="62" r="1.8" fill="${f}"/><circle cx="30" cy="74" r="1.2" fill="${f}"/>`
+  };
+  return `<svg class="thumb sq" viewBox="0 0 100 100" role="img" aria-label="Xem trước tài sản">${m[sz]||""}</svg>`;
+}
+function frame(s){ // placeholder frame composed from positions
+  const P={upper_left:[22,24],upper_center:[50,24],upper_right:[78,24],center_left:[22,50],center:[50,50],center_right:[78,50],lower_left:[22,76],lower_center:[50,76],lower_right:[78,76],split_left:[25,50],split_right:[75,50]};
+  const sc={wide:.7,medium:1,close:1.5,comparison:.9}[s.cam];
+  const sh=id=>ASSETS.find(a=>a.id===id)?.shape;
+  const put=(id,pos)=>{ if(!id||!P[pos])return ""; const [x,y]=P[pos]; const g=sh(id);
+    const body={person:`<circle cx="0" cy="-9" r="5" fill="var(--frame-fg)"/><rect x="-5" y="-3" width="10" height="16" rx="3" fill="var(--accent)"/>`,person2:`<circle cx="0" cy="-9" r="5" fill="var(--frame-fg)"/><rect x="-5" y="-3" width="10" height="16" rx="2" fill="#7aa2ff"/>`,hole:`<circle r="14" fill="#05060f" stroke="var(--accent)" stroke-width="1.5"/>`,ring:`<ellipse rx="22" ry="6" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`}[g]||"";
+    return `<g transform="translate(${x*1.6} ${y*.9}) scale(${sc})">${body}</g>`};
+  const t=s.txt.map((x,i)=>`<text x="${s.txt.length>1?(i?120:40):80}" y="84" font-size="6" fill="var(--frame-fg)" text-anchor="middle" font-family="Inter,sans-serif">${x}</text>`).join("");
+  const stars=`<circle cx="14" cy="12" r=".8" fill="var(--frame-fg)"/><circle cx="130" cy="10" r=".8" fill="var(--frame-fg)"/><circle cx="148" cy="62" r="1" fill="var(--frame-fg)"/><circle cx="30" cy="70" r=".7" fill="var(--frame-fg)"/>`;
+  const split=s.cam==="comparison"?`<line x1="80" y1="0" x2="80" y2="90" stroke="var(--frame-fg)" stroke-width=".5" stroke-dasharray="2 2"/>`:"";
+  return `<svg class="thumb" viewBox="0 0 160 90" role="img" aria-label="Khung ${s.id}">${stars}${split}${put(s.obj,s.op)}${put(s.subj,s.sp)}${t}</svg>`;
+}
+const OPEN=new Set(); // ids the Creator expanded; an approved item folds unless its id is here
+const unitOk=u=>u.shots.every(s=>s.st==="approved");
+const beatOk=b=>b.units.every(unitOk);
+const findShot=id=>UNITS.flatMap(b=>b.units.flatMap(u=>u.shots)).find(s=>s.id===id);
+function assetCard(a){
+  if(a.st==="approved"&&!OPEN.has(a.id)){
+    return `<article class="card folded" data-fold="${a.id}"><span class="mono">${a.id}</span><span class="sum">${a.name} · ${a.kind==="figure"?"hình":"phông nền"} · ${a.tier}</span>${chip(a.st)}<button data-act="open" data-id="${a.id}">Mở</button></article>`;
+  }
+  const act=a.st==="approved"?`<button class="ghost" data-act="unapprove" data-id="${a.id}">Bỏ duyệt</button><button class="ghost" data-act="fold" data-id="${a.id}">Thu gọn</button>`:a.st==="drawn"?`<button class="primary" data-act="approve" data-id="${a.id}">Duyệt</button>`:"";
+  return `<article class="card" style="display:flex;flex-direction:column;gap:10px">
+   <div class="row between"><div><h3>${a.name}</h3><div class="mono">${a.id}</div></div>${chip(a.st)}</div>
+   ${a.st==="planned"?`<div class="thumb sq" style="display:grid;place-items:center;color:var(--frame-fg);font-size:12px">Chưa vẽ</div>`:art(a.shape,a.shape)}
+   <dl class="kv"><dt>Loại · hạng</dt><dd>${a.kind==="figure"?"Hình":"Phông nền"} · ${a.tier}</dd>
+     <dt>Khái niệm</dt><dd class="mono">${a.concept||"(không gắn)"}</dd>
+     <dt>Cảm giác</dt><dd>${a.portray}</dd>
+     <dt>Không gợi ý</dt><dd>${a.not.length?a.not.join("; "):"—"}</dd>
+     <dt>Màu · biểu cảm</dt><dd>${a.tokens.join(", ")}${a.expr.length?" · "+a.expr.join(", "):""}</dd>
+     <dt>Hình gốc</dt><dd>${a.base}</dd></dl>
+   <label class="lib"><input type="checkbox" ${a.lib?"checked":""}> Đưa vào thư viện khi duyệt, thư mục
+     <select aria-label="Thư mục thư viện"><option>Từ dự án</option><option>Nhân vật</option><option>Phông nền</option></select></label>
+   <div class="row"><button>Sửa</button>${a.st==="planned"?'<button class="run">Vẽ</button>':'<button>Vẽ lại</button>'}${act}</div>
+  </article>`;
+}
+function shotCard(s){
+  if(s.st==="approved"&&!OPEN.has(s.id)){
+    return `<article class="card folded" data-fold="${s.id}"><span class="mono">${s.id}</span><span class="sum">${s.cam} · ${s.purpose}</span>${chip(s.st)}<button data-act="open" data-id="${s.id}">Mở</button></article>`;
+  }
+  const assets=s.refs.map(r=>`<span class="chip mono">${r}</span>`).join(" ");
+  const act=s.st==="approved"?`<button class="ghost" data-act="unapprove" data-id="${s.id}">Bỏ duyệt</button><button class="ghost" data-act="fold" data-id="${s.id}">Thu gọn</button>`:`<button class="primary" data-act="approve" data-id="${s.id}" ${s.st==="missing"?"disabled":""}>Duyệt</button>`;
+  return `<article class="card shot ${s.stale?"stale":""}">
+   ${frame(s)}
+   <div class="row between"><h3>${s.id}</h3><div class="row" style="gap:6px">${s.stale?'<span class="chip warn">Khung cũ</span>':""}${chip(s.st)}</div></div>
+   <dl class="kv"><dt>Mục đích</dt><dd>${s.purpose}</dd>
+    <dt>Bố cục</dt><dd><span class="mono">${s.subj} @ ${s.sp}</span>${s.obj?` · <span class="mono">${s.obj} @ ${s.op}</span>`:""} · góc <span class="mono">${s.cam}</span></dd>
+    <dt>Hành động</dt><dd>${s.act}</dd>
+    <dt>Chữ</dt><dd>${s.txt.length?s.txt.map(x=>"«"+x+"»").join(" "):"—"}</dd>
+    <dt>Tài sản</dt><dd class="row" style="gap:4px">${assets}</dd></dl>
+   ${s.st==="missing"?'<div class="banner warn">Cần tài sản <span class="mono">AST-DISK-001</span> đã duyệt trước khi dựng khung.</div>':""}
+   <div class="row"><button data-edit="${s.id}">Sửa</button><button>Vẽ lại khung</button>${act}</div>
+  </article>`;
+}
+function unitHtml(u){
+  const ok=unitOk(u);
+  if(ok&&!OPEN.has(u.id)){
+    return `<div class="unit"><div class="folded" data-fold="${u.id}"><span class="mono">${u.id}</span><span class="sum">${u.goal} · ${u.shots.length} shot</span><span class="chip ok">Unit đã duyệt</span><button data-act="open" data-id="${u.id}">Mở</button></div></div>`;
+  }
+  return `<div class="unit"><div class="row between"><div class="row"><h3>${u.id}</h3><span class="muted">${u.goal}</span>${ok?'<span class="chip ok">Unit đã duyệt</span>':'<span class="chip warn">Chưa duyệt đủ shot</span>'}</div>
+     <div class="row"><button class="run">AI viết lại unit</button><button data-ext="Viết shot cho ${u.id}">Dùng AI ngoài</button><button class="run">Chạy bằng DeepSeek</button><button>+ Thêm shot</button>${ok?`<button class="ghost" data-act="fold" data-id="${u.id}">Thu gọn</button>`:""}</div></div>
+     <div class="grid">${u.shots.map(shotCard).join("")}</div></div>`;
+}
+function beatHtml(b){
+  if(beatOk(b)&&!OPEN.has(b.beat)){
+    return `<div class="beat"><div class="folded" data-fold="${b.beat}"><span class="mono">${b.beat}</span><span class="sum">${b.title} · ${b.units.length} unit · ${b.units.reduce((n,u)=>n+u.shots.length,0)} shot</span><span class="chip ok">Beat đã duyệt</span><button data-act="open" data-id="${b.beat}">Mở</button></div></div>`;
+  }
+  return `<div class="beat"><div class="beathead"><h2>${b.beat}</h2><span>${b.title}</span>${beatOk(b)?`<button class="ghost" data-act="fold" data-id="${b.beat}">Thu gọn</button>`:""}</div>${b.units.map(unitHtml).join("")}</div>`;
+}
+function render(){
+  $("#assetGrid").innerHTML=ASSETS.map(assetCard).join("");
+  $("#shotList").innerHTML=UNITS.map(beatHtml).join("");
+  const all=UNITS.flatMap(b=>b.units.flatMap(u=>u.shots));
+  $("#sheetGrid").innerHTML=all.map(s=>`<figure>${frame(s)}<figcaption><strong>${s.id}</strong> · ${s.cam}</figcaption></figure>`).join("");
+  $("#cAssets").textContent=ASSETS.filter(a=>a.st==="approved").length+"/"+ASSETS.length+" đã duyệt";
+  $("#cShots").textContent=all.filter(s=>s.st==="approved").length+"/"+all.length+" đã duyệt";
+}
+function tab(n){["assets","shots","lock"].forEach(k=>{$("#p-"+k).hidden=k!==n;$("#t-"+k).setAttribute("aria-selected",k===n)})}
+let grid=false;
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tab],[data-act],[data-ext],[data-edit],#viewBtn"); if(!t)return;
+  if(t.dataset.tab){tab(t.dataset.tab);return}
+  if(t.id==="viewBtn"){grid=!grid;$("#sheet").hidden=!grid;$("#shotList").hidden=grid;t.textContent=grid?"Xem dạng danh sách":"Xem dạng lưới";$("#viewChip").textContent=grid?"Xem dạng lưới":"Xem theo danh sách";return}
+  if(t.dataset.ext){$("#extTitle").textContent="Dùng AI ngoài · "+t.dataset.ext;$("#ext").showModal();return}
+  if(t.dataset.edit){$("#dlgTitle").textContent="Sửa shot "+t.dataset.edit;$("#dlg").showModal();return}
+  const id=t.dataset.id, act=t.dataset.act, item=ASSETS.find(a=>a.id===id)||findShot(id);
+  if(act==="open")OPEN.add(id);
+  else if(act==="fold")OPEN.delete(id);
+  else if(act==="approve"&&item){item.st="approved";OPEN.delete(id)}      // approving folds the item
+  else if(act==="unapprove"&&item){item.st=ASSETS.includes(item)?"drawn":"pending";OPEN.add(id)} // reopened to edit
+  render();
+});
+$$(".ds").forEach(b=>b.classList.add("run"));
+render();
+</script>

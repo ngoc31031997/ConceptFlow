@@ -150,3 +150,14 @@ Ba vai `storyboard_assets`, `storyboard_unit`, `storyboard_review`, owner `visua
 - Dựng nhiều tài sản trong một khung chưa từng làm → S0 chạy đầu tiên.
 - Bộ vẽ AI vẽ sai hoặc lệch kit nhiều lần → tài sản ở `planned`/lỗi, Creator sửa mô tả rồi vẽ lại; không giả thành công.
 - Bước 12 "Thiết kế tài nguyên" trên bản đồ luồng trùng ý với pha tài sản: để CR sau.
+
+## 13. AI ngoài và DeepSeek (bổ sung theo mockup v2)
+Ba lượt AI viết chữ của bước (lập tài sản, viết shot của một unit, rà soát) dùng cùng cơ chế với bước 8–10 (ADR-0047):
+- **Dùng AI ngoài:** route nhận `X-External-AI` (`describe` dựng yêu cầu mà không gửi, `reply` nhận kết quả dán về). Hộp thoại hai bước: chép prompt sang AI ngoài, dán kết quả; kết quả đọc chặt như reply AI trong, đọc không được thì báo lý do.
+- **Chạy bằng DeepSeek:** qua extension AI Bridge, khi đã cài. Có nút từng việc và nút **"Chạy tất cả bằng DeepSeek (n)"** trong thẻ "Chạy AI": mỗi unit chưa duyệt một mục trong hàng đợi, theo thứ tự chuỗi, mỗi unit đọc shot của unit trước. Hàng đợi hiện số đang chạy, chờ, lỗi.
+- **Thẻ "Chạy AI"** đặt trước các tab: chọn model của bước (`storyboard_model`, mặc định của bước `storyboard` ở llm-service), nút viết cho các unit còn trống, nút DeepSeek, trạng thái hàng đợi.
+- **Không áp dụng cho vẽ tài sản và dựng khung:** vẽ tài sản chạy bộ vẽ AI của rendering (gọi `/v1/chat` của llm-service), dựng khung chạy Remotion; cả hai chạy trên hệ thống, không có chế độ AI ngoài.
+Mockup: `cr-117-storyboard-mockup.html` (artifact https://claude.ai/artifact/5D3n6WfATdcf76picCqoLt, bản 2).
+
+## 14. Gập mục đã duyệt (bổ sung theo mockup v3)
+Như bước 10: tài sản, shot, unit và beat đã duyệt **gập thành một dòng tóm tắt** (mã, nội dung chính, chip trạng thái, nút "Mở"). Bấm "Duyệt" thì mục gập lại ngay; "Mở" mở ra, "Thu gọn" gập lại; "Bỏ duyệt" mở mục ra để sửa. Unit gập khi mọi shot đã duyệt, beat gập khi mọi unit đã duyệt. Trạng thái mở/gập chỉ nằm ở trang, không lưu. Hiệu ứng theo quy tắc 3 của `docs/ux-ui-design-rules.md` (dùng `.reveal`/`.revealOut`, `usePresence`).
