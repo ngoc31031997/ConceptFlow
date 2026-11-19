@@ -3774,3 +3774,19 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **User Input**: "xoá"
 **AI Response**: Đã chạy: DROP 6 bảng hình + trigger/hàm pin_visual_language + 4 cột ở authoring; xoá mọi dự án trừ 335da643 (orchestrator 7, authoring 579 project_authoring + bảng con, llm_calls 229, outbox đã gửi tts 1013/rendering 1264/video-assembly 1023); ghi kit phatsang vào R12; xoá /shared/stills và /shared/1332cd4d…. Kiểm: kit dự án = R12, vẽ khung tĩnh thật thành công (ảnh thử đã xoá).
 **Context**: Construction CR-116, chờ Creator review.
+
+---
+
+## CR-117 · Bước 11 Storyboard — câu hỏi yêu cầu
+**Timestamp**: 2026-11-20
+**User Input**: "làm cr117 đi"
+**AI Response**: Mở nhánh feature/cr-117-storyboard (worktree); không có CR/nhánh nào khác đang mở nên không chồng lấn, CR-116 đã vào main. Viết cr-117-requirement-questions.md: ghi các điều đã chốt (cấp bậc, duyệt, lưu, tài sản hai tầng) và 8 câu mới (thứ tự việc, cách dựng khung, đơn vị AI, rà soát, chốt phiên bản, tìm hình gốc, đưa vào thư viện, bố cục màn hình).
+**Context**: Inception/Requirements CR-117, chờ Creator trả lời. Chưa commit.
+
+---
+
+## CR-117 · Yêu cầu
+**Timestamp**: 2026-11-20
+**User Input**: Trả lời câu 1–8: 1A, 2A, 3A, 4A, 5A, 6A, 7 "default là đưa vào, user có thể bỏ bằng cách untick checkbox", 8A.
+**AI Response**: Viết cr-117-storyboard.md (FR-1..10). Nêu hai điểm cần xác nhận: bản tài sản mang vai trò riêng khi đưa vào thư viện; ai điều phối bước 11 (visual-service hay rendering). Chưa commit, chưa code.
+**Context**: Inception/Requirements CR-117, chờ Creator duyệt.
