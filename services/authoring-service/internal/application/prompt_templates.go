@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -194,9 +193,6 @@ type AuthoringStateReaderPort interface {
 	// the project: the zero value ("" for every step) when none was picked.
 	// A step left empty is shown on the default saved for it.
 	GetChosenAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
-	// PinnedLanguage is the visual language version the project is pinned to
-	// (domain.ErrProjectNotPinned when it has none).
-	PinnedLanguage(ctx context.Context, projectID string) (domain.PinnedLanguage, error)
 }
 
 // AuthoringState is what GET /v1/projects/{id}/authoring returns — every
@@ -213,10 +209,6 @@ type AuthoringState struct {
 	// "ai" — each field either "" (server default) or one of
 	// domain.AuthoringModelCatalog's ids.
 	Models domain.AuthoringStepModels
-	// Language is the visual language version the project is pinned to; its
-	// ID is empty for a project with no pin, which the steps that draw or
-	// render refuse to run.
-	Language domain.PinnedLanguage
 }
 
 // GetAuthoringStateUseCase backs the read side of the authoring pipeline.
@@ -253,14 +245,9 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
-	pinned, err := uc.authoring.PinnedLanguage(ctx, projectID)
-	if err != nil && !errors.Is(err, domain.ErrProjectNotPinned) {
-		return AuthoringState{}, err
-	}
 	return AuthoringState{
 		Mode: domain.NormalizeAuthoringMode(mode), Topic: topic,
 		Story: story, Storyboard: storyboard, Code: code, Models: models,
-		Language: pinned,
 	}, nil
 }
 
@@ -377,10 +364,6 @@ type AuthoringSummary struct {
 	Story      bool   `json:"story"`
 	Storyboard bool   `json:"storyboard"`
 	Code       bool   `json:"code"`
-	// IllustrationsReady: the drawing list is planned and every drawing
-	// approved or skipped — what the code step's gate asks. Engine-agnostic; the
-	// orchestrator only reads it for a Remotion project.
-	IllustrationsReady bool `json:"illustrations_ready"`
 	// BriefApproved: the creative brief is written and approved; it is what
 	// lets a project leave the idea step.
 	BriefApproved bool `json:"brief_approved"`

@@ -115,7 +115,7 @@ func TestStale_FollowsOnlyTheSourcesAPartReads(t *testing.T) {
 		}
 	}
 	r.auth.v = lockedScript(t, 2, "C")
-	st = mustState(t)(r.desk.SetRefs(ctx, project, []string{"R01", "R02"}))
+	st = mustState(t)(r.desk.SetRefs(ctx, project, []string{"R02"}))
 	for _, u := range st.Units {
 		readsRefs := u.Key == domain.UnitCreativeDirection || u.Key == domain.UnitVisualLanguage
 		if u.Stale != readsRefs {
@@ -129,6 +129,9 @@ func TestStale_FollowsOnlyTheSourcesAPartReads(t *testing.T) {
 	st = mustState(t)(r.desk.State(ctx, project))
 	if !unitView(st, domain.UnitVisualLanguage).Stale || unitView(st, domain.UnitColorSystem).Stale {
 		t.Error("editing a picked description makes only the parts that read references stale")
+	}
+	if _, err := r.desk.SetRefs(ctx, project, []string{"R01", "R02"}); !errors.Is(err, domain.ErrOneReferenceOnly) {
+		t.Errorf("two picks: err %v, want ErrOneReferenceOnly", err)
 	}
 	if _, err := r.desk.SetRefs(ctx, project, []string{"R77"}); !errors.Is(err, domain.ErrUnknownReference) {
 		t.Error(err)

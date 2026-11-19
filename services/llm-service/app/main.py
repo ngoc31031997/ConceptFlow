@@ -163,8 +163,8 @@ class CodeBody(BaseModel):
     # No band = nothing burned into the frame; no font = the video default.
     subtitle_band: SubtitleBandIn | None = None
     video_font: str = ""
-    # The visual language the project is pinned to (required): the checker draws with its kit.
-    kit_key: str = Field(min_length=1)
+    # The drawing kit of the project's reference style (required, non-empty): the checker draws with it.
+    kit: dict = Field(min_length=1)
     # Shots per chunk for this project; 0 = CODE_CHUNK_SHOTS.
     chunk_shots: int = Field(0, ge=0, le=10)
     # What the caller already has, and the only segments to run.
@@ -180,7 +180,7 @@ class CodeBody(BaseModel):
             max_reasoning_chars=max_reasoning_chars, project_id=self.project_id,
             illustrations=[i.model_dump() for i in self.illustrations],
             subtitle_band=self.subtitle_band.model_dump() if self.subtitle_band else None,
-            video_font=self.video_font, kit_key=self.kit_key, chunk_shots=self.chunk_shots,
+            video_font=self.video_font, kit=self.kit, chunk_shots=self.chunk_shots,
             done={s.key: DoneSegment(s.fingerprint, s.content) for s in self.segments},
             only=set(self.only) if self.only is not None else None, canvas=_canvas(self.frame))
 

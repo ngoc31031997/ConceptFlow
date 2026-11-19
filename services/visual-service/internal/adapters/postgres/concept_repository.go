@@ -143,7 +143,8 @@ func (r *ConceptRepository) ReferenceLibrary(ctx context.Context) ([]domain.Pick
 	return scanRefs(rows)
 }
 
-// SetPicks replaces the video's picks in one transaction.
+// SetPicks replaces the video's pick in one transaction; the unique index on
+// project_id keeps it to one row.
 func (r *ConceptRepository) SetPicks(ctx context.Context, projectID string, refIDs []string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

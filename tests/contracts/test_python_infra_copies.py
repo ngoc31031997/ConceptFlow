@@ -21,8 +21,9 @@ GROUPS = [
     ("adapters/persistence/outbox.py", ALL_FOUR),
     ("adapters/persistence/relay.py", ALL_FOUR),
     ("adapters/persistence/inbox.py", ALL_FOUR),
-    # video-assembly and publisher extend db.py / cancellation.py with their own tables and steps.
-    ("adapters/persistence/db.py", ["tts", "rendering"]),
+    # video-assembly, publisher and rendering extend db.py with their own tables (rendering: the
+    # illustration library), so only db.py's outbox/inbox part is common and it is not compared here.
+    # video-assembly and publisher also extend cancellation.py with their own steps.
     ("adapters/messaging/cancellation.py", ["tts", "rendering"]),
     # video-assembly's fake also models its channel-asset tables.
     ("tests/adapters/fake_postgres.py", ["tts", "rendering", "publisher"]),

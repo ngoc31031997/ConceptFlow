@@ -35,6 +35,7 @@ from collections.abc import Callable
 
 from adapters.messaging.cancellation import REGISTRY
 from domain.errors import AnimationEngineError
+from domain.kit import InvalidKitError, validate_kit
 from domain.models import DryRunResult, ScriptRenderRequest, ScriptRenderResult
 from domain.ports import ScriptRendererPort
 
@@ -225,9 +226,11 @@ class RemotionScriptRenderer(ScriptRendererPort):
             with open(entry_path, "w", encoding="utf-8") as f:
                 f.write(_sanitize_script(request.script_content))
             with open(props_path, "w", encoding="utf-8") as f:
-                if not request.kit_key:
-                    raise AnimationEngineError("project chưa ghim ngôn ngữ hình: render_scenes thiếu kit_key")
-                props: dict = {"segments": segments, "kitKey": request.kit_key}
+                try:
+                    kit = validate_kit(request.kit)
+                except InvalidKitError as exc:
+                    raise AnimationEngineError(f"render_scenes: {exc}") from exc
+                props: dict = {"segments": segments, "kit": kit}
                 if request.video_font:
                     props["videoFont"] = request.video_font
                 json.dump(props, f)

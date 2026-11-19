@@ -14,10 +14,6 @@ type AuthoringSummary struct {
 	Story      bool   `json:"story"`
 	Storyboard bool   `json:"storyboard"`
 	Code       bool   `json:"code"`
-	// IllustrationsReady: the drawing list is planned and every drawing
-	// approved or skipped. nil means the authoring-service did not send
-	// it — read as ready.
-	IllustrationsReady *bool `json:"illustrations_ready"`
 	// BriefApproved: the idea step's creative brief is approved. nil means
 	// the authoring-service did not send it — read as approved.
 	BriefApproved *bool `json:"brief_approved"`
@@ -27,8 +23,7 @@ type AuthoringSummary struct {
 func (s AuthoringSummary) Content() domain.AuthoredContent {
 	return domain.AuthoredContent{
 		Story: s.Story, Storyboard: s.Storyboard, Code: s.Code,
-		Illustrations: s.IllustrationsReady == nil || *s.IllustrationsReady,
-		BriefOpen:     s.BriefApproved != nil && !*s.BriefApproved,
+		BriefOpen: s.BriefApproved != nil && !*s.BriefApproved,
 	}
 }
 

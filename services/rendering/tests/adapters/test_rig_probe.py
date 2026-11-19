@@ -11,6 +11,7 @@ import pytest
 
 from adapters.rendering.layout_checker import LayoutChecker
 from tests.adapters.test_layout_checker import REAL, _browser_available
+from tests.kit_fixtures import phatsang_kit
 
 needs_real = pytest.mark.skipif(
     not (REAL / "node_modules" / "playwright-core").exists() or shutil.which("node") is None
@@ -102,7 +103,7 @@ registerRoot(() => (
 def probe():
     checker = LayoutChecker(REAL, timeout_seconds=60)
     try:
-        yield checker.measure(SCRIPT)
+        yield checker.measure(SCRIPT, phatsang_kit())
     finally:
         checker.close()
 
@@ -152,7 +153,7 @@ def test_a_stub_with_the_lines_prop_is_skipped():
     )
     checker = LayoutChecker(REAL, timeout_seconds=60)
     try:
-        by_id = {s["id"]: s for s in checker.measure(stubbed)["shots"]}
+        by_id = {s["id"]: s for s in checker.measure(stubbed, phatsang_kit())["shots"]}
     finally:
         checker.close()
     assert by_id["2.2"].get("skipped") == "stub"

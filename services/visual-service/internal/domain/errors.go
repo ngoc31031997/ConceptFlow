@@ -32,6 +32,8 @@ var (
 	ErrNoVersion = errors.New("chưa có phiên bản đã chốt này")
 	// ErrUnknownReference: a picked reference is not in the library.
 	ErrUnknownReference = errors.New("mô tả tham chiếu không có trong thư viện")
+	// ErrOneReferenceOnly: a video picks at most one reference style.
+	ErrOneReferenceOnly = errors.New("mỗi dự án chỉ chọn được một phong cách tham chiếu")
 	// ErrUnreadableReply: the AI's answer cannot be used; nothing was stored.
 	ErrUnreadableReply = errors.New("câu trả lời của AI không dùng được")
 	// ErrUnknownStep: no later step reads the locked visual concept by this name.

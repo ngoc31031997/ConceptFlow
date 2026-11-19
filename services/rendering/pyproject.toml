@@ -9,6 +9,8 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.per-file-ignores]
+# Bảng các hình dựng sẵn của kit: mỗi hàng một hình, mô tả dài.
+"domain/illustration.py" = ["E501"]
 # Offline asset generators: dense geometry/data tables, not service code.
 "tools/*" = ["E501", "E702"]
 # Layout-probe sample generator: its long lines are JSX

@@ -11,7 +11,7 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {CameraMotionBlur} from '@remotion/motion-blur';
-import {useKit, type Look} from './kits';
+import {currentKit, type Look} from './kits';
 
 const LookContext = React.createContext<Look | null>(null);
 
@@ -111,7 +111,7 @@ function TintedVignette({ambient, strength}: {ambient: string; strength: number}
  * vignette. `motionBlur` adds camera motion blur for a fast camera move.
  */
 export function Shot({look, motionBlur = false, children}: {look: Look; motionBlur?: boolean; children: React.ReactNode}) {
-  const kit = useKit();
+  const kit = currentKit();
   const {warmth, contrast, saturation} = look.grade;
   const content = (
     <AbsoluteFill style={{filter: `contrast(${1 + contrast}) saturate(${1 + saturation})`}}>{children}</AbsoluteFill>

@@ -7,6 +7,7 @@ from application.validate_script import ScriptValidationError
 from domain.errors import AnimationEngineError
 from domain.layout_rules import SubtitleBand
 from domain.lint_issue import LintIssue
+from tests.kit_fixtures import phatsang_kit
 
 
 class FakeValidate:
@@ -48,7 +49,8 @@ def test_remotion_pass_runs_both_the_gate_and_tsc():
 
 
 def test_remotion_reports_tsc_diagnostics_with_lines():
-    out = make(ts=FakeTs([Diag(12, "TS2304", "Cannot find name 'x'.")])).check("remotion", "code", "creator", KIT)
+    use_case = make(ts=FakeTs([Diag(12, "TS2304", "Cannot find name 'x'.")]))
+    out = use_case.check("remotion", "code", "creator", KIT)
     assert not out.ok and out.diagnostics[0].line == 12 and "TS2304" in out.diagnostics[0].message
     assert out.diagnostics[0].rule == "TS2304"
 
@@ -57,7 +59,8 @@ def test_gate_and_tsc_failures_are_both_reported():
     validate = FakeValidate(
         ScriptValidationError("bad lottie", [LintIssue(line=7, message="unknown lottie id")])
     )
-    out = make(validate, FakeTs([Diag(3, "TS1005", "';' expected.")])).check("remotion", "code", "creator", KIT)
+    use_case = make(validate, FakeTs([Diag(3, "TS1005", "';' expected.")]))
+    out = use_case.check("remotion", "code", "creator", KIT)
     assert [d.line for d in out.diagnostics] == [7, 3]
     assert [d.rule for d in out.diagnostics] == ["", "TS1005"]  # lint issues carry no rule code
 
@@ -98,15 +101,15 @@ TOOTH_OUT = {"kind": "kit", "component": "Tooth", "line": 12, "rect": box(1460, 
 SMALL_APPLE = {"kind": "kit", "component": "Apple", "line": 13, "rect": box(800, 400, 200, 200), "opacity": 1}
 
 
-KIT = LayoutContext(kit_key="phatsang")
+KIT = LayoutContext(kit=phatsang_kit())
 
 
 class FakeLayout:
     def __init__(self, result=None, error=None):
         self.result, self.error, self.seen = result, error, []
 
-    def measure(self, code, kit_key, font=""):
-        self.seen.append((code, font, kit_key))
+    def measure(self, code, kit, font=""):
+        self.seen.append((code, font, kit))
         if self.error:
             raise self.error
         return self.result
@@ -131,9 +134,10 @@ def test_non_blocking_findings_are_warnings_and_the_check_passes():
 
 def test_the_subtitle_band_and_font_reach_the_layout_check():
     layout = FakeLayout(probe([{**TOOTH_OUT, "rect": box(700, 600, 420, 300)}]))
-    ctx = LayoutContext(subtitle_band=SubtitleBand("bottom", 240), video_font="Montserrat", kit_key="phatsang")
+    ctx = LayoutContext(
+        subtitle_band=SubtitleBand("bottom", 240), video_font="Montserrat", kit=phatsang_kit())
     out = CheckScriptUseCase(FakeValidate(), FakeTs(), layout).check("remotion", "code", "creator", ctx)
-    assert layout.seen == [("code", "Montserrat", "phatsang")]
+    assert layout.seen == [("code", "Montserrat", phatsang_kit())]
     assert [d.message.split(": ", 1)[1] for d in out.diagnostics] == [
         "hình Tooth lấn vùng phụ đề ở mép dưới khung (mép dưới y=900 > 840)"]
 

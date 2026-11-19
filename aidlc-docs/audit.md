@@ -3766,3 +3766,11 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **User Input**: "ok" (duyệt yêu cầu) / "tiếp"
 **AI Response**: Commit yêu cầu (2e2557d). Viết ADR-0050 (Proposed) và cr-116-visuals-to-rendering-design.md: kit thành reference_styles.detail.kit, mọi lệnh vẽ nhận kit object, thư viện hình Python ở rendering, prompt owner "rendering", gỡ authoring, danh sách xoá dữ liệu từng service (giữ 335da643). Chưa code, chưa xoá.
 **Context**: Application Design CR-116, chờ Creator duyệt.
+
+---
+
+## CR-116 · T7 dọn dữ liệu (không hoàn tác)
+**Timestamp**: 2026-11-20
+**User Input**: "xoá"
+**AI Response**: Đã chạy: DROP 6 bảng hình + trigger/hàm pin_visual_language + 4 cột ở authoring; xoá mọi dự án trừ 335da643 (orchestrator 7, authoring 579 project_authoring + bảng con, llm_calls 229, outbox đã gửi tts 1013/rendering 1264/video-assembly 1023); ghi kit phatsang vào R12; xoá /shared/stills và /shared/1332cd4d…. Kiểm: kit dự án = R12, vẽ khung tĩnh thật thành công (ảnh thử đã xoá).
+**Context**: Construction CR-116, chờ Creator review.

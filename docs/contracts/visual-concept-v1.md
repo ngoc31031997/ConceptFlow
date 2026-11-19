@@ -47,7 +47,7 @@ Mọi lời gọi trả lại toàn màn như GET.
 | Phương thức | Đường dẫn | Việc |
 |---|---|---|
 | GET | `/v1/projects/{id}/visual-concept` | Toàn màn: `input`, `input_view[]` (văn bản AI đọc), `refs[]` (thư viện, `picked`), `units[]`, `approved_count`, `checks[]`, `fonts[]`, `fonts_error` (lý do rendering không liệt kê được font, `""` khi được), `review`, `criteria[]` (5 tiêu chí), `blockers[]`, `can_lock`, `versions[]`, `locked_version`, `next_version`, `draft[]`, `model`, `default_model`, `models[]` |
-| PUT | `…/refs` | `{ref_ids[]}`; mã không có trong thư viện → `400`, không ghi gì |
+| PUT | `…/refs` | `{ref_ids[]}` thay lượt chọn: rỗng là bỏ chọn, một mã là chọn phong cách đó (thay cái cũ); hơn một mã → `400 {"error":"mỗi dự án chỉ chọn được một phong cách tham chiếu"}`; mã không có trong thư viện → `400`; cả hai trường hợp không ghi gì |
 | PUT | `…/model` | `{model}`; `''` = mặc định của bước `visual_concept` ở llm-service; model ngoài danh mục → `400` |
 | POST | `…/generate` | `{note, rewrite_all}`: AI viết lần lượt 1→8 các phần chưa có (hoặc mọi phần khi `rewrite_all`), phần sau đọc phần trước; mỗi phần lưu ngay khi có kết quả; lỗi thì dừng, phần đã viết giữ lại. Không nhận `X-External-AI` |
 | POST | `…/units/{key}/generate` | `{note}`; một lượt AI; giữ các trường trong `creator_fields`; phần về `pending`. Nhận `X-External-AI: prompt|paste` ([`external-ai-v1.md`](external-ai-v1.md)) |

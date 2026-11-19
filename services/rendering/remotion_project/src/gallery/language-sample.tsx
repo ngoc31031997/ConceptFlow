@@ -5,7 +5,7 @@
  * a way of painting and not a colour scheme.
  *
  * Registered by language-sample-entry.tsx (gallery) and by the preview host (stills API).
- * Render: node render_gallery.mjs sample <outDir> [--kit <key>]
+ * Render: node render_gallery.mjs sample <outDir> --kit <kit.json>
  */
 import React from 'react';
 import {Composition, useVideoConfig} from 'remotion';

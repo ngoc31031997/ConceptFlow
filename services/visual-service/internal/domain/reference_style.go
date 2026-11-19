@@ -78,6 +78,9 @@ type ReferenceStyleInput struct {
 	Avoid          []string             `json:"avoid"`
 	PromptTemplate string               `json:"prompt_template"`
 	NegativePrompt string               `json:"negative_prompt"`
+	// Kit is the drawing numbers rendering paints the style with; nil while
+	// the style has none. See ReferenceKit.
+	Kit *ReferenceKit `json:"kit"`
 }
 
 // ReferenceStyle is a structured text description of a visual style in the
@@ -252,6 +255,13 @@ func (in ReferenceStyleInput) Normalize() (ReferenceStyleInput, error) {
 	}
 	if out.NegativePrompt, err = trimField("negative_prompt", in.NegativePrompt, MaxReferencePromptLength); err != nil {
 		return ReferenceStyleInput{}, err
+	}
+	if in.Kit != nil {
+		kit, err := in.Kit.Normalize()
+		if err != nil {
+			return ReferenceStyleInput{}, err
+		}
+		out.Kit = &kit
 	}
 	return out, nil
 }

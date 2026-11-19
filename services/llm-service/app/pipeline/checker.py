@@ -40,10 +40,10 @@ class LayoutContext:
     # cover. None = nothing is burned into the frame.
     subtitle_band: dict | None = None
     video_font: str = ""  # "" = the Stage's default
-    kit_key: str = ""  # the visual language the project is pinned to; the check refuses ""
+    kit: dict = field(default_factory=dict)  # the drawing kit; the check refuses an empty one
 
     def to_json(self) -> dict:
-        out: dict = {"kit_key": self.kit_key}
+        out: dict = {"kit": self.kit}
         if self.subtitle_band:
             out["subtitle_band"] = {"edge": self.subtitle_band["edge"], "px": int(self.subtitle_band["px"])}
         if self.video_font:

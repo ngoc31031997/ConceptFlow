@@ -11,11 +11,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from pathlib import Path
 import time
+from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -25,13 +25,15 @@ from adapters.rendering.typescript_checker import TypeScriptCheckError
 from application.check_script import CheckScriptUseCase, LayoutContext
 from application.preview_illustration import PreviewIllustrationUseCase
 from application.stills import StillsUseCase
-from domain.kits import UnknownKitError
+from domain.kit import InvalidKitError
 from domain.layout_rules import SubtitleBand
 
 logger = logging.getLogger(__name__)
 
 # The list of fonts the rendering image installs; the Remotion project imports the same file.
-FONTS_FILE = Path(__file__).resolve().parents[2] / "remotion_project" / "src" / "conceptflow-mini" / "fonts.json"
+FONTS_FILE = (
+    Path(__file__).resolve().parents[2] / "remotion_project" / "src" / "conceptflow-mini" / "fonts.json"
+)
 
 
 def load_fonts(path: Path | None = None) -> dict:
@@ -41,15 +43,19 @@ def load_fonts(path: Path | None = None) -> dict:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"font list {path.name} cannot be read: {exc}") from exc
-    fonts, default = data.get("fonts") if isinstance(data, dict) else None, data.get("default") if isinstance(data, dict) else None
+    as_dict = data if isinstance(data, dict) else {}
+    fonts, default = as_dict.get("fonts"), as_dict.get("default")
     if (not isinstance(fonts, list) or not fonts or not all(isinstance(f, str) and f for f in fonts)
             or not isinstance(default, str) or default not in fonts):
-        raise ValueError(f"font list {path.name} is malformed: need a non-empty \"fonts\" list of names and a \"default\" among them")
+        raise ValueError(
+            f"font list {path.name} is malformed: "
+            "need a non-empty \"fonts\" list of names and a \"default\" among them"
+        )
     return {"fonts": fonts, "default": default}
 
 
 class IllustrationBody(BaseModel):
-    kit_key: str  # the visual language the project is pinned to; required
+    kit: dict  # drawing tokens of the project's reference style; required
     # Role of the drawing in this video: "hero", "support" or "background".
     tier: Literal["hero", "support", "background"] = "support"
     name: str
@@ -63,7 +69,7 @@ class IllustrationBody(BaseModel):
 class StillBody(BaseModel):
     """One frame of a sample composition of a kit."""
     composition: str
-    kit_key: str
+    kit: dict
     props: dict = {}
     frame: int = 10
 
@@ -82,7 +88,7 @@ class SubtitleBandBody(BaseModel):
 
 class CheckBody(BaseModel):
     code: str
-    kit_key: str  # the visual language the project is pinned to; required
+    kit: dict  # drawing tokens of the project's reference style; required
     scene_class_name: str = ""
     # For the layout check (Remotion only). No band = nothing is
     # burned into the frame; no font = the Stage's default.
@@ -94,7 +100,8 @@ def create_check_app(
     use_case: CheckScriptUseCase, concurrency: int = 2, metrics: CheckMetrics | None = None,
     illustrations: PreviewIllustrationUseCase | None = None,
     stills: StillsUseCase | None = None,
-    kits: dict[str, int] | None = None,
+    library_router: APIRouter | None = None,
+    preview_gate: asyncio.Semaphore | None = None,
 ) -> FastAPI:
     metrics = metrics or CheckMetrics()
     app = FastAPI(title="rendering-check")
@@ -124,7 +131,7 @@ def create_check_app(
                     layout = LayoutContext(
                         subtitle_band=SubtitleBand(band.edge, band.px) if band else None,
                         video_font=body.video_font,
-                        kit_key=body.kit_key,
+                        kit=body.kit,
                     )
                     out = await asyncio.to_thread(
                         use_case.check, engine, body.code, body.scene_class_name, layout)
@@ -163,8 +170,9 @@ def create_check_app(
         return await run("remotion", body)
 
     # Xem trước một hình của thư viện minh hoạ. Hàng đợi riêng, một
-    # yêu cầu một lúc — bộ dựng xem trước chỉ mở một tab trình duyệt.
-    preview_gate = asyncio.Semaphore(1)
+    # yêu cầu một lúc — bộ dựng xem trước chỉ mở một tab trình duyệt. Thư viện hình dùng chung
+    # hàng đợi này (`preview_gate`), nên một lượt vẽ của thư viện và một lượt xem trước không chen nhau.
+    preview_gate = preview_gate or asyncio.Semaphore(1)
 
     @app.post("/v1/illustrations/preview")
     async def preview_illustration(body: IllustrationBody):
@@ -173,9 +181,9 @@ def create_check_app(
         async with preview_gate:
             try:
                 out = await asyncio.to_thread(
-                    illustrations.run, body.kit_key, body.name, body.code, body.props, body.gif, body.kind,
+                    illustrations.run, body.kit, body.name, body.code, body.props, body.gif, body.kind,
                     body.tier)
-            except UnknownKitError as exc:
+            except InvalidKitError as exc:
                 return JSONResponse({"error": str(exc)}, status_code=400)
             except (IllustrationPreviewError, TypeScriptCheckError) as exc:
                 logger.error("illustration preview could not run: %s", exc)
@@ -184,10 +192,6 @@ def create_check_app(
             "ok": out.ok, "diagnostics": out.diagnostics, "warnings": out.warnings,
             "png": out.png, "gif": out.gif,
         }
-
-    @app.get("/v1/kits")
-    async def list_kits():
-        return {"kits": [{"key": k, "version": v} for k, v in sorted((kits or {}).items())]}
 
     @app.get("/v1/fonts")
     async def list_fonts():
@@ -205,8 +209,9 @@ def create_check_app(
             return JSONResponse({"error": "stills are not enabled"}, status_code=404)
         async with still_gate:
             try:
-                out = await asyncio.to_thread(stills.render, body.composition, body.kit_key, body.props, body.frame)
-            except UnknownKitError as exc:
+                out = await asyncio.to_thread(
+                    stills.render, body.composition, body.kit, body.props, body.frame)
+            except InvalidKitError as exc:
                 return JSONResponse({"error": str(exc)}, status_code=400)
             except IllustrationPreviewError as exc:
                 logger.error("still could not be rendered: %s", exc)
@@ -223,4 +228,6 @@ def create_check_app(
             return JSONResponse({"error": str(exc)}, status_code=400)
         return {"removed": removed}
 
+    if library_router is not None:
+        app.include_router(library_router)
     return app

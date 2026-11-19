@@ -24,7 +24,7 @@
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import {withAlpha, useLook} from './film';
-import {useKit} from './kits';
+import {currentKit} from './kits';
 
 /** Where the camera looks: the frame point shown at the centre, and the zoom. */
 export type CameraPoint = {x: number; y: number; zoom?: number};
@@ -211,7 +211,7 @@ export function Scene({
 }) {
   const cam = useCamera(camera, duration);
   const look = useLook();
-  const kit = useKit();
+  const kit = currentKit();
   const blurOf = (layer: 'sky' | 'far' | 'mid' | 'near') => (look.focus === layer ? 0 : kit.dof[layer]);
   const haze = (density: number) => (
     <AbsoluteFill
@@ -246,7 +246,7 @@ export function Scene({
  */
 function LightBloom() {
   const look = useLook();
-  const kit = useKit();
+  const kit = currentKit();
   const {x, y, color, intensity} = look.light;
   return (
     <AbsoluteFill

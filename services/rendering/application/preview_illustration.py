@@ -13,7 +13,7 @@ from adapters.rendering.illustration_previewer import IllustrationPreviewer
 from adapters.rendering.typescript_checker import TypeScriptChecker
 from domain.illustration_asset import validate_asset_code
 from domain.illustration_style import check_style
-from domain.kits import require_kit
+from domain.kit import validate_kit
 
 
 @dataclass
@@ -28,23 +28,23 @@ class IllustrationPreview:
 
 class PreviewIllustrationUseCase:
     def __init__(
-        self, typescript: TypeScriptChecker, previewer: IllustrationPreviewer, kits: dict[str, int],
+        self, typescript: TypeScriptChecker, previewer: IllustrationPreviewer,
         skeletons: dict[str, dict[str, str | None]],
     ) -> None:
         self._ts = typescript
         self._preview = previewer
-        self._kits = kits
         self._skeletons = skeletons
 
     def run(
-        self, kit_key: str, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+        self, kit: dict, name: str, code: str = "", props: dict | None = None, gif: bool = True,
         kind: str = "figure", tier: str = "support",
     ) -> IllustrationPreview:
-        """Kiểm tra rồi dựng một hình (`kind` "figure") hay một nền ("backdrop") theo kit đã ghim.
+        """Kiểm tra rồi dựng một hình (`kind` "figure") hay một nền ("backdrop") theo `kit`
+        của phong cách tham chiếu.
 
         `tier` là hạng của hình trong video này; luật số hình con và gradient theo hạng.
-        Thiếu hoặc sai `kit_key` thì ném UnknownKitError."""
-        require_kit(self._kits, kit_key)
+        Thiếu hoặc sai `kit` thì ném InvalidKitError."""
+        validate_kit(kit)
         if code:
             issues = validate_asset_code(name, code)
             if issues:
@@ -60,7 +60,7 @@ class PreviewIllustrationUseCase:
                 return IllustrationPreview(False, found)
         else:
             warnings = []  # hình có sẵn của bộ minh hoạ: đã duyệt tay
-        out = self._preview.preview(kit_key, name, code, props, gif, kind)
+        out = self._preview.preview(kit, name, code, props, gif, kind)
         if not out.ok:
             return IllustrationPreview(False, [{"message": out.error, "line": None}], warnings=warnings)
         return IllustrationPreview(True, png=out.png, gif=out.gif, warnings=warnings)

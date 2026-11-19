@@ -5,9 +5,9 @@
  * Bundles src/illustration-preview/host.tsx and opens the browser once, then
  * answers one JSON request per stdin line with one JSON reply per stdout line:
  *
- *   -> {"id", "kit_key", "code"?: TSX source, "name": component, "props"?: {...}, "gif"?: bool, "kind"?: "figure" or "backdrop"}
+ *   -> {"id", "kit": {drawing tokens}, "code"?: TSX source, "name": component, "props"?: {...}, "gif"?: bool, "kind"?: "figure" or "backdrop"}
  *   <- {"id", "ok": true, "png": base64, "gif"?: base64}
- *   -> {"id", "op": "still", "kit_key", "composition": id of a sample composition, "frame"?: n, "output": path}
+ *   -> {"id", "op": "still", "kit": {drawing tokens}, "composition": id of a sample composition, "frame"?: n, "output": path}
  *   <- {"id", "ok": true, "path": output}
  *   <- {"id", "ok": false, "error": "..."}
  *
@@ -34,8 +34,8 @@ out({ready: true});
 
 /** One frame of a sample composition (the visual language's sample scenes), written to `req.output`. */
 async function handleStill(req) {
-  if (!req.kit_key) throw new Error('thiếu kit_key: project chưa ghim ngôn ngữ hình');
-  const inputProps = {kitKey: req.kit_key, ...(req.props ?? {})};
+  if (!req.kit) throw new Error('thiếu kit: lượt vẽ không nhận được bộ thông số vẽ');
+  const inputProps = {...(req.props ?? {}), kit: req.kit};
   const composition = await selectComposition({serveUrl, id: req.composition, inputProps, puppeteerInstance: browser});
   await renderStill({composition, serveUrl, inputProps, frame: req.frame ?? 10, output: req.output, puppeteerInstance: browser});
   return {id: req.id, ok: true, path: req.output};
@@ -43,7 +43,7 @@ async function handleStill(req) {
 
 async function handle(req) {
   if (req.op === 'still') return handleStill(req);
-  if (!req.kit_key) throw new Error('thiếu kit_key: project chưa ghim ngôn ngữ hình');
+  if (!req.kit) throw new Error('thiếu kit: lượt vẽ không nhận được bộ thông số vẽ');
   let js = '';
   if (req.code) {
     try {
@@ -53,7 +53,7 @@ async function handle(req) {
       throw new Error(`syntax error: ${msgs.join('; ') || err.message}`);
     }
   }
-  const inputProps = {kitKey: req.kit_key, js, name: req.name, props: req.props ?? {}, background: req.background, kind: req.kind ?? 'figure'};
+  const inputProps = {kit: req.kit, js, name: req.name, props: req.props ?? {}, background: req.background, kind: req.kind ?? 'figure'};
   const composition = await selectComposition({serveUrl, id: 'asset', inputProps, puppeteerInstance: browser});
   const dir = mkdtempSync(join(tmpdir(), 'asset-'));
   try {

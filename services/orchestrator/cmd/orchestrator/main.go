@@ -90,13 +90,14 @@ func main() {
 	// still needs: the topic search, list summaries, a fork's copy and cleanup.
 	authoringClient := authoring.NewClient(cfg.AuthoringServiceURL, cfg.AuthoringServiceTimeout)
 
+	visualClient := visual.NewClient(cfg.VisualServiceURL, cfg.VisualServiceTimeout)
 	channelAssetPointers := postgres.NewChannelAssetPointerRepository(pool)
 	handleStepEvent := application.NewHandleStepEventUseCase(projectRepo, outboxRepo, realPublisher, channelAssetPointers, logger).
 		WithQCReports(qcReportRepo).
 		WithErrorLog(projectRepo).
 		WithAuthoringCleanup(authoringClient).
-		WithVisualCleanup(visual.NewClient(cfg.VisualServiceURL, cfg.VisualServiceTimeout)).
-		WithKitKeys(authoringClient)
+		WithVisualCleanup(visualClient).
+		WithKits(visualClient)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 	// Cancel goes straight to the broker (a fanout to every worker), not through
 	// the outbox: it must reach a worker that is busy right now, and there is no

@@ -179,8 +179,7 @@ func TestHandlePromptRenders_PassesTheDraftThrough(t *testing.T) {
 	}
 }
 
-// The illustration style is no longer a prompt role: the rules belong to the
-// visual language a project is pinned to, so the old role is simply unknown.
+// illustration_style is not a prompt role, so it is rejected as unknown.
 func TestTheRetiredIllustrationStyleRoleIsAnUnknownRole(t *testing.T) {
 	router := NewRouter(nil, nil).WithRenderPrompt(&fakePromptRenderer{})
 	rec := httptest.NewRecorder()

@@ -116,8 +116,8 @@ type HandleStepEventUseCase struct {
 	authoringCleanup AuthoringCleanupPort
 	// visualCleanup, when set, runs after the project row is deleted.
 	visualCleanup VisualCleanupPort
-	// kitKeys supplies the kit render_scenes is drawn with.
-	kitKeys   KitKeyPort
+	// kits supplies the kit render_scenes is drawn with.
+	kits      KitPort
 	publisher domain.CommandPublisherPort
 	progress  domain.ProgressPublisherPort
 	// qcReports stores the automated QC report. Optional/nil-checked
@@ -143,22 +143,28 @@ func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher doma
 	return &HandleStepEventUseCase{repo: repo, publisher: publisher, progress: progress, channelAssets: channelAssets, logger: logger}
 }
 
-// KitKeyPort reads the kit of the visual language a project is pinned to, from
-// authoring-service. It answers "" for a project that has no pin.
-type KitKeyPort interface {
-	KitKey(ctx context.Context, projectID string) (string, error)
+// KitPort reads, from visual-service, the drawing kit of the reference style
+// the project picked at step 8. It fails with domain.ErrNoReferenceStyle when
+// no style is picked and domain.ErrReferenceStyleHasNoKit when the style has
+// no kit. See ADR-0050.
+type KitPort interface {
+	ProjectKit(ctx context.Context, projectID string) (map[string]interface{}, error)
 }
 
-// WithKitKeys makes render_scenes carry the project's kit, which the rendering
-// service draws with. Without it, or for a project with no pin, the render
-// step fails with a message that says so.
-func (uc *HandleStepEventUseCase) WithKitKeys(k KitKeyPort) *HandleStepEventUseCase {
-	uc.kitKeys = k
+// WithKits makes render_scenes carry the project's kit, which the rendering
+// service draws with. Without it the render step fails with a message that
+// says so.
+func (uc *HandleStepEventUseCase) WithKits(k KitPort) *HandleStepEventUseCase {
+	uc.kits = k
 	return uc
 }
 
-// errNoPinnedLanguage is what a render without a visual language fails with.
-const errNoPinnedLanguage = "project chưa ghim ngôn ngữ hình: không biết dựng hình bằng kit nào"
+// Messages a render that has no kit to draw with fails with.
+const (
+	errNoKitSource         = "orchestrator không nối tới visual-service: không lấy được bộ thông số vẽ"
+	errNoReferenceStyle    = "project chưa chọn phong cách tham chiếu ở bước 8: không biết dựng hình bằng bộ thông số vẽ nào"
+	errReferenceStyleNoKit = "phong cách tham chiếu đã chọn chưa có bộ thông số vẽ: hãy điền bộ thông số vẽ cho phong cách này trong thư viện phong cách tham chiếu"
+)
 
 // AuthoringCleanupPort removes a deleted project's authoring row in
 // authoring-service.
@@ -794,15 +800,20 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 	if font == "" {
 		font = domain.DefaultVideoFont
 	}
-	kitKey, err := uc.pinnedKit(ctx, projectID)
-	if err != nil {
-		return err
+	if uc.kits == nil {
+		return uc.failRenderScenes(ctx, sagaID, projectID, errNoKitSource)
 	}
-	if kitKey == "" {
-		return uc.failRenderScenes(ctx, sagaID, projectID, errNoPinnedLanguage)
+	kit, err := uc.kits.ProjectKit(ctx, projectID)
+	switch {
+	case errors.Is(err, domain.ErrNoReferenceStyle):
+		return uc.failRenderScenes(ctx, sagaID, projectID, errNoReferenceStyle)
+	case errors.Is(err, domain.ErrReferenceStyleHasNoKit):
+		return uc.failRenderScenes(ctx, sagaID, projectID, errReferenceStyleNoKit)
+	case err != nil:
+		return fmt.Errorf("read the project's drawing kit: %w", err)
 	}
 	payload := map[string]interface{}{
-		"kit_key":          kitKey,
+		"kit":              kit,
 		"scenes":           scenesToPayload(project.Scenes),
 		"script_content":   project.ScriptContent,
 		"scene_class_name": project.SceneClassName,
@@ -1255,18 +1266,6 @@ func (uc *HandleStepEventUseCase) handlePurgeEvent(ctx context.Context, event St
 	}
 	uc.logger.InfoContext(ctx, "project deleted after all artifact purges", "project_id", event.ProjectID)
 	return nil
-}
-
-// pinnedKit is the kit of the project's pinned language; "" when it has none.
-func (uc *HandleStepEventUseCase) pinnedKit(ctx context.Context, projectID string) (string, error) {
-	if uc.kitKeys == nil {
-		return "", nil
-	}
-	kit, err := uc.kitKeys.KitKey(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("read the project's visual language: %w", err)
-	}
-	return kit, nil
 }
 
 // failRenderScenes ends the render_scenes step as failed with message, the way

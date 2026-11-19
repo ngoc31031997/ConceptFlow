@@ -170,3 +170,9 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.trialImage {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md, 8px);
+}

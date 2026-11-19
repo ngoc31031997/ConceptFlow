@@ -53,16 +53,11 @@ func RunStateOf(status ProjectStatus, errorMessage *string) RunState {
 
 // AuthoredContent says which authoring artefacts a draft holds.
 //
-// Illustrations says the drawing list of the illustrations step (5) is planned
-// and every drawing approved or skipped — the same rule that gates the code
-// step.
-//
 // BriefOpen says the creative brief exists in authoring-service but is not
 // approved (or was never written): the idea step is not finished, so the
 // project still stands at step 1.
 type AuthoredContent struct {
 	Story, Storyboard, Code bool
-	Illustrations           bool
 	BriefOpen               bool
 }
 
@@ -95,11 +90,7 @@ func FlowStateFor(status ProjectStatus, storedWizardStep int, content AuthoredCo
 			return FlowState{FlowConfig, RunIdle}
 		case content.Code:
 			// Code exists: the draft waits for the Creator to start validation.
-			// Checked before the drawings so a Remotion project from before the
-			// illustrations step (code, no drawing list) is not pulled back to 5.
 			return FlowState{FlowCode, RunIdle}
-		case content.Storyboard && !content.Illustrations:
-			return FlowState{FlowIllustrations, RunIdle}
 		case content.Storyboard:
 			return FlowState{FlowCode, RunIdle}
 		case content.Story:

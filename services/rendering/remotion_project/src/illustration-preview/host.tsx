@@ -22,7 +22,7 @@ import * as RigKit from '../conceptflow-mini/rig';
 import * as KitsModule from '../conceptflow-mini/kits';
 import {SampleCompositions} from '../gallery/language-sample';
 import {LookProvider} from '../conceptflow-mini/film';
-import {useKit} from '../conceptflow-mini/kits';
+import {currentKit} from '../conceptflow-mini/kits';
 
 export const PREVIEW_SIZE = 720;
 /** A backdrop is previewed as a whole landscape frame, scaled down. */
@@ -71,7 +71,7 @@ function load(js: string): Record<string, unknown> {
 function Preview() {
   const {js = '', name = '', props = {}, background = '#FFF4D6', kind = 'figure'} = getInputProps() as HostProps;
   const builtin = {...(Kit as unknown as Record<string, unknown>), ...(Backdrops as unknown as Record<string, unknown>)};
-  const kit = useKit();
+  const kit = currentKit();
   const exports = js ? load(js) : builtin;
   const Figure = exports[name] as React.ComponentType<Record<string, unknown>> | undefined;
   if (typeof Figure !== 'function') {

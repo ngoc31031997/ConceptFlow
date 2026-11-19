@@ -30,7 +30,7 @@ import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {FigureFrameProvider, GroundShadow, Shape} from './material';
 import {Bone, Brows, Eyes, Mechanism, Mouth, Part, Rig, isBlinking, rotateAbout, solveRig, type CycleSpec, type MechanismView, type Mood, type P2, type ReachSpec, type RigAction, type RigMotion} from './skeleton';
-import {useKit} from './kits';
+import {currentKit} from './kits';
 
 export {GroundShadow};
 
@@ -330,7 +330,7 @@ export function Person({
 }: PersonProps) {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const kit = useKit();
+  const kit = currentKit();
   const walking = fromPose === 'walk';
   const basePose = walking ? 'stand' : fromPose;
   const target = toPose === 'walk' ? 'stand' : toPose;
@@ -649,7 +649,7 @@ export function Germ({
   ...fig
 }: FigureProps & {color?: string; mood?: 'evil' | 'happy' | 'sad'; variant?: number}) {
   const frame = useCurrentFrame();
-  const ink = useKit().ink;
+  const ink = currentKit().ink;
   const phase = phaseOf(fig.x ?? 960, fig.y ?? 540) + variant * 11;
   const t = still ? 0 : (frame + phase) / 9;
   const bumps = [7, 9, 6, 11][variant % 4];
@@ -789,7 +789,7 @@ export function Drop({
   face = false,
   ...fig
 }: FigureProps & {color?: string; face?: boolean}) {
-  const ink = useKit().ink;
+  const ink = currentKit().ink;
   return (
     <Figure {...fig} size={fig.size ?? 120} vw={140} vh={180}>
       <Shape material="liquid" color={color} d="M70,8 C92,52 128,86 128,118 C128,152 102,172 70,172 C38,172 12,152 12,118 C12,86 48,52 70,8 Z" />

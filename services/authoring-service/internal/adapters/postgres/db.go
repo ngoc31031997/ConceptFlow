@@ -54,78 +54,9 @@ CREATE TABLE IF NOT EXISTS video_archetypes (
 CREATE UNIQUE INDEX IF NOT EXISTS video_archetypes_code_key ON video_archetypes (upper(code));
 ALTER TABLE video_archetypes ADD COLUMN IF NOT EXISTS recommended_format_id TEXT NOT NULL DEFAULT '';
 
--- The illustration library. Folders are shelves; each drawing lives in
--- exactly one. Built-in rows (the illustration kit) carry no code: it ships in the
--- rendering image. The preview is stored for the version it was rendered from,
--- so a stale one is never served after the code changes.
-CREATE TABLE IF NOT EXISTS illustration_folders (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    position    INTEGER NOT NULL DEFAULT 1000,
-    is_system   BOOLEAN NOT NULL DEFAULT false
-);
-CREATE TABLE IF NOT EXISTS illustrations (
-    id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    name            TEXT NOT NULL,
-    title           TEXT NOT NULL,
-    folder_id       TEXT NOT NULL REFERENCES illustration_folders(id),
-    tags            TEXT[] NOT NULL DEFAULT '{}',
-    description     TEXT NOT NULL DEFAULT '',
-    usage           TEXT NOT NULL DEFAULT '',
-    code            TEXT NOT NULL DEFAULT '',
-    builtin         BOOLEAN NOT NULL DEFAULT false,
-    status          TEXT NOT NULL DEFAULT 'draft',
-    version         INTEGER NOT NULL DEFAULT 1,
-    preview_version INTEGER NOT NULL DEFAULT 0,
-    preview_png     BYTEA,
-    preview_gif     BYTEA,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE UNIQUE INDEX IF NOT EXISTS illustrations_name_key ON illustrations (name);
-CREATE INDEX IF NOT EXISTS illustrations_folder_idx ON illustrations (folder_id);
--- Style exemplars are read-only rows that carry their code; warnings are the
--- style findings of the current version that did not block saving.
-ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS exemplar BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
--- A Hình mẫu copy points at the drawing it was made from (NULL once
--- that one is deleted); an original exemplar remembers the folder it goes
--- back to when it stops being one.
-ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS source_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL;
-ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS home_folder_id TEXT;
--- 'figure' (placed in a shot) or 'backdrop' (a whole-frame place in the depth
--- layers of a Scene).
-ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'figure';
-
--- The drawings one video needs, planned from its storyboard. No FK to
--- the project (it lives in the orchestrator); deleting the project deletes
--- these rows with its authoring row.
-CREATE TABLE IF NOT EXISTS project_illustrations (
-    id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    project_id      TEXT NOT NULL,
-    position        INTEGER NOT NULL,
-    name            TEXT NOT NULL DEFAULT '',
-    description     TEXT NOT NULL DEFAULT '',
-    folder_id       TEXT NOT NULL DEFAULT '',
-    shots           TEXT[] NOT NULL DEFAULT '{}',
-    state           TEXT NOT NULL DEFAULT 'planned',
-    error           TEXT NOT NULL DEFAULT '',
-    illustration_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS project_illustrations_project_idx ON project_illustrations (project_id, position);
--- 'figure' (drawn for some shots) or 'backdrop' (the place of a whole scene).
-ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'figure';
--- When the video's drawing list was last planned, so the code step can
--- tell "planned, needs no drawing" from "never planned".
-ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_planned_at TIMESTAMPTZ;
--- sha256 of the storyboard the list was planned from, so a list
--- made from an older storyboard is known to be stale. '' = planned before this
--- existed (or never): no evidence either way, not treated as stale.
-ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_storyboard_sha TEXT NOT NULL DEFAULT '';
 -- The code step stored segment by segment, so a
 -- failed or interrupted run keeps what it already wrote. No FK, like
--- project_illustrations: DeleteAuthoring removes a project's segments.
+-- the others: DeleteAuthoring removes a project's segments.
 CREATE TABLE IF NOT EXISTS authoring_segments (
     project_id    TEXT NOT NULL,
     step          TEXT NOT NULL,
@@ -199,69 +130,6 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS target_duration TEXT NOT 
 -- outline written from an older brief (or before any brief) is known to be
 -- stale. '' = no approved brief at the time.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS story_brief_sha TEXT NOT NULL DEFAULT '';
--- The visual languages of the channel: the kit that paints the forms
--- (kit_key) and the rule texts, versioned. Exactly one language is active; a
--- project pins one (id, version) when its authoring row is created.
-CREATE TABLE IF NOT EXISTS visual_languages (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    note        TEXT NOT NULL DEFAULT '',
-    description TEXT NOT NULL DEFAULT '',
-    kit_key     TEXT NOT NULL,
-    is_system   BOOLEAN NOT NULL DEFAULT false,
-    is_active   BOOLEAN NOT NULL DEFAULT false,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE UNIQUE INDEX IF NOT EXISTS visual_languages_one_active ON visual_languages ((true)) WHERE is_active;
-CREATE UNIQUE INDEX IF NOT EXISTS visual_languages_name_key ON visual_languages (lower(name));
--- Append-only: editing a language's rules adds a version, never rewrites one.
-CREATE TABLE IF NOT EXISTS visual_language_versions (
-    language_id        TEXT NOT NULL REFERENCES visual_languages(id) ON DELETE CASCADE,
-    version            INTEGER NOT NULL,
-    illustration_rules TEXT NOT NULL,
-    backdrop_rules     TEXT NOT NULL,
-    scene_rules        TEXT NOT NULL,
-    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (language_id, version)
-);
--- Sample scenes of a kit, rendered by the rendering service into its shared
--- stills directory; kit_version says which version of the kit drew them.
-CREATE TABLE IF NOT EXISTS visual_language_samples (
-    kit_key     TEXT NOT NULL,
-    scene       TEXT NOT NULL,
-    frame       TEXT NOT NULL,
-    kit_version INTEGER NOT NULL,
-    file        TEXT NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (kit_key, scene, frame)
-);
--- The language version a project is pinned to (NULL = not pinned: its drawing,
--- check and render steps refuse to run).
-ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS visual_language_id TEXT REFERENCES visual_languages(id);
-ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS visual_language_version INTEGER;
--- Pins the active language the moment a project's authoring row is created, on
--- whichever path creates it.
-CREATE OR REPLACE FUNCTION pin_visual_language() RETURNS trigger AS $$
-BEGIN
-    IF NEW.visual_language_id IS NULL THEN
-        SELECT l.id, (SELECT max(version) FROM visual_language_versions WHERE language_id = l.id)
-          INTO NEW.visual_language_id, NEW.visual_language_version
-          FROM visual_languages l WHERE l.is_active;
-    END IF;
-    RETURN NEW;
-END
-$$ LANGUAGE plpgsql;
-DROP TRIGGER IF EXISTS project_authoring_pin_language ON project_authoring;
-CREATE TRIGGER project_authoring_pin_language BEFORE INSERT ON project_authoring
-    FOR EACH ROW EXECUTE FUNCTION pin_visual_language();
--- The kit a library drawing was drawn for, and how much detail it has
--- (rich / medium / silhouette: the tier it was first drawn as).
-ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS kit_key TEXT NOT NULL DEFAULT '';
-ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS detail_level TEXT NOT NULL DEFAULT 'medium';
--- The role of a drawing in this video (hero / support / background) and the
--- AI's one-line reason for it.
-ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'support';
-ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS tier_reason TEXT NOT NULL DEFAULT '';
 -- The unit a review unit was built from (kind:key) and the hash of that
 -- unit's content at the time; a unit whose source has changed since is stale.
 ALTER TABLE review_units ADD COLUMN IF NOT EXISTS input_ref TEXT NOT NULL DEFAULT '';
@@ -588,10 +456,6 @@ SELECT project_id, unit_key, COALESCE(content->>'text', ''), COALESCE(content->>
 FROM review_units WHERE kind = 'research_question'
 ON CONFLICT DO NOTHING;
 DELETE FROM review_units WHERE kind IN ('research', 'script_review', 'handoff_beat', 'glossary', 'research_question', 'idea', 'brief', 'brief_platform');
-UPDATE illustrations SET warnings = COALESCE((
-    SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
-), '[]'::jsonb)
-WHERE warnings::text LIKE '%[S9]%';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

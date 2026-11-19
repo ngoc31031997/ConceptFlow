@@ -113,7 +113,7 @@ func writeConceptError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrUnknownUnit), errors.Is(err, domain.ErrUnknownFinding), errors.Is(err, domain.ErrNoVersion),
 		errors.Is(err, domain.ErrUnknownPlanUnit), errors.Is(err, domain.ErrUnknownQuestion), errors.Is(err, domain.ErrUnknownPlanBeat), errors.Is(err, domain.ErrUnknownMotif):
 		status = http.StatusNotFound
-	case errors.Is(err, domain.ErrInvalidEdit), errors.Is(err, domain.ErrFindingNotApplicable), errors.Is(err, domain.ErrUnknownReference),
+	case errors.Is(err, domain.ErrInvalidEdit), errors.Is(err, domain.ErrFindingNotApplicable), errors.Is(err, domain.ErrUnknownReference), errors.Is(err, domain.ErrOneReferenceOnly),
 		errors.Is(err, application.ErrUnknownModel), errors.Is(err, domain.ErrUnknownStep), errors.Is(err, application.ErrNoProjectID),
 		errors.Is(err, application.ErrExternalAISingleTurn), errors.Is(err, domain.ErrNotSplittable), errors.Is(err, domain.ErrNotMergeable):
 		status = http.StatusBadRequest

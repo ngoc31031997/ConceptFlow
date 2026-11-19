@@ -7,11 +7,11 @@ import {registerRoot, Composition, AbsoluteFill} from 'remotion';
 import {Stage} from '../conceptflow-mini/primitives';
 import * as K from '../conceptflow-mini/illustration';
 import {LookProvider} from '../conceptflow-mini/film';
-import {useKit} from '../conceptflow-mini/kits';
+import {currentKit} from '../conceptflow-mini/kits';
 
 /** Contact sheets are lit with the kit's neutral preview look. */
 function Lit({children}: {children: React.ReactNode}) {
-  return <LookProvider look={useKit().previewLook}>{children}</LookProvider>;
+  return <LookProvider look={currentKit().previewLook}>{children}</LookProvider>;
 }
 
 function Label({x, y, children}: {x: number; y: number; children: React.ReactNode}) {

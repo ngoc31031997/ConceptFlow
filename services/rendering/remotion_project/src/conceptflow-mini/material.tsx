@@ -16,7 +16,7 @@
 import React from 'react';
 import {useVideoConfig} from 'remotion';
 import {darken, mix, useLook, withAlpha} from './film';
-import {useKit, type MaterialName} from './kits';
+import {currentKit, type MaterialName} from './kits';
 
 /** Where a figure sits in the frame; `Figure` provides it to the shapes inside. */
 export interface FigureFrameValue {
@@ -119,7 +119,7 @@ export function Shape(props: ShapeProps) {
   const {material, color, unit, opacity = 1, depth = DEFAULT_DEPTH, glow = 1} = props;
   const geometry = props as ShapeGeometry;
   const look = useLook();
-  const kit = useKit();
+  const kit = currentKit();
   const {width, height} = useVideoConfig();
   const placed = React.useContext(FigureFrame);
   const id = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -222,7 +222,7 @@ export function Shape(props: ShapeProps) {
  */
 export function GroundShadow({cx, cy, rx, lit = false}: {cx: number; cy: number; rx: number; lit?: boolean}) {
   const look = useLook();
-  const kit = useKit();
+  const kit = currentKit();
   const {width, height} = useVideoConfig();
   const placed = React.useContext(FigureFrame);
   const frame = placed ?? {x: width / 2, y: height / 2, rotate: 0, flip: false};

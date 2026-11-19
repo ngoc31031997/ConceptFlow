@@ -21,6 +21,8 @@ type referenceLibraryUseCase interface {
 	Delete(ctx context.Context, id string) error
 	UsedBy(ctx context.Context, id string) ([]string, error)
 	Validate(in domain.ReferenceStyleInput) (domain.ReferenceStyleInput, error)
+	KitOf(ctx context.Context, id string) (application.ReferenceKitResult, error)
+	KitOfProject(ctx context.Context, projectID string) (application.ReferenceKitResult, error)
 }
 
 // WithReferenceLibrary adds the reference library routes to the router.
@@ -40,6 +42,8 @@ func (rt *Router) mountReferenceLibrary(r chi.Router) {
 	r.Put("/v1/reference-styles/{id}", rt.handleUpdateReferenceStyle)
 	r.Delete("/v1/reference-styles/{id}", rt.handleDeleteReferenceStyle)
 	r.Get("/v1/reference-styles/{id}/usage", rt.handleReferenceStyleUsage)
+	r.Get("/internal/v1/reference-styles/{id}/kit", rt.handleReferenceStyleKit)
+	r.Get("/internal/v1/visual/{project_id}/kit", rt.handleProjectKit)
 }
 
 type referenceStylesResponse struct {
@@ -112,6 +116,27 @@ func (rt *Router) handleReferenceStyleUsage(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, referenceUsageResponse{Projects: users})
 }
 
+// handleReferenceStyleKit returns the kit of one style for rendering.
+func (rt *Router) handleReferenceStyleKit(w http.ResponseWriter, r *http.Request) {
+	res, err := rt.referenceLibrary.KitOf(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		writeReferenceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// handleProjectKit returns the kit of the style a video picked, for the
+// orchestrator's render command.
+func (rt *Router) handleProjectKit(w http.ResponseWriter, r *http.Request) {
+	res, err := rt.referenceLibrary.KitOfProject(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeReferenceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
 // pastedReferenceStyle is the JSON the Creator pastes: a description, or the
 // {"error": "..."} an outside AI answers when it could not read the link.
 type pastedReferenceStyle struct {
@@ -156,8 +181,10 @@ func writeReferenceError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidReferenceStyle):
 		writeError(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, application.ErrReferenceStyleNotFound):
+	case errors.Is(err, application.ErrReferenceStyleNotFound), errors.Is(err, application.ErrNoReferencePicked):
 		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, application.ErrReferenceKitMissing):
+		writeError(w, http.StatusConflict, err.Error())
 	default:
 		slog.ErrorContext(r.Context(), "reference library request failed", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

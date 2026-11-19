@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -36,9 +35,6 @@ type InternalAuthoring interface {
 type Router struct {
 	suggestPublishMetadata  suggestPublishMetadataUseCase
 	archetypes              archetypesUseCase
-	visualLanguages         visualLanguagesUseCase
-	illustrations           illustrationsUseCase
-	projectIllustrations    projectIllustrationsUseCase
 	renderPrompt            renderPromptUseCase
 	llmStatus               llmStatusSource
 	modelCatalog            application.ModelCatalogPort
@@ -77,9 +73,6 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/projects/{project_id}/operations", rt.handleListProjectOperations)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
 	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
-	rt.visualLanguageRoutes(r)
-	rt.illustrationRoutes(r)
-	rt.projectIllustrationRoutes(r)
 	// The idea step's brief and the review units of every step. See ADR-0035.
 	rt.reviewUnitRoutes(r)
 	// The research step: questions, the prompt for an outside tool, pasted answers, facts.
@@ -546,10 +539,6 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"story_model":       state.Models.Story,
 		"storyboard_model":  state.Models.Storyboard,
 		"code_model":        state.Models.Code,
-		// The visual language the project is pinned to; "" for a project with no pin.
-		"visual_language_id":      state.Language.ID,
-		"visual_language_version": strconv.Itoa(state.Language.Version),
-		"kit_key":                 state.Language.KitKey,
 	})
 }
 
@@ -769,14 +758,6 @@ func DescribeGenerateError(err error) (int, string) {
 			"Chưa cấu hình HIVE_API_KEY trong .env (llm-service) nên không gọi được AI." + fallback
 	case errors.Is(err, domain.ErrProjectNotFound):
 		return http.StatusNotFound, "project not found"
-	}
-	// Not a failure — the code step waits for the Creator's review.
-	var pending *application.ErrIllustrationsPending
-	if errors.As(err, &pending) {
-		return http.StatusConflict, pending.Error()
-	}
-	if errors.Is(err, application.ErrIllustrationsNotPlanned) || errors.Is(err, application.ErrIllustrationsStale) {
-		return http.StatusConflict, err.Error()
 	}
 	status := http.StatusBadGateway
 	var message string

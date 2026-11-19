@@ -18,14 +18,6 @@ import (
 // of thing that loses a character in translation, and embedding removes that
 // risk by construction instead of asking a test to catch it afterwards.
 
-// illustration_kit_vi.txt is the API of remotion_project/src/conceptflow-mini/
-// illustration.tsx as the Remotion Engineer reads it. It is written by
-// hand, and rendering/tests/domain/test_illustration_kit.py fails when a
-// component is exported but not documented here, or documented but gone.
-//
-//go:embed prompts/illustration_kit_vi.txt
-var illustrationKitVI string
-
 // narration_rule_*.txt say which language the spoken lines are written in;
 // the steps before code (story, storyboard) read it.
 //

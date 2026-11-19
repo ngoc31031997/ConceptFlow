@@ -1,21 +1,27 @@
 'use strict';
 
 const express = require('express');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const request = require('supertest');
 const { illustrationsRouter } = require('../../src/routes/illustrations');
+
+const HASH = 'a'.repeat(64);
+const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 
 function client(response = { status: 200, headers: new Map(), body: {} }) {
   return { request: jest.fn().mockResolvedValue(response) };
 }
 
-function buildApp(fast, slow) {
+function buildApp(fast, slow, sharedDir = os.tmpdir()) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.requestId = 'test-id';
     next();
   });
-  app.use(illustrationsRouter(fast, slow));
+  app.use(illustrationsRouter(fast, slow, sharedDir));
   return app;
 }
 
@@ -39,13 +45,8 @@ describe('illustration library routing', () => {
     ['post', '/v1/admin/illustrations/i1/redraw', 'slow'],
     ['get', '/v1/admin/illustrations/export', 'slow'],
     ['post', '/v1/admin/illustrations/import', 'slow'],
-    ['get', '/v1/projects/p1/illustrations', 'fast'],
-    ['post', '/v1/projects/p1/illustrations/plan', 'slow'],
-    ['post', '/v1/projects/p1/illustrations/r1/draw', 'slow'],
-    ['post', '/v1/projects/p1/illustrations/r1/skip', 'fast'],
-    ['put', '/v1/projects/p1/illustrations/r1/tier', 'fast'],
-    ['delete', '/v1/projects/p1/illustrations/r1/drawing', 'fast'],
     // Making a Hình mẫu renders the copy; undoing it does not.
+    ['post', '/v1/stills', 'slow'],
     ['post', '/v1/admin/illustrations/i1/exemplar', 'slow'],
     ['delete', '/v1/admin/illustrations/i1/exemplar', 'fast'],
   ])('%s %s -> %s client', async (method, path, which) => {
@@ -87,7 +88,7 @@ describe('illustration library routing', () => {
     expect(Buffer.compare(res.body, zip)).toBe(0);
   });
 
-  test('an uploaded backup reaches authoring-service as the raw ZIP, with its conflict mode', async () => {
+  test('an uploaded backup reaches rendering as the raw ZIP, with its conflict mode', async () => {
     const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff]);
     const slow = client({ status: 200, headers: new Map(), body: { items: [] } });
     const res = await request(buildApp(client(), slow))
@@ -101,4 +102,53 @@ describe('illustration library routing', () => {
     expect(sent.query).toEqual({ on_conflict: 'replace' });
     expect(sent.headers['content-type']).toBe('application/zip');
   });
+});
+
+describe('GET /v1/stills/:file', () => {
+  let dir;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gateway-stills-'));
+    fs.mkdirSync(path.join(dir, 'stills'));
+    fs.writeFileSync(path.join(dir, 'stills', `${HASH}.png`), PNG);
+    fs.writeFileSync(path.join(dir, 'secret.png'), PNG);
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  const app = () => buildApp(client(), client(), dir);
+
+  test('serves a still with its type, size and a long cache', async () => {
+    const res = await request(app()).get(`/v1/stills/${HASH}.png`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(res.headers['content-length']).toBe(String(PNG.length));
+    expect(res.headers['cache-control']).toContain('immutable');
+    expect(Buffer.compare(res.body, PNG)).toBe(0);
+  });
+
+  test('serves a byte range', async () => {
+    const res = await request(app()).get(`/v1/stills/${HASH}.png`).set('Range', 'bytes=0-3');
+    expect(res.status).toBe(206);
+    expect(res.headers['content-range']).toBe(`bytes 0-3/${PNG.length}`);
+    expect(Buffer.compare(res.body, PNG.subarray(0, 4))).toBe(0);
+  });
+
+  test('refuses a range that starts past the end', async () => {
+    const res = await request(app())
+      .get(`/v1/stills/${HASH}.png`)
+      .set('Range', `bytes=${PNG.length + 10}-`);
+    expect(res.status).toBe(416);
+  });
+
+  test('a still that is not there is 404', async () => {
+    const res = await request(app()).get(`/v1/stills/${'b'.repeat(64)}.png`);
+    expect(res.status).toBe(404);
+  });
+
+  test.each(['..%2Fsecret.png', 'secret.png', 'notahash.png', `${HASH}.gif`, `${HASH.toUpperCase()}.png`])(
+    'only a still name is served: %s',
+    async (name) => {
+      const res = await request(app()).get(`/v1/stills/${name}`);
+      expect(res.status).toBe(404);
+    },
+  );
 });

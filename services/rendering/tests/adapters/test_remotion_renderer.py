@@ -16,6 +16,7 @@ import pytest
 from adapters.rendering.remotion_renderer import RemotionScriptRenderer, _extract_narrations
 from domain.errors import AnimationEngineError
 from domain.models import NarrationSegment, ScriptRenderRequest
+from tests.kit_fixtures import phatsang_kit
 
 ENTRY_SCRIPT = """
 import {registerRoot, Composition} from 'remotion';
@@ -34,7 +35,7 @@ def make_request(tmp_path, **overrides) -> ScriptRenderRequest:
             NarrationSegment(scene_index=1, duration_seconds=3.0),
         ],
         engine="remotion",
-        kit_key="phatsang",
+        kit=phatsang_kit(),
     )
     kwargs.update(overrides)
     return ScriptRenderRequest(**kwargs)
@@ -167,7 +168,7 @@ class TestRender:
         ]
         # No font chosen → the key is absent and conceptflow-mini keeps its default.
         assert "videoFont" not in props
-        assert props["kitKey"] == "phatsang"
+        assert props["kit"] == phatsang_kit()
 
     def test_render_passes_the_chosen_video_font(self, tmp_path, monkeypatch):
         template_dir = tmp_path / "remotion_project"
@@ -238,7 +239,7 @@ class TestRender:
             renderer.render(request, str(tmp_path / "out.mp4"))
 
 
-class TestKitKey:
+class TestKit:
     def test_a_render_without_a_pinned_kit_is_refused_before_node_starts(self, tmp_path, monkeypatch):
         template_dir = tmp_path / "remotion_project"
         (template_dir / "src").mkdir(parents=True)
@@ -249,6 +250,6 @@ class TestKitKey:
         renderer = RemotionScriptRenderer(
             project_template_dir=str(template_dir), cache_root=str(tmp_path / "media")
         )
-        with pytest.raises(AnimationEngineError, match="ghim ngôn ngữ hình"):
-            renderer.render(make_request(tmp_path, kit_key=None), str(tmp_path / "out.mp4"))
+        with pytest.raises(AnimationEngineError, match="thiếu kit"):
+            renderer.render(make_request(tmp_path, kit=None), str(tmp_path / "out.mp4"))
         assert started == []

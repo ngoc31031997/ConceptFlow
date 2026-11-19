@@ -105,8 +105,8 @@ type ConceptStorePort interface {
 	SaveUnit(ctx context.Context, u domain.ReviewUnit) error
 	ConceptModel(ctx context.Context, projectID string) (string, error)
 	SetConceptModel(ctx context.Context, projectID, model string) error
-	// SetPicks replaces the video's picks; an id not in the library is
-	// domain.ErrUnknownReference and nothing is written.
+	// SetPicks replaces the video's pick with refIDs (none or one id); an id
+	// not in the library is domain.ErrUnknownReference and nothing is written.
 	SetPicks(ctx context.Context, projectID string, refIDs []string) error
 	// Versions lists the locked versions without their documents, oldest first.
 	Versions(ctx context.Context, projectID string) ([]VersionRecord, error)
