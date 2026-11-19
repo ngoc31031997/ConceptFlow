@@ -360,6 +360,9 @@ func TestSequenceDesk_LockThenNothingNewThenOutdated(t *testing.T) {
 	if st.LockedVersion != 1 || st.NextVersion != 2 || f.store.versions[0].Note != "Chốt lần đầu" || f.store.versions[0].PlanVersion != 1 {
 		t.Fatalf("v1 locked: %+v %+v", st, f.store.versions)
 	}
+	if raw, _ := json.Marshal(st); !strings.Contains(string(raw), `"draft":[]`) {
+		t.Errorf("a lock with nothing new sends an empty draft list, not null: %s", raw)
+	}
 	var doc domain.SequenceDocument
 	if err := json.Unmarshal(f.store.versions[0].Document, &doc); err != nil || len(doc.Sequence) != 3 || len(doc.Motifs) != 2 {
 		t.Fatalf("the locked document: %+v %v", doc, err)

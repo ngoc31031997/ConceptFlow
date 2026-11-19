@@ -431,7 +431,7 @@ func changedSequence(latest SequenceVersionRecord, data *sequenceData) []string 
 		return []string{"Không đọc được bản chốt trước"}
 	}
 	in := data.in
-	var out []string
+	out := []string{}
 	if old.SourceVersions.VisualPlan != in.PlanVersion {
 		out = append(out, fmt.Sprintf("Kế hoạch hình v%d → v%d", old.SourceVersions.VisualPlan, in.PlanVersion))
 	}
