@@ -3742,3 +3742,19 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: Inception/Application Design CR-100, chờ Creator duyệt.
 
 ---
+
+---
+
+## CR-116 · Chuyển phần hình ảnh từ authoring sang rendering — câu hỏi yêu cầu
+**Timestamp**: 2026-11-19
+**User Input**: "authoring chỉ dùng để viết kịch bản thôi" / "/v1/illustrations/preview, /v1/kits, /v1/stills, prune => đưa về rendering-service" / "ok mở cr-116 đi"
+**AI Response**: Mở nhánh feature/cr-116-visuals-to-rendering (worktree). Kiểm kê: 6 bảng (293 hình, 14 thư mục, 1 phong cách, 4 khung mẫu, 0 hình theo dự án), 33 route, bên gọi (web-gui qua gateway, orchestrator kit_key). Viết cr-116-requirement-questions.md (7 câu). Không có CR mở nào chồng lấn. CR-117 (bước 11 Storyboard) phụ thuộc CR-116.
+**Context**: Inception/Requirements CR-116, chờ Creator trả lời.
+
+---
+
+## CR-116 · Yêu cầu
+**Timestamp**: 2026-11-19
+**User Input**: Trả lời câu 1–10: 1A Python trong rendering, 2 xoá toàn bộ vẽ lại, 3A, 4 phong cách ở bước 8, 5A, 6A, 7B, 8 xoá không sao lưu, 9 "chuyển thông tin kit vào thư viện tham chiếu Glowing Flat Vector, bước 8 chọn thì bước 11 đọc lại", 10 chỉ bước 8. Thêm: "1 a" (cả bộ thông số kit thành dữ liệu R12) / "xoá hết các dự án ko cần backup chỉ giữ lại 1 dự án đang làm là 335da643".
+**AI Response**: Viết cr-116-visuals-to-rendering.md (FR-1..7, dọn dữ liệu không hoàn tác). Chưa xoá dữ liệu, chưa code.
+**Context**: Inception/Requirements CR-116, chờ Creator duyệt.
