@@ -3758,3 +3758,11 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **User Input**: Trả lời câu 1–10: 1A Python trong rendering, 2 xoá toàn bộ vẽ lại, 3A, 4 phong cách ở bước 8, 5A, 6A, 7B, 8 xoá không sao lưu, 9 "chuyển thông tin kit vào thư viện tham chiếu Glowing Flat Vector, bước 8 chọn thì bước 11 đọc lại", 10 chỉ bước 8. Thêm: "1 a" (cả bộ thông số kit thành dữ liệu R12) / "xoá hết các dự án ko cần backup chỉ giữ lại 1 dự án đang làm là 335da643".
 **AI Response**: Viết cr-116-visuals-to-rendering.md (FR-1..7, dọn dữ liệu không hoàn tác). Chưa xoá dữ liệu, chưa code.
 **Context**: Inception/Requirements CR-116, chờ Creator duyệt.
+
+---
+
+## CR-116 · Thiết kế
+**Timestamp**: 2026-11-19
+**User Input**: "ok" (duyệt yêu cầu) / "tiếp"
+**AI Response**: Commit yêu cầu (2e2557d). Viết ADR-0050 (Proposed) và cr-116-visuals-to-rendering-design.md: kit thành reference_styles.detail.kit, mọi lệnh vẽ nhận kit object, thư viện hình Python ở rendering, prompt owner "rendering", gỡ authoring, danh sách xoá dữ liệu từng service (giữ 335da643). Chưa code, chưa xoá.
+**Context**: Application Design CR-116, chờ Creator duyệt.
