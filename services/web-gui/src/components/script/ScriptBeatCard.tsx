@@ -121,6 +121,7 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         title={`Gợi ý cho câu ${lineId} · AI ngoài`}
         label="Gợi ý bằng AI ngoài"
         run={(external) => suggestScriptLine(projectId, kind, lineId, { external })}
+        queued={false}
         onDone={(text) => setSuggestion({ kind, lineId, text })}
         disabled={busy}
         testId={`script-ask-external-${kind}-${lineId}`}

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ExternalPromptReady, type ExternalAi } from "../../src/api/client";
+import { ApiError, ExternalPromptReady, ExternalRequestDescribed, type ExternalAi } from "../../src/api/client";
 import { ExternalAiButton } from "../../src/components/ExternalAiButton";
 import { installFakeAiBridge, type FakeAiBridge } from "../helpers/fakeAiBridge";
 
@@ -11,10 +11,14 @@ afterEach(() => {
   bridge = null;
 });
 
+const REQUEST = { gateway: "http://localhost:8080", method: "POST", path: "/v1/projects/p1/story/generate", body: "{}" };
+
 function stepRun(pasteResult: () => Promise<unknown>) {
-  return vi.fn().mockImplementation((external: ExternalAi) =>
-    external.mode === "prompt" ? Promise.reject(new ExternalPromptReady("PROMPT")) : pasteResult(),
-  );
+  return vi.fn().mockImplementation((external: ExternalAi) => {
+    if (external.mode === "prompt") return Promise.reject(new ExternalPromptReady("PROMPT"));
+    if (external.mode === "describe") return Promise.reject(new ExternalRequestDescribed(REQUEST));
+    return pasteResult();
+  });
 }
 
 function renderButton(run: ReturnType<typeof stepRun>, onDone = vi.fn()) {
@@ -22,88 +26,107 @@ function renderButton(run: ReturnType<typeof stepRun>, onDone = vi.fn()) {
   return { onDone };
 }
 
-describe("ExternalAiButton · Chạy bằng DeepSeek", () => {
-  it("shows no DeepSeek button without the extension", async () => {
+describe("ExternalAiButton · Thêm vào hàng đợi AI", () => {
+  it("shows no queue button without the extension", async () => {
     bridge = installFakeAiBridge({ answersPing: false });
     renderButton(stepRun(() => Promise.resolve("xong")));
     expect(screen.getByTestId("ext")).toBeInTheDocument();
-    expect(screen.queryByTestId("ext-deepseek")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ext-queue")).not.toBeInTheDocument();
   });
 
   it("explains how to install the extension in the dialog when it is missing", async () => {
     bridge = installFakeAiBridge({ answersPing: false });
     renderButton(stepRun(() => Promise.resolve("xong")));
     fireEvent.click(screen.getByTestId("ext"));
-    expect(await screen.findByTestId("ext-dialog-deepseek-missing")).toHaveTextContent("ConceptFlow AI Bridge");
+    expect(await screen.findByTestId("ext-dialog-extension-missing")).toHaveTextContent("ConceptFlow AI Bridge");
   });
 
-  it("runs the prompt on DeepSeek, has the step read the answer and hands the result on", async () => {
-    bridge = installFakeAiBridge();
+  it("says to update an extension of the old protocol", async () => {
+    bridge = installFakeAiBridge({ legacy: true });
+    renderButton(stepRun(() => Promise.resolve("xong")));
+    expect(await screen.findByTestId("ext-queue-outdated")).toHaveTextContent("Cập nhật extension ConceptFlow AI Bridge");
+  });
+
+  it("queues the request, follows the item and reloads when it is done", async () => {
+    bridge = installFakeAiBridge({ queue: true });
     const run = stepRun(() => Promise.resolve("xong"));
     const { onDone } = renderButton(run);
 
-    fireEvent.click(await screen.findByTestId("ext-deepseek"));
-    await waitFor(() => expect(bridge!.runs).toHaveLength(1));
-    expect(bridge!.runs[0]).toMatchObject({ provider: "deepseek", prompt: "PROMPT" });
+    fireEvent.click(await screen.findByTestId("ext-queue"));
+    await waitFor(() => expect(bridge!.queued).toHaveLength(1));
+    expect(bridge!.queued[0].item).toMatchObject({ label: "Câu chuyện · AI ngoài", project: "p1", request: REQUEST });
     expect(screen.queryByTestId("ext-dialog")).not.toBeInTheDocument();
 
-    act(() => bridge!.send({ type: "result", request_id: bridge!.runs[0].requestId, text: "câu trả lời" }));
-    await waitFor(() => expect(onDone).toHaveBeenCalledWith("xong"));
-    expect(run).toHaveBeenLastCalledWith({ mode: "paste", reply: "câu trả lời" });
+    act(() => bridge!.announce("q1", { status: "running", stage: "opening", provider: "grok" }));
+    expect(await screen.findByTestId("ext-queue-stage")).toHaveTextContent("Đang mở Grok");
+    act(() => bridge!.announce("q1", { status: "done", provider: "grok" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith());
+    expect(await screen.findByTestId("ext-queue")).toBeEnabled();
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ mode: "paste" }));
   });
 
-  it("says why the extension gave no answer and calls nothing else", async () => {
-    bridge = installFakeAiBridge();
+  it("says why the item failed and reloads nothing", async () => {
+    bridge = installFakeAiBridge({ queue: true });
     const run = stepRun(() => Promise.resolve("xong"));
     const { onDone } = renderButton(run);
 
-    fireEvent.click(await screen.findByTestId("ext-deepseek"));
-    await waitFor(() => expect(bridge!.runs).toHaveLength(1));
-    act(() => bridge!.send({ type: "error", request_id: bridge!.runs[0].requestId, message: "Chưa đăng nhập DeepSeek" }));
+    fireEvent.click(await screen.findByTestId("ext-queue"));
+    await waitFor(() => expect(bridge!.queued).toHaveLength(1));
+    act(() => bridge!.announce("q1", { status: "failed", provider: "gemini", error: "Chưa đăng nhập Gemini." }));
 
-    expect(await screen.findByTestId("ext-deepseek-error")).toHaveTextContent("Chưa đăng nhập DeepSeek");
+    expect(await screen.findByTestId("ext-queue-error")).toHaveTextContent("Chưa đăng nhập Gemini.");
     expect(onDone).not.toHaveBeenCalled();
-    expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it("says why the prompt could not be built and does not run DeepSeek", async () => {
-    bridge = installFakeAiBridge();
+  it("says why the request could not be described and queues nothing", async () => {
+    bridge = installFakeAiBridge({ queue: true });
     const run = vi.fn().mockRejectedValue(new ApiError("Duyệt brief ở bước Creative brief trước."));
     renderButton(run);
 
-    fireEvent.click(await screen.findByTestId("ext-deepseek"));
-    expect(await screen.findByTestId("ext-deepseek-error")).toHaveTextContent("Duyệt brief");
-    expect(bridge.runs).toHaveLength(0);
+    fireEvent.click(await screen.findByTestId("ext-queue"));
+    expect(await screen.findByTestId("ext-queue-error")).toHaveTextContent("Duyệt brief");
+    expect(bridge.queued).toHaveLength(0);
   });
 
   it("opens the dialog with the answer and the reason when the step cannot read it", async () => {
-    bridge = installFakeAiBridge();
-    const run = stepRun(() => Promise.reject(new ApiError("Kết quả AI không dùng được: khối JSON không đọc được")));
+    bridge = installFakeAiBridge({ queue: true });
+    const run = stepRun(() => Promise.resolve("xong"));
     const { onDone } = renderButton(run);
 
-    fireEvent.click(await screen.findByTestId("ext-deepseek"));
-    await waitFor(() => expect(bridge!.runs).toHaveLength(1));
-    act(() => bridge!.send({ type: "result", request_id: bridge!.runs[0].requestId, text: "xin chào" }));
+    fireEvent.click(await screen.findByTestId("ext-queue"));
+    await waitFor(() => expect(bridge!.queued).toHaveLength(1));
+    act(() =>
+      bridge!.announce("q1", { status: "failed", provider: "deepseek", error: "khối JSON không đọc được", reply: "xin chào" }),
+    );
 
     expect(await screen.findByTestId("ext-dialog-read-error")).toHaveTextContent("khối JSON không đọc được");
     expect(screen.getByTestId("ext-dialog-reply")).toHaveValue("xin chào");
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it("stops waiting when cancelled and reads nothing", async () => {
-    bridge = installFakeAiBridge();
+  it("takes the item out of the queue when cancelled and reads nothing", async () => {
+    bridge = installFakeAiBridge({ queue: true });
     const run = stepRun(() => Promise.resolve("xong"));
     const { onDone } = renderButton(run);
 
-    fireEvent.click(await screen.findByTestId("ext-deepseek"));
-    await waitFor(() => expect(bridge!.runs).toHaveLength(1));
-    act(() => bridge!.send({ type: "progress", request_id: bridge!.runs[0].requestId, stage: "answering" }));
-    fireEvent.click(await screen.findByTestId("ext-deepseek-cancel"));
+    fireEvent.click(await screen.findByTestId("ext-queue"));
+    await waitFor(() => expect(bridge!.queued).toHaveLength(1));
+    act(() => bridge!.announce("q1", { status: "running", stage: "answering" }));
+    fireEvent.click(await screen.findByTestId("ext-queue-cancel"));
 
-    await waitFor(() => expect(bridge!.cancels).toEqual([bridge!.runs[0].requestId]));
-    expect(await screen.findByTestId("ext-deepseek")).toBeEnabled();
-    expect(screen.queryByTestId("ext-deepseek-error")).not.toBeInTheDocument();
+    await waitFor(() => expect(bridge!.cancels).toEqual(["q1"]));
+    act(() => bridge!.announce("q1", { status: "cancelled" }));
+    expect(await screen.findByTestId("ext-queue")).toBeEnabled();
+    expect(screen.queryByTestId("ext-queue-error")).not.toBeInTheDocument();
     expect(onDone).not.toHaveBeenCalled();
-    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("a step that shows its result instead of storing it has no queue button", async () => {
+    bridge = installFakeAiBridge({ queue: true });
+    const onDone = vi.fn();
+    render(<ExternalAiButton title="Gợi ý · AI ngoài" run={stepRun(() => Promise.resolve("gợi ý"))} queued={false} onDone={onDone} testId="ext" />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByTestId("ext")).toBeInTheDocument();
+    expect(screen.queryByTestId("ext-queue")).not.toBeInTheDocument();
   });
 });

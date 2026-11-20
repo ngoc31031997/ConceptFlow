@@ -379,8 +379,8 @@ function SequenceBeatBlock({ projectId, state, beat, sequence, readOnly }: BeatP
           viết. Trường bạn đã sửa tay được giữ; mọi unit của beat về “Chờ duyệt”.
         </p>
         <p className={researchStyles.hint}>
-          Muốn dùng AI ngoài hoặc DeepSeek: bấm “Làm lại kèm ghi chú” trên từng unit, hoặc “Chạy tất
-          cả bằng DeepSeek” ở mục 3.
+          Muốn dùng AI ngoài hoặc hàng đợi AI: bấm “Làm lại kèm ghi chú” trên từng unit, hoặc “Thêm tất
+          cả vào hàng đợi AI” ở mục 3.
         </p>
         <FormField label="Ghi chú cho AI (không bắt buộc)">
           <TextArea

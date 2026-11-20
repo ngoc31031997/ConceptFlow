@@ -6,7 +6,7 @@ import {
   type VisualConceptState,
   type VisualConceptUnit,
 } from "../../api/client";
-import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import type { VisualConceptControls } from "../../hooks/useVisualConcept";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, CopyBox, Dialog, Dropdown } from "../ui";
@@ -55,14 +55,14 @@ interface VisualHeadCardProps {
 /**
  * The head of step 8: what the AI reads, the colour strip over the beats, the
  * machine checks of the whole concept, the model, and the actions on every part
- * at once (write the empty parts, rewrite all, queue on DeepSeek, approve the rest).
+ * at once (write the empty parts, rewrite all, queue on an outside AI, approve the rest).
  */
 export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHeadCardProps) {
   const [inputOpen, setInputOpen] = useState(false);
   const [rewriteOpen, setRewriteOpen] = useState(false);
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/visual-concept`)) void concept.reload();
   });
   const total = state.units.length;
@@ -103,7 +103,7 @@ export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHe
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} phần vào hàng đợi DeepSeek${already > 0 ? `, ${already} phần đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi phần đọc các phần trước nó; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} phần vào hàng đợi AI${already > 0 ? `, ${already} phần đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi phần đọc các phần trước nó; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({
@@ -260,7 +260,7 @@ export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHe
               disabled={disabled || queueing}
               data-testid="concept-queue"
             >
-              Chạy tất cả bằng DeepSeek ({notApproved.length})
+              Thêm tất cả vào hàng đợi AI ({notApproved.length})
             </Button>
           )}
           <span className={researchStyles.grow} />
@@ -285,7 +285,7 @@ export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHe
         {queue.counts &&
           (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
             <p className={researchStyles.hint} data-testid="concept-queue-counts">
-              Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
+              Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
               {queue.counts.failed} lỗi
               {queue.counts.paused ? " · đang tạm dừng" : ""}.
             </p>

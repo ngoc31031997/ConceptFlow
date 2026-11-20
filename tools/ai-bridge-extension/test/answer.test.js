@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const A = require("../src/deepseek/answer.js");
+const A = require("../src/adapter/answer.js");
 
 test("an answer is finished once it stays the same with its icon row shown", () => {
   assert.equal(A.isFinished("xong", 0, A.STABLE_MS - 1, true), false);

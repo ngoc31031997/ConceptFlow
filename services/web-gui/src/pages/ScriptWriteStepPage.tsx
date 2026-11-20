@@ -11,7 +11,7 @@ import { Button, Card } from "../components/ui";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
-import { useDeepSeekQueue } from "../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../hooks/useAiQueue";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useScript, type ScriptControls } from "../hooks/useScript";
 import { VIEW_SCRIPT, beatsRoute, lockRoute, readOnlyReason } from "../utils/flow";
@@ -57,7 +57,7 @@ function stripOf(state: ScriptState, running: ScriptControls["running"]): StepSt
  * edits, redoes and approves each beat and can listen to any line, a beat or the
  * whole script in the project's voice. Checks over the opening, the
  * closing, long or hard-to-hear lines and the joins between beats only warn.
- * With the AI Bridge extension, one click queues every beat without dialogue on DeepSeek.
+ * With the AI Bridge extension, one click queues every beat without dialogue on an outside AI.
  */
 export function ScriptWriteStepPage() {
   const params = useParams<{ id?: string }>();
@@ -69,7 +69,7 @@ export function ScriptWriteStepPage() {
   const script = useScript(projectId, !!projectId);
   // A line opened from another screen (the lock step's "Mở câu đó") is marked and brought into view.
   const highlight = useSearchParams()[0].get("line");
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/script`)) script.reload();
   });
   const [queueing, setQueueing] = useState(false);
@@ -109,7 +109,7 @@ export function ScriptWriteStepPage() {
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} beat vào hàng đợi DeepSeek${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} beat vào hàng đợi AI${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({ tone: "error", text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi." });
@@ -146,7 +146,7 @@ export function ScriptWriteStepPage() {
                   </Button>
                   {queue.available && (
                     <Button variant="run" onClick={() => void queueAll(unwrittenBeats)} disabled={busy || queueing} data-testid="script-queue-all">
-                      {queueing ? "Đang thêm…" : `Chạy tất cả bằng DeepSeek (${unwritten})`}
+                      {queueing ? "Đang thêm…" : `Thêm tất cả vào hàng đợi AI (${unwritten})`}
                     </Button>
                   )}
                   <span className={researchStyles.hint}>Lời thoại đã có giữ nguyên; mỗi beat viết lần lượt, đọc beat liền trước.</span>
@@ -154,7 +154,7 @@ export function ScriptWriteStepPage() {
               )}
               {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
                 <p className={researchStyles.hint} data-testid="script-queue-state">
-                  Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
+                  Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
                 </p>
               )}
               {queueNote && (

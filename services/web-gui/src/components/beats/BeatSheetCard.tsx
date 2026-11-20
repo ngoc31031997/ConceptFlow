@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ExternalRequestDescribed, redoBeat, type Beat, type BeatState, type ExternalRequest } from "../../api/client";
 import type { BeatsControls } from "../../hooks/useBeats";
-import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
 import researchStyles from "../research/research.module.css";
@@ -50,7 +50,7 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
   const writingAdd = beats.running === "add";
   const approved = state.beats.filter((b) => b.status === "approved").length;
   const unwrittenBeats = state.beats.filter((b) => !b.goal.trim() && !b.content.trim());
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/beats`)) void beats.reload();
   });
   const [queueing, setQueueing] = useState(false);
@@ -80,7 +80,7 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} beat vào hàng đợi DeepSeek${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} beat vào hàng đợi AI${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({ tone: "error", text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi." });
@@ -185,7 +185,7 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
               )}
               {queue.available && unwrittenBeats.length > 0 && (
                 <Button variant="run" onClick={() => void queueAll()} disabled={busy || queueing} data-testid="beats-queue-all">
-                  {queueing ? "Đang thêm…" : `Chạy tất cả bằng DeepSeek (${unwrittenBeats.length})`}
+                  {queueing ? "Đang thêm…" : `Thêm tất cả vào hàng đợi AI (${unwrittenBeats.length})`}
                 </Button>
               )}
               <span className={researchStyles.grow} />
@@ -197,7 +197,7 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
         </div>
         {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
           <p className={researchStyles.hint} data-testid="beats-queue-state">
-            Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
+            Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
           </p>
         )}
         {queueNote && (

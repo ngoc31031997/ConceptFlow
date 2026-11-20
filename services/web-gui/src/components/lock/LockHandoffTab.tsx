@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ExternalRequestDescribed, generateHandoff, handoffBeatUnit, redoUnit, type ExternalRequest, type LockBeat } from "../../api/client";
 import type { ScriptLockControls } from "../../hooks/useScriptLock";
-import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
@@ -225,7 +225,7 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
   const [adding, setAdding] = useState(false);
   const [term, setTerm] = useState({ term: "", say: "", draw: "", avoid: "" });
   const [error, setError] = useState<string | null>(null);
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/script-lock`)) lock.reload();
   });
   const [queueing, setQueueing] = useState(false);
@@ -259,7 +259,7 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} beat vào hàng đợi DeepSeek${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} beat vào hàng đợi AI${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({ tone: "error", text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi." });
@@ -298,7 +298,7 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
                   </Button>
                   {queue.available && (
                     <Button variant="run" onClick={() => void queueAll(unwrittenBeats)} disabled={busy || queueing} data-testid="handoff-queue-all">
-                      {queueing ? "Đang thêm…" : `Chạy tất cả bằng DeepSeek (${unwritten})`}
+                      {queueing ? "Đang thêm…" : `Thêm tất cả vào hàng đợi AI (${unwritten})`}
                     </Button>
                   )}
                   <span className={researchStyles.hint}>Ghi chú đã có giữ nguyên; thuật ngữ AI đề xuất gộp vào bảng chung.</span>
@@ -307,7 +307,7 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
             )}
             {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
               <p className={researchStyles.hint} data-testid="handoff-queue-state">
-                Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
+                Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
               </p>
             )}
             {queueNote && (

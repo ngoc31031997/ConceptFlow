@@ -3806,3 +3806,8 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **User Input**: "ok" (duyệt thiết kế)
 **AI Response**: Commit thiết kế (1ff8b82). Viết cr-117-prompts-draft.md (3 prompt, chờ duyệt nguyên văn) và mockup bước 11 https://claude.ai/artifact/5D3n6WfATdcf76picCqoLt (bản HTML lưu ở cr-117-storyboard-mockup.html). Chưa code, chưa commit hai file này.
 **Context**: Construction CR-117, chờ Creator duyệt mockup và prompt.
+## CR-118 · AI Bridge chỉ qua hàng đợi, DeepSeek / Gemini / Grok — yêu cầu và thiết kế
+**Timestamp**: 2026-11-20
+**User Input**: "sửa lại theo dạng chạy AI Extension bằng cách add task vào queue default chạy deepseek có thể đổi qua kimi" / "dùng qua kimi.com bổ sung thêm gemini" / "bỏ kimi" (thêm Grok, gửi HTML Gemini/Grok) / "ok chỉ dùng hàng đợi. mỗi lượt mở lượt chat mới" / "trong hàng đợi có thể cho thay đổi model cho 1 task. còn trong cài đặt là thay đổi model default cho toàn bộ task" / "go"
+**AI Response**: Mở worktree feature/cr-118-ai-bridge-providers. Không chồng lấn CR-117. Viết cr-118-ai-bridge-providers.md (FR-1..9), ADR-0051 (Proposed), cr-118-ai-bridge-providers-design.md. Chưa code.
+**Context**: Inception + Application Design CR-118, chờ Creator duyệt.

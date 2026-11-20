@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ExternalAiDialog, type ExternalRedo } from "../ExternalAiDialog";
-import { ExternalRedoDeepSeek } from "../ExternalRedoDeepSeek";
+import { ExternalRedoQueued } from "../ExternalRedoQueued";
 import { Button, Dialog, FormField, TextArea } from "../ui";
 import { reachesLaterSteps, type UnitImpact } from "../../hooks/useUnitImpact";
 import { ImpactList } from "./ImpactList";
@@ -83,7 +83,8 @@ export function UnitRedoModal({
                 >
                   Dùng AI ngoài
                 </Button>
-                <ExternalRedoDeepSeek
+                <ExternalRedoQueued
+                  label={title}
                   external={external}
                   note={note.trim()}
                   onClose={onClose}
@@ -92,7 +93,7 @@ export function UnitRedoModal({
                     setOutside(true);
                   }}
                   disabled={!canSend}
-                  testId={`${testId}-deepseek`}
+                  testId={`${testId}-queue`}
                 />
               </>
             )}

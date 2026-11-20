@@ -6,7 +6,7 @@ import {
   type SequenceUnit,
   type VisualSequenceState,
 } from "../../api/client";
-import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import type { VisualSequenceControls } from "../../hooks/useVisualSequence";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, Dropdown, FormField, TextArea } from "../ui";
@@ -33,14 +33,14 @@ interface SequenceRunCardProps {
 /**
  * Section 3 of step 10: the model the step runs on, then the run that writes
  * every beat with no sequence yet in plan order, on the system's AI or queued
- * on DeepSeek through the extension.
+ * on an outside AI through the extension.
  */
 export function SequenceRunCard({ projectId, state, sequence, readOnly }: SequenceRunCardProps) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/visual-sequence`)) void sequence.reload();
   });
   // Units with no item or one still waiting for review, in plan order.
@@ -85,7 +85,7 @@ export function SequenceRunCard({ projectId, state, sequence, readOnly }: Sequen
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} unit vào hàng đợi DeepSeek${already > 0 ? `, ${already} unit đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi unit một prompt và đọc các unit trước nó; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} unit vào hàng đợi AI${already > 0 ? `, ${already} unit đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi unit một prompt và đọc các unit trước nó; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({
@@ -132,7 +132,7 @@ export function SequenceRunCard({ projectId, state, sequence, readOnly }: Sequen
               title={ready ? undefined : "Duyệt motif trước khi AI viết chuỗi"}
               data-testid="seq-queue"
             >
-              Chạy tất cả bằng DeepSeek ({notApproved.length})
+              Thêm tất cả vào hàng đợi AI ({notApproved.length})
             </Button>
           )}
         </div>
@@ -148,7 +148,7 @@ export function SequenceRunCard({ projectId, state, sequence, readOnly }: Sequen
         {queue.counts &&
           (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
             <p className={researchStyles.hint} data-testid="seq-queue-counts">
-              Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
+              Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
               {queue.counts.failed} lỗi
               {queue.counts.paused ? " · đang tạm dừng" : ""}.
             </p>

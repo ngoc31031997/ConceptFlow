@@ -440,7 +440,7 @@ describe("BeatsStepPage", () => {
       const redo = vi.spyOn(apiClient, "redoBeat");
       await ready();
       const button = await screen.findByTestId("beats-queue-all");
-      expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (2)");
+      expect(button).toHaveTextContent("Thêm tất cả vào hàng đợi AI (2)");
       fireEvent.click(button);
       await waitFor(() => expect(bridge.queued).toHaveLength(2));
       expect(bridge.queued.map((q) => q.item.label)).toEqual(["B2 · Beat b2", "B3 · Beat b3"]);
@@ -449,7 +449,7 @@ describe("BeatsStepPage", () => {
       expect(first.path).toBe("/v1/projects/p1/beats/b2/redo");
       expect(JSON.parse(first.body)).toEqual({ note: "" });
       expect(bridge.queued[0].item.modes).toEqual({ deepThink: true, search: false });
-      expect(await screen.findByTestId("beats-queue-note")).toHaveTextContent("Đã thêm 2 beat vào hàng đợi DeepSeek");
+      expect(await screen.findByTestId("beats-queue-note")).toHaveTextContent("Đã thêm 2 beat vào hàng đợi AI");
       // Describing a request makes no AI call: redoBeat ran only in its "describe" mode.
       redo.mock.calls.forEach((call) => expect(call[3]).toEqual({ external: { mode: "describe" } }));
     });
@@ -468,10 +468,10 @@ describe("BeatsStepPage", () => {
       expect(await screen.findByTestId("beats-queue-state")).toHaveTextContent("1 đang chạy · 2 chờ · 1 lỗi");
       const get = vi.mocked(apiClient.getBeats);
       const before = get.mock.calls.length;
-      bridge.send({ type: "queue_item_done", item_id: "q1", path: "/v1/projects/p1/beats/b2/redo", project: "p1" });
+      bridge.send({ type: "queue_item", status: "done", item_id: "q1", path: "/v1/projects/p1/beats/b2/redo", project: "p1" });
       await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(before));
       const afterOther = get.mock.calls.length;
-      bridge.send({ type: "queue_item_done", item_id: "q2", path: "/v1/projects/other/beats/b2/redo", project: "other" });
+      bridge.send({ type: "queue_item", status: "done", item_id: "q2", path: "/v1/projects/other/beats/b2/redo", project: "other" });
       await new Promise((r) => setTimeout(r, 30));
       expect(get.mock.calls.length).toBe(afterOther);
     });

@@ -1,5 +1,5 @@
 /**
- * Pure rules for reading a DeepSeek answer: when it counts as finished, and
+ * Pure rules for reading a provider answer: when it counts as finished, and
  * how the page's rendered blocks are turned back into text that keeps the
  * code fences (ConceptFlow looks for the ```json block). No DOM access here,
  * so node tests can check every rule.
@@ -13,7 +13,7 @@
   /**
    * Whether the answer is finished. `text` is the answer read so far,
    * `changedAt` when it last changed, `hasActions` whether the icon row under
-   * it (Copy, Regenerate…) is there, which DeepSeek only shows once done.
+   * it (Copy, Regenerate…) is there, which the page only shows once done.
    */
   function isFinished(text, changedAt, now, hasActions) {
     if (!text || text.trim() === "") return false;
@@ -56,6 +56,6 @@
   }
 
   const api = { STABLE_MS, STABLE_WITHOUT_ACTIONS_MS, isFinished, hasLabel, fence, joinBlocks };
-  root.DeepSeekAnswer = api;
+  root.AiBridgeAnswer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : self);

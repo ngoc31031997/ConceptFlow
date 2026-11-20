@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { AiModelSelect } from "../components/AiModelSelect";
-import { DeepSeekRunButton } from "../components/DeepSeekRunButton";
+import { QueuedRunButton } from "../components/QueuedRunButton";
 import { ExternalAiDialog } from "../components/ExternalAiDialog";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { ProjectIdeaCard } from "../components/idea/ProjectIdeaCard";
@@ -19,7 +19,7 @@ import {
   updateProjectTopic,
   type SimilarProject,
 } from "../api/client";
-import { useDeepSeekRun } from "../hooks/useDeepSeekRun";
+import { useQueuedExternalRun } from "../hooks/useQueuedExternalRun";
 import { useProjectIdea } from "../hooks/useProjectIdea";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { FLOW_INIT, flowStepName } from "../utils/flow";
@@ -77,9 +77,10 @@ export function ScriptStepPage() {
   const created = createdFor === draft.projectId || flow.project?.project_id === draft.projectId;
   const checking = !created && !flow.loaded;
   const idea = useProjectIdea(draft.projectId, created);
-  // DeepSeek's answer the step could not read, shown in the outside-AI dialog for the Creator to fix.
+  // An answer the step could not read, shown in the outside-AI dialog for the Creator to fix.
   const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
-  const deepSeek = useDeepSeekRun({
+  const queued = useQueuedExternalRun({
+    label: "Ý tưởng",
     run: (external) => generateProjectIdea(draft.projectId, "", { external }),
     onDone: idea.reload,
     onUnreadable: (reply, message) => {
@@ -96,7 +97,7 @@ export function ScriptStepPage() {
   const savedText = idea.screen?.subject ?? "";
   const textEdited = created && idea.screen !== null && text.trim() !== savedText.trim() && text.trim().length > 0;
 
-  async function handleCreate(via: "system" | "outside" | "deepseek") {
+  async function handleCreate(via: "system" | "outside" | "queue") {
     const trimmed = text.trim();
     if (!trimmed) return;
     const projectId = draft.projectId;
@@ -124,7 +125,7 @@ export function ScriptStepPage() {
     if (via === "outside") {
       setUnreadable(null);
       setOutsideOpen(true);
-    } else if (via === "deepseek") await deepSeek.start();
+    } else if (via === "queue") await queued.start();
     else if (aiAvailable) void idea.generate();
   }
 
@@ -209,12 +210,12 @@ export function ScriptStepPage() {
                 <Button variant="ghost" onClick={() => void handleCreate("outside")} disabled={!canCreate} data-testid="script-step-create-external">
                   Tạo project và viết bằng AI ngoài
                 </Button>
-                <DeepSeekRunButton
-                  run={deepSeek}
+                <QueuedRunButton
+                  run={queued}
                   disabled={!canCreate || creating}
-                  onStart={() => void handleCreate("deepseek")}
-                  label="Tạo project và chạy bằng DeepSeek"
-                  testId="script-step-create-deepseek"
+                  onStart={() => void handleCreate("queue")}
+                  label="Tạo project và thêm vào hàng đợi AI"
+                  testId="script-step-create-queue"
                 />
                 <Button
                   variant={aiAvailable ? "run" : "primary"}

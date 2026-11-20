@@ -26,3 +26,5 @@ li .project { color: var(--muted); font-size: 12px; }
 .row { display: flex; gap: 6px; flex-wrap: wrap; }
 .hint { color: var(--muted); margin: 8px 0; }
 details pre { margin: 4px 0 0; max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 11px; background: var(--bg); border: 1.5px solid var(--line); border-radius: 4px; padding: 6px; }
+li .provider { color: var(--muted); font-size: 12px; }
+li .provider select { font: inherit; max-width: 200px; }

@@ -169,3 +169,75 @@ test("a prompt answer without a prompt is an error, not an empty run", async () 
   const out = await H.callExternal(fakeFetch(reply(200, {})), request("b1"), "prompt");
   assert.deepEqual(out, { ok: false, message: H.NO_PROMPT });
 });
+
+test("an item runs on its own provider, else on the default", () => {
+  const own = Q.add(Q.emptyState(), Object.assign(described("b1"), { provider: "gemini" }), "i1", 1).item;
+  assert.equal(own.provider, "gemini");
+  assert.equal(Q.providerOf(own, "deepseek"), "gemini");
+  const plain = Q.add(Q.emptyState(), described("b1"), "i1", 1).item;
+  assert.equal(plain.provider, null);
+  assert.equal(Q.providerOf(plain, "grok"), "grok");
+  assert.equal(Q.add(Q.emptyState(), Object.assign(described("b1"), { provider: "chatgpt" }), "i1", 1).item, null, "an unknown provider");
+});
+
+test("the provider can change only while the item waits or has failed", () => {
+  let state = queueOf("b1", "b2");
+  assert.equal(Q.find(Q.setProvider(state, "i0", "grok"), "i0").provider, "grok");
+  assert.equal(Q.find(Q.setProvider(Q.setProvider(state, "i0", "grok"), "i0", null), "i0").provider, null, "back to the default");
+  assert.equal(Q.setProvider(state, "i0", "chatgpt"), state, "an unknown provider");
+  state = Q.start(state, "i0", "deepseek");
+  assert.equal(Q.setProvider(state, "i0", "grok"), state, "running");
+  assert.equal(Q.setProvider(Q.finish(state, "i0"), "i0", "grok").items[0].provider, null, "done");
+  const failed = Q.fail(state, "i0", "lỗi");
+  assert.equal(Q.find(Q.setProvider(failed, "i0", "gemini"), "i0").provider, "gemini", "a failed item can be retried elsewhere");
+});
+
+test("the provider a run used is kept after it ends, until the item is changed or retried", () => {
+  let state = Q.start(queueOf("b1"), "i0", "gemini");
+  assert.equal(Q.find(state, "i0").ranOn, "gemini");
+  state = Q.fail(state, "i0", "lỗi");
+  assert.equal(Q.find(state, "i0").ranOn, "gemini");
+  assert.equal(Q.find(Q.retry(state, "i0"), "i0").ranOn, "");
+  assert.equal(Q.find(Q.setProvider(state, "i0", "grok"), "i0").ranOn, "");
+});
+
+test("an item of kind prompt carries its prompt and is a different item from a request with the same path", () => {
+  const research = (prompt) => ({ label: "Tra cứu", project: "Dự án 1", kind: "prompt", prompt: prompt, request: { gateway: "http://localhost:8080", method: "POST", path: "/v1/projects/p1/research/paste" } });
+  const first = Q.add(Q.emptyState(), research("hỏi gì đó"), "i1", 1);
+  assert.equal(first.item.kind, "prompt");
+  assert.equal(first.item.prompt, "hỏi gì đó");
+  assert.equal(Q.add(first.state, research("hỏi gì đó"), "i2", 2).added, false, "the same prompt is not added twice");
+  assert.equal(Q.add(first.state, research("hỏi điều khác"), "i2", 2).added, true, "another prompt is another item");
+  assert.equal(Q.add(Q.emptyState(), research("  "), "i1", 1).item, null, "a prompt item needs a prompt");
+  assert.equal(Q.add(Q.emptyState(), Object.assign(research("x"), { kind: "other" }), "i1", 1).item, null, "an unknown kind");
+  assert.equal(Q.add(Q.emptyState(), described("b1"), "i1", 1).item.kind, "request");
+});
+
+test("what the page is told names the provider the item runs or ran on", () => {
+  let state = queueOf("b1");
+  assert.deepEqual(Q.describe(Q.find(state, "i0"), "grok"), {
+    item_id: "i0", path: "/v1/projects/p1/beats/b1/redo", project: "Dự án 1", status: "waiting", stage: "", provider: "grok", error: "", reply: "",
+  });
+  state = Q.fail(Q.start(state, "i0", "gemini"), "i0", "không đọc được", "trả lời");
+  const told = Q.describe(Q.find(state, "i0"), "grok");
+  assert.equal(told.provider, "gemini");
+  assert.equal(told.status, "failed");
+  assert.equal(told.error, "không đọc được");
+  assert.equal(told.reply, "trả lời");
+});
+
+test("an item stored without the provider fields gets their defaults", () => {
+  const state = Q.readState({ items: [{ id: "i1", status: "waiting", request: request("b1") }] });
+  assert.equal(state.items[0].provider, null);
+  assert.equal(state.items[0].kind, "request");
+  assert.equal(state.items[0].ranOn, "");
+});
+
+test("the answer of a prompt item is pasted as raw text with no external-AI header", async () => {
+  const fetchImpl = fakeFetch(reply(200, {}));
+  const out = await H.callExternal(fetchImpl, { gateway: "http://localhost:8080", method: "POST", path: "/v1/projects/p1/research/paste" }, "raw", "bảng dữ kiện");
+  assert.deepEqual(out, { ok: true });
+  assert.equal(fetchImpl.calls[0].url, "http://localhost:8080/v1/projects/p1/research/paste");
+  assert.equal(fetchImpl.calls[0].init.headers["X-External-AI"], undefined);
+  assert.deepEqual(JSON.parse(fetchImpl.calls[0].init.body), { raw: "bảng dữ kiện" });
+});

@@ -8,7 +8,7 @@
 </head>
 <body>
 <nav role="tablist" aria-label="Extension">
-  <button type="button" role="tab" id="tab-queue" aria-controls="panel-queue" aria-selected="true">Hàng đợi</button>
+  <button type="button" role="tab" id="tab-queue" aria-controls="panel-queue" aria-selected="true">Hàng đợi AI</button>
   <button type="button" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false">Cài đặt</button>
 </nav>
 <section id="panel-queue" role="tabpanel" aria-labelledby="tab-queue">
@@ -18,12 +18,13 @@
     <span id="summary" role="status"></span>
   </div>
   <ol id="items"></ol>
-  <p id="empty" class="hint">Chưa có mục nào. Ở ConceptFlow, bấm "Thêm vào hàng đợi" cạnh nút "Chạy bằng DeepSeek".</p>
+  <p id="empty" class="hint">Chưa có mục nào. Ở ConceptFlow, bấm "Thêm vào hàng đợi AI" ở bước muốn chạy bằng AI ngoài.</p>
 </section>
 <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
-  <p class="hint">Khi DeepSeek đổi giao diện, extension cần selector mới. Trang cài đặt đầy đủ cho phép sửa và kiểm tra từng selector trên tab DeepSeek.</p>
-  <button type="button" id="open-options" class="primary">Mở cài đặt selector</button>
+  <p class="hint">Nhà cung cấp mặc định và selector của DeepSeek, Gemini, Grok chỉnh ở trang cài đặt. Khi một trang AI đổi giao diện, extension cần selector mới; trang cài đặt cho phép sửa và kiểm tra từng selector trên tab của nhà cung cấp đó.</p>
+  <button type="button" id="open-options" class="primary">Mở cài đặt</button>
 </section>
+<script src="../providers.js"></script>
 <script src="../queue.js"></script>
 <script src="popup.js"></script>
 </body>

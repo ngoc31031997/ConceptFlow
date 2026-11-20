@@ -48,8 +48,6 @@
 
   /** Controls searched when a toggle is found by its label. */
   const CLICKABLE = 'button, [role="button"], [class*="button"]';
-  /** URL path of the sign-in page DeepSeek redirects to. */
-  const SIGN_IN_PATH = /sign_in|login/i;
 
   function defaults() {
     const out = {};
@@ -100,12 +98,12 @@
       thinking: raw.thinking,
       iconButton: raw.iconButton,
       clickable: CLICKABLE,
-      signInPath: SIGN_IN_PATH,
       invalid: invalid,
     };
   }
 
   const api = { STORAGE_KEY, FIELDS, defaults, resolve };
-  root.DeepSeekSelectors = api;
+  root.AiBridgeSelectors = root.AiBridgeSelectors || {};
+  root.AiBridgeSelectors.deepseek = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : self);

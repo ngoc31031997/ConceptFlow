@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ExternalAiDialog, type ExternalRedo } from "../ExternalAiDialog";
-import { ExternalRedoDeepSeek } from "../ExternalRedoDeepSeek";
+import { ExternalRedoQueued } from "../ExternalRedoQueued";
 import { Button, Dialog, FormField, TextArea } from "../ui";
 
 interface BeatAiDialogProps {
@@ -12,7 +12,7 @@ interface BeatAiDialogProps {
   modelSelect?: ReactNode;
   /** Runs the task on the system's AI; absent when no language model is configured. */
   onSystem?: (note: string) => void;
-  /** Runs the task through an AI outside the system or DeepSeek, with the note. */
+  /** Runs the task through an AI outside the system or the AI queue, with the note. */
   external: ExternalRedo;
   /** Adds an empty beat instead of asking an AI; the dialog closes after it. */
   onBlank?: () => void;
@@ -22,7 +22,7 @@ interface BeatAiDialogProps {
 /**
  * The dialog that sends one beat's AI task (write it, or add a beat after it)
  * to the engine the Creator picks in the footer: the system's AI, an AI
- * outside, or DeepSeek (docs/ux-ui-design-rules.md, rule 4). The note is
+ * outside, or the AI queue (docs/ux-ui-design-rules.md, rule 4). The note is
  * optional, since nothing written exists yet that it would have to correct.
  */
 export function BeatAiDialog({ open, onClose, title, modelSelect, onSystem, external, onBlank, testId }: BeatAiDialogProps) {
@@ -72,7 +72,8 @@ export function BeatAiDialog({ open, onClose, title, modelSelect, onSystem, exte
             >
               Dùng AI ngoài
             </Button>
-            <ExternalRedoDeepSeek
+            <ExternalRedoQueued
+              label={title}
               external={external}
               note={note.trim()}
               onClose={onClose}
@@ -80,7 +81,7 @@ export function BeatAiDialog({ open, onClose, title, modelSelect, onSystem, exte
                 setUnreadable({ reply, message });
                 setOutside(true);
               }}
-              testId={`${testId}-deepseek`}
+              testId={`${testId}-queue`}
             />
             {onSystem && (
               <Button

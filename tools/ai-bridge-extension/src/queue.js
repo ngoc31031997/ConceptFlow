@@ -1,12 +1,17 @@
 /**
- * The DeepSeek queue as it is kept in chrome.storage.local: items that run one
+ * The AI queue as it is kept in chrome.storage.local: items that run one
  * after another, each a plain HTTP request of ConceptFlow's API that the
- * service worker makes in the "prompt" and "paste" external-AI modes around a
- * run on DeepSeek. Every function takes a state and returns a new one, so the
- * service worker can read the state, change it and write it back after being
- * stopped and restarted, and node tests can check the rules.
+ * service worker makes around a run on a provider (DeepSeek, Gemini or Grok):
+ * the "prompt" and "paste" external-AI modes, or, for an item of kind "prompt",
+ * a prompt the page already holds and a paste of the answer as `{raw}`.
+ * An item names its provider, or null to run on the default at run time.
+ * Every function takes a state and returns a new one, so the service worker
+ * can read the state, change it and write it back after being stopped and
+ * restarted, and node tests can check the rules.
  */
 (function (root) {
+  const PR = root.AiBridgeProviders || (typeof require === "function" ? require("./providers.js") : null);
+  const KINDS = ["request", "prompt"];
   const STATUSES = ["waiting", "running", "done", "failed"];
 
   /** Statuses whose request still has work to do, so the same request is not added twice. */
@@ -19,11 +24,16 @@
   /** Reads the state stored earlier; anything that is not a queue gives an empty one. */
   function readState(raw) {
     if (!raw || typeof raw !== "object" || !Array.isArray(raw.items)) return emptyState();
-    return { items: raw.items.filter(isItem), paused: raw.paused === true };
+    return { items: raw.items.filter(isItem).map(withDefaults), paused: raw.paused === true };
   }
 
   function isItem(item) {
     return !!item && typeof item.id === "string" && STATUSES.indexOf(item.status) >= 0 && !!item.request;
+  }
+
+  /** An item stored without the provider fields gets their defaults. */
+  function withDefaults(item) {
+    return Object.assign({ provider: null, kind: "request", prompt: "", ranOn: "" }, item);
   }
 
   /**
@@ -43,17 +53,30 @@
     return a.gateway === b.gateway && a.method === b.method && a.path === b.path && (a.body || "") === (b.body || "");
   }
 
+  /** The provider id an item runs on: its own choice, else the default. */
+  function providerOf(item, defaultId) {
+    return PR.isId(item.provider) ? item.provider : defaultId;
+  }
+
   /**
-   * Adds an item the page described, as `{label, project, request, modes}`.
+   * Adds an item the page described, as `{label, project, request, modes, provider, kind, prompt}`
+   * (`provider` null or a provider id; `kind` "request" or "prompt", which needs a `prompt`).
    * Returns `{state, item, added}`; a request that is already waiting, running
    * or failed is not added again and `item` is the one that holds it. `item`
    * is null when the description is not valid.
    */
   function add(state, raw, id, now) {
+    const none = { state: state, item: null, added: false };
     const request = raw ? readRequest(raw.request) : null;
-    if (!request || typeof raw.label !== "string" || raw.label.trim() === "") return { state: state, item: null, added: false };
+    if (!request || typeof raw.label !== "string" || raw.label.trim() === "") return none;
+    const provider = raw.provider === undefined || raw.provider === null ? null : raw.provider;
+    if (provider !== null && !PR.isId(provider)) return none;
+    const kind = raw.kind === undefined ? "request" : raw.kind;
+    if (KINDS.indexOf(kind) < 0) return none;
+    const prompt = kind === "prompt" ? raw.prompt : "";
+    if (kind === "prompt" && (typeof prompt !== "string" || prompt.trim() === "")) return none;
     const same = state.items.find(function (it) {
-      return OPEN.indexOf(it.status) >= 0 && sameRequest(it.request, request);
+      return OPEN.indexOf(it.status) >= 0 && it.kind === kind && it.prompt === prompt && sameRequest(it.request, request);
     });
     if (same) return { state: state, item: same, added: false };
     const item = {
@@ -61,6 +84,10 @@
       label: raw.label.trim(),
       project: typeof raw.project === "string" ? raw.project : "",
       request: request,
+      provider: provider,
+      kind: kind,
+      prompt: prompt,
+      ranOn: "",
       modes: { deepThink: !raw.modes || raw.modes.deepThink !== false, search: !!(raw.modes && raw.modes.search === true) },
       status: "waiting",
       stage: "",
@@ -80,9 +107,11 @@
   }
 
   function find(state, id) {
-    return state.items.find(function (it) {
-      return it.id === id;
-    }) || null;
+    return (
+      state.items.find(function (it) {
+        return it.id === id;
+      }) || null
+    );
   }
 
   /**
@@ -96,8 +125,17 @@
     return state.items.find(function (it) { return it.status === "waiting"; }) || null;
   }
 
-  function start(state, id) {
-    return update(state, id, { status: "running", stage: "preparing", error: "", reply: "" });
+  /** `ranOn` is the id of the provider this run uses. */
+  function start(state, id, ranOn) {
+    return update(state, id, { status: "running", stage: "preparing", error: "", reply: "", ranOn: ranOn || "" });
+  }
+
+  /** Changes the provider of an item that is waiting or failed; null means the default. */
+  function setProvider(state, id, provider) {
+    const item = find(state, id);
+    if (!item || (item.status !== "waiting" && item.status !== "failed")) return state;
+    if (provider !== null && !PR.isId(provider)) return state;
+    return update(state, id, { provider: provider, ranOn: "" });
   }
 
   function setStage(state, id, stage) {
@@ -108,7 +146,7 @@
     return update(state, id, { status: "done", stage: "", error: "", reply: "" });
   }
 
-  /** `reply` is DeepSeek's answer when the server could not use it, kept so the Creator can fix it by hand. */
+  /** `reply` is the provider's answer when the server could not use it, kept so the Creator can fix it by hand. */
   function fail(state, id, error, reply) {
     return update(state, id, { status: "failed", stage: "", error: error, reply: reply || "" });
   }
@@ -116,7 +154,7 @@
   /** A failed item goes back to waiting; its request is made again from the start. */
   function retry(state, id) {
     const item = find(state, id);
-    return item && item.status === "failed" ? update(state, id, { status: "waiting", stage: "", error: "", reply: "" }) : state;
+    return item && item.status === "failed" ? update(state, id, { status: "waiting", stage: "", error: "", reply: "", ranOn: "" }) : state;
   }
 
   /** Removes an item that is not running. */
@@ -136,7 +174,7 @@
   }
 
   /**
-   * After the worker restarts: a running item whose DeepSeek run is gone
+   * After the worker restarts: a running item whose provider run is gone
    * (`keepId` is the item of the run still stored, or null) goes back to
    * waiting, so it is made again from the start.
    */
@@ -148,6 +186,23 @@
     });
   }
 
+  /**
+   * What the page is told about an item: where it stands and, in `provider`, the
+   * provider it runs or ran on (the default one while it has not started).
+   */
+  function describe(item, defaultId) {
+    return {
+      item_id: item.id,
+      path: item.request.path,
+      project: item.project,
+      status: item.status,
+      stage: item.stage,
+      provider: item.ranOn || providerOf(item, defaultId),
+      error: item.error,
+      reply: item.reply,
+    };
+  }
+
   /** The numbers the page shows on its queue button. */
   function counts(state) {
     const n = { waiting: 0, running: 0, done: 0, failed: 0 };
@@ -157,7 +212,7 @@
     return { waiting: n.waiting, running: n.running, done: n.done, failed: n.failed, paused: state.paused };
   }
 
-  const api = { STATUSES, emptyState, readState, readRequest, add, find, next, start, setStage, finish, fail, retry, drop, clear, setPaused, recover, counts };
+  const api = { STATUSES, KINDS, emptyState, readState, readRequest, add, find, providerOf, setProvider, describe, next, start, setStage, finish, fail, retry, drop, clear, setPaused, recover, counts };
   root.AiBridgeQueue = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : self);

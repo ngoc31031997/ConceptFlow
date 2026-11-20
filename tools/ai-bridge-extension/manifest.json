@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ConceptFlow AI Bridge",
-  "version": "1.4.0",
-  "description": "Gửi prompt từ ConceptFlow sang DeepSeek trên web, chờ câu trả lời rồi đưa về ConceptFlow.",
+  "version": "2.0.0",
+  "description": "Hàng đợi AI của ConceptFlow: chạy prompt trên DeepSeek, Gemini hoặc Grok (web), chờ câu trả lời rồi đưa về ConceptFlow.",
   "minimum_chrome_version": "111",
   "permissions": [
     "tabs",
@@ -10,6 +10,8 @@
   ],
   "host_permissions": [
     "https://chat.deepseek.com/*",
+    "https://gemini.google.com/*",
+    "https://grok.com/*",
     "http://localhost:8080/*",
     "http://127.0.0.1:8080/*"
   ],
@@ -23,6 +25,7 @@
         "http://127.0.0.1:3000/*"
       ],
       "js": [
+        "src/providers.js",
         "src/protocol.js",
         "src/bridge.js"
       ],
@@ -30,10 +33,12 @@
     },
     {
       "matches": [
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://gemini.google.com/*",
+        "https://grok.com/*"
       ],
       "js": [
-        "src/deepseek/clipboard-hook.js"
+        "src/adapter/clipboard-hook.js"
       ],
       "world": "MAIN",
       "run_at": "document_start"
@@ -43,10 +48,42 @@
         "https://chat.deepseek.com/*"
       ],
       "js": [
+        "src/providers.js",
         "src/protocol.js",
-        "src/deepseek/selectors.js",
-        "src/deepseek/answer.js",
-        "src/deepseek/adapter.js"
+        "src/adapter/answer.js",
+        "src/adapter/core.js",
+        "src/providers/deepseek/selectors.js",
+        "src/providers/deepseek/adapter.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "src/providers.js",
+        "src/protocol.js",
+        "src/adapter/answer.js",
+        "src/adapter/core.js",
+        "src/adapter/selector-kit.js",
+        "src/providers/gemini/selectors.js",
+        "src/providers/gemini/adapter.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://grok.com/*"
+      ],
+      "js": [
+        "src/providers.js",
+        "src/protocol.js",
+        "src/adapter/answer.js",
+        "src/adapter/core.js",
+        "src/adapter/selector-kit.js",
+        "src/providers/grok/selectors.js",
+        "src/providers/grok/adapter.js"
       ],
       "run_at": "document_idle"
     }
@@ -56,7 +93,7 @@
     "open_in_tab": true
   },
   "action": {
-    "default_title": "ConceptFlow AI Bridge · Hàng đợi DeepSeek",
+    "default_title": "ConceptFlow AI Bridge · Hàng đợi AI",
     "default_popup": "src/popup/popup.html"
   }
 }

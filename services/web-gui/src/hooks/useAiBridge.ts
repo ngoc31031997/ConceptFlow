@@ -1,83 +1,77 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-/** Tag every message of the page ↔ extension protocol carries (docs/contracts/ai-bridge-v1.md). */
+/** Tag every message of the page ↔ extension protocol carries (docs/contracts/ai-bridge-v2.md). */
 const BRIDGE_SOURCE = "conceptflow-ai-bridge";
-const BRIDGE_VERSION = 1;
-/** A run the extension has not acknowledged with a first progress message within this time failed to reach it. */
-const ACK_TIMEOUT_MS = 5000;
+const BRIDGE_VERSION = 2;
+/** The protocol of the extension before the queue became the only way to run; its pong marks an extension to update. */
+const LEGACY_VERSION = 1;
 
 /** The outside AI sites the extension can drive. */
-export type AiBridgeProvider = "deepseek";
+export type AiBridgeProvider = "deepseek" | "gemini" | "grok";
 
-/** Where a run stands, as the extension reports it. */
-export type AiBridgeStage = "opening" | "sending" | "answering" | "reading";
+/** Display names of the providers, for text that names the one an item runs on. */
+export const PROVIDER_NAMES: Record<AiBridgeProvider, string> = {
+  deepseek: "DeepSeek",
+  gemini: "Gemini",
+  grok: "Grok",
+};
 
-/** Which DeepSeek modes a run turns on. */
+/** The name to show for a provider id the extension reported; an unknown id is shown as is. */
+export function providerName(id: string): string {
+  return id in PROVIDER_NAMES ? PROVIDER_NAMES[id as AiBridgeProvider] : id;
+}
+
+/** Which DeepSeek modes an item turns on; the other providers ignore them. */
 export interface AiBridgeModes {
   deepThink: boolean;
   search: boolean;
 }
 
-/** How a run ended: the answer, or the reason it has none. */
-export type AiBridgeOutcome =
-  { ok: true; text: string } | { ok: false; cancelled: boolean; message: string };
-
 /** What the screen gets from useAiBridge. */
 export interface AiBridge {
   /** True once the extension has answered on this page. */
   available: boolean;
+  /** True when an extension answered with the old protocol: it has to be updated before it can run anything. */
+  outdated: boolean;
   /** Providers the installed extension supports. */
   providers: AiBridgeProvider[];
-  /** The stage of the run in progress, or null when nothing runs. */
-  stage: AiBridgeStage | null;
-  /** Sends the prompt to the provider and resolves with its answer or the error; never rejects. */
-  run: (
-    provider: AiBridgeProvider,
-    prompt: string,
-    modes: AiBridgeModes,
-  ) => Promise<AiBridgeOutcome>;
-  /** Stops waiting for the run in progress, which then resolves as cancelled. */
-  cancel: () => void;
+  /** The provider an item without its own choice runs on. */
+  defaultProvider: AiBridgeProvider | null;
 }
 
 export interface ExtensionMessage {
-  type: "pong" | "progress" | "result" | "error" | "queue_added" | "queue_state" | "queue_item_done";
+  type: "pong" | "error" | "queue_added" | "queue_state" | "queue_item";
   request_id?: string;
   item_id?: string;
   added?: boolean;
   path?: string;
+  project?: string;
+  status?: string;
+  stage?: string;
+  provider?: string;
+  error?: string;
+  reply?: string;
   waiting?: number;
   running?: number;
   done?: number;
   failed?: number;
   paused?: boolean;
   providers?: AiBridgeProvider[];
-  stage?: AiBridgeStage;
-  text?: string;
+  default_provider?: AiBridgeProvider;
   message?: string;
 }
 
-interface Pending {
-  requestId: string;
-  resolve: (outcome: AiBridgeOutcome) => void;
-  ackTimer: ReturnType<typeof setTimeout>;
+/** The message of an extension on this page, or null for anything else (other scripts, other origins, another protocol version). */
+export function readExtensionMessage(event: MessageEvent): ExtensionMessage | null {
+  const data = ownMessage(event, BRIDGE_VERSION);
+  return data as unknown as ExtensionMessage | null;
 }
 
-const NO_ACK =
-  "Extension không phản hồi. Tải lại trang hoặc kiểm tra extension đã bật trong chrome://extensions.";
-const UNKNOWN_ERROR = "Extension báo lỗi nhưng không nói lý do.";
-
-export function readExtensionMessage(event: MessageEvent): ExtensionMessage | null {
+function ownMessage(event: MessageEvent, version: number): Record<string, unknown> | null {
   if (event.source !== window || event.origin !== window.location.origin) return null;
   const data = event.data as Record<string, unknown> | null;
-  if (
-    !data ||
-    data.source !== BRIDGE_SOURCE ||
-    data.v !== BRIDGE_VERSION ||
-    data.from !== "extension"
-  )
-    return null;
-  return data as unknown as ExtensionMessage;
+  if (!data || data.source !== BRIDGE_SOURCE || data.v !== version || data.from !== "extension") return null;
+  return data;
 }
 
 export function post(fields: Record<string, unknown>) {
@@ -87,6 +81,24 @@ export function post(fields: Record<string, unknown>) {
   );
 }
 
+/**
+ * Pings in both protocol versions, so an extension that still speaks the old one
+ * (which ignores the new ping) answers and can be told to update.
+ */
+export function pingExtension() {
+  post({ type: "ping" });
+  window.postMessage(
+    { source: BRIDGE_SOURCE, v: LEGACY_VERSION, from: "page", type: "ping" },
+    window.location.origin,
+  );
+}
+
+/** True when this message is the pong of an extension with the old protocol. */
+export function isLegacyPong(event: MessageEvent): boolean {
+  const data = ownMessage(event, LEGACY_VERSION);
+  return data !== null && data.type === "pong";
+}
+
 export function newRequestId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -94,86 +106,33 @@ export function newRequestId(): string {
 }
 
 /**
- * Talks to the ConceptFlow AI Bridge browser extension (tools/ai-bridge-extension),
- * which runs a prompt on an outside AI website the Creator is signed in to and
- * brings the answer back. It pings on mount and is `available` once the
- * extension answers; without the extension nothing changes on the page.
- * One run at a time; messages for any other request id are ignored.
+ * Detects the ConceptFlow AI Bridge browser extension (tools/ai-bridge-extension),
+ * which runs prompts on the outside AI websites the Creator is signed in to. It
+ * pings on mount and is `available` once the extension answers; without the
+ * extension nothing changes on the page. Running is done through the queue
+ * (`useAiQueue`).
  */
 export function useAiBridge(): AiBridge {
   const [providers, setProviders] = useState<AiBridgeProvider[]>([]);
-  const [stage, setStage] = useState<AiBridgeStage | null>(null);
-  const pending = useRef<Pending | null>(null);
-
-  const finish = useCallback((outcome: AiBridgeOutcome) => {
-    const current = pending.current;
-    if (!current) return;
-    clearTimeout(current.ackTimer);
-    pending.current = null;
-    setStage(null);
-    current.resolve(outcome);
-  }, []);
+  const [defaultProvider, setDefaultProvider] = useState<AiBridgeProvider | null>(null);
+  const [outdated, setOutdated] = useState(false);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      const msg = readExtensionMessage(event);
-      if (!msg) return;
-      if (msg.type === "pong") {
-        setProviders(Array.isArray(msg.providers) ? msg.providers : []);
+      if (isLegacyPong(event)) {
+        setOutdated(true);
         return;
       }
-      const current = pending.current;
-      if (!current || msg.request_id !== current.requestId) return;
-      clearTimeout(current.ackTimer);
-      if (msg.type === "progress" && msg.stage) setStage(msg.stage);
-      else if (msg.type === "result") finish({ ok: true, text: msg.text ?? "" });
-      else if (msg.type === "error")
-        finish({ ok: false, cancelled: false, message: msg.message || UNKNOWN_ERROR });
+      const msg = readExtensionMessage(event);
+      if (!msg || msg.type !== "pong") return;
+      setProviders(Array.isArray(msg.providers) ? msg.providers : []);
+      setDefaultProvider(msg.default_provider ?? null);
+      setOutdated(false);
     }
     window.addEventListener("message", onMessage);
-    post({ type: "ping" });
-    return () => {
-      window.removeEventListener("message", onMessage);
-      const current = pending.current;
-      if (current) {
-        clearTimeout(current.ackTimer);
-        post({ type: "cancel", request_id: current.requestId });
-        pending.current = null;
-      }
-    };
-  }, [finish]);
+    pingExtension();
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
-  const run = useCallback(
-    (provider: AiBridgeProvider, prompt: string, modes: AiBridgeModes) =>
-      new Promise<AiBridgeOutcome>((resolve) => {
-        if (pending.current) {
-          resolve({ ok: false, cancelled: false, message: "Đang có một lượt chạy khác." });
-          return;
-        }
-        const requestId = newRequestId();
-        const ackTimer = setTimeout(
-          () => finish({ ok: false, cancelled: false, message: NO_ACK }),
-          ACK_TIMEOUT_MS,
-        );
-        pending.current = { requestId, resolve, ackTimer };
-        setStage("opening");
-        post({
-          type: "run",
-          request_id: requestId,
-          provider,
-          prompt,
-          modes: { deep_think: modes.deepThink, search: modes.search },
-        });
-      }),
-    [finish],
-  );
-
-  const cancel = useCallback(() => {
-    const current = pending.current;
-    if (!current) return;
-    post({ type: "cancel", request_id: current.requestId });
-    finish({ ok: false, cancelled: true, message: "" });
-  }, [finish]);
-
-  return { available: providers.length > 0, providers, stage, run, cancel };
+  return { available: providers.length > 0, outdated, providers, defaultProvider };
 }

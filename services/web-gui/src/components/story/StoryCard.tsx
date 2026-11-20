@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { generateStory, type StoryFieldKey, type StoryPatch, type StoryState } from "../../api/client";
-import { useDeepSeekRun } from "../../hooks/useDeepSeekRun";
+import { useQueuedExternalRun } from "../../hooks/useQueuedExternalRun";
 import type { StoryControls } from "../../hooks/useStory";
 import { AiBridgeRunStatus } from "../AiBridgeRunStatus";
 import { AiModelSelect } from "../AiModelSelect";
@@ -28,11 +28,11 @@ interface StoryCardProps {
   onRedo: () => void;
 }
 
-type Engine = "system" | "deepseek" | "outside";
+type Engine = "system" | "queue" | "outside";
 
 const ENGINES: { id: Engine; label: string }[] = [
   { id: "system", label: "AI hệ thống" },
-  { id: "deepseek", label: "DeepSeek" },
+  { id: "queue", label: "Hàng đợi AI" },
   { id: "outside", label: "AI ngoài" },
 ];
 
@@ -64,9 +64,10 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
   const [inputOpen, setInputOpen] = useState(false);
   const [inputLoading, setInputLoading] = useState(false);
   const [outside, setOutside] = useState(false);
-  // DeepSeek's answer the step could not read, shown in the outside-AI dialog for the Creator to fix.
+  // An answer the step could not read, shown in the outside-AI dialog for the Creator to fix.
   const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
-  const deepSeek = useDeepSeekRun({
+  const queued = useQueuedExternalRun({
+    label: "Viết câu chuyện",
     run: (external) => generateStory(projectId, "", { external }),
     onDone: story.reload,
     onUnreadable: (reply, message) => {
@@ -75,12 +76,12 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
     },
   });
   const [pickedEngine, setPickedEngine] = useState<Engine | null>(null);
-  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, deepseek: deepSeek.available, outside: true };
+  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, queue: queued.available, outside: true };
   // The Creator's pick, or the first engine that can run when that one cannot.
   const engine: Engine = pickedEngine && engineAvailable[pickedEngine] ? pickedEngine : (ENGINES.find((e) => engineAvailable[e.id])?.id ?? "outside");
   const s = state.story;
   const open = state.briefApproved && state.researchResolved;
-  const busy = locked || story.busy || story.writing || deepSeek.busy;
+  const busy = locked || story.busy || story.writing || queued.busy;
   const owns = (key: StoryFieldKey) => s?.creatorFields.includes(key) ?? false;
   const approved = s?.status === "approved";
 
@@ -103,7 +104,7 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
 
   function generate() {
     if (engine === "system") void story.generate("");
-    else if (engine === "deepseek") void deepSeek.start();
+    else if (engine === "queue") void queued.start();
     else {
       setUnreadable(null);
       setOutside(true);
@@ -216,7 +217,7 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
                   Sinh bằng
                 </span>
                 <div className={styles.seg} role="radiogroup" aria-labelledby="story-engine-label">
-                  {ENGINES.filter((e) => e.id !== "deepseek" || deepSeek.available).map((e) => (
+                  {ENGINES.filter((e) => e.id !== "queue" || queued.available).map((e) => (
                     <button
                       key={e.id}
                       type="button"
@@ -236,20 +237,20 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
                   <AiModelSelect projectId={projectId} step="story_frame" label="Model AI cho bước Câu chuyện" testId="story-model" />
                 )}
                 <span className={researchStyles.grow} />
-                {deepSeek.stage !== null ? (
-                  <AiBridgeRunStatus stage={deepSeek.stage} modes={deepSeek.modes} onCancel={deepSeek.cancel} testId="story-generate-deepseek" />
+                {queued.busy ? (
+                  <AiBridgeRunStatus item={queued.item} ahead={queued.ahead} onCancel={queued.cancel} testId="story-generate-queue" />
                 ) : (
                   <Button variant="run" onClick={generate} disabled={busy} data-testid="story-generate">
-                    {deepSeek.busy ? "Đang chạy…" : "Viết câu chuyện"}
+                    Viết câu chuyện
                   </Button>
                 )}
               </>
             )}
           </div>
         )}
-        {deepSeek.error && (
-          <p className={researchStyles.error} role="alert" data-testid="story-generate-deepseek-error">
-            {deepSeek.error}
+        {queued.error && (
+          <p className={researchStyles.error} role="alert" data-testid="story-generate-queue-error">
+            {queued.error}
           </p>
         )}
         {story.actionError && (

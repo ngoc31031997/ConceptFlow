@@ -3,7 +3,7 @@ import { generateResearchQuestions, type QuestionCoverage, type ResearchBrief, t
 import type { OperationRun } from "../../hooks/useOperationRun";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
-import { useDeepSeekRun } from "../../hooks/useDeepSeekRun";
+import { useQueuedExternalRun } from "../../hooks/useQueuedExternalRun";
 import { AiBridgeRunStatus } from "../AiBridgeRunStatus";
 import { ExternalAiDialog } from "../ExternalAiDialog";
 import { Button, Card, TextInput } from "../ui";
@@ -87,11 +87,11 @@ function QuestionRow({ question, coverage, checking, disabled, onSave, onDelete 
   );
 }
 
-type Engine = "system" | "deepseek" | "outside";
+type Engine = "system" | "queue" | "outside";
 
 const ENGINES: { id: Engine; label: string }[] = [
   { id: "system", label: "AI hệ thống" },
-  { id: "deepseek", label: "DeepSeek" },
+  { id: "queue", label: "Hàng đợi AI" },
   { id: "outside", label: "AI ngoài" },
 ];
 
@@ -125,7 +125,7 @@ interface QuestionsCardProps {
  * it is sourced. The AI writes them from the brief and nobody approves them;
  * every question is a field the Creator edits, deletes (after a confirmation)
  * or adds to. One button generates them on the engine picked beside it: the
- * system's AI, DeepSeek or an AI outside. Regenerating keeps the questions the
+ * system's AI, the AI queue or an AI outside. Regenerating keeps the questions the
  * Creator wrote, unless they agree to replace those too.
  */
 export function QuestionsCard({
@@ -150,23 +150,24 @@ export function QuestionsCard({
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<ResearchQuestion | null>(null);
   // Regenerating while the Creator has questions of their own asks first, for the system's AI or an AI outside.
-  const [regenerating, setRegenerating] = useState<"system" | "outside" | "deepseek" | null>(null);
+  const [regenerating, setRegenerating] = useState<"system" | "outside" | "queue" | null>(null);
   // The dialog of the AI outside the system; the value is whether it replaces the Creator's own questions.
   const [outside, setOutside] = useState<boolean | null>(null);
-  // DeepSeek's answer the step could not read, shown in that dialog for the Creator to fix.
+  // An answer the step could not read, shown in that dialog for the Creator to fix.
   const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
-  // Whether the DeepSeek run in progress replaces the Creator's own questions.
-  const deepSeekReplace = useRef(false);
-  const deepSeek = useDeepSeekRun({
-    run: (external) => generateResearchQuestions(projectId, { replaceEdited: deepSeekReplace.current }, { external }),
+  // Whether the queued run in progress replaces the Creator's own questions.
+  const queuedReplace = useRef(false);
+  const queued = useQueuedExternalRun({
+    label: "Sinh câu hỏi tra cứu",
+    run: (external) => generateResearchQuestions(projectId, { replaceEdited: queuedReplace.current }, { external }),
     onDone: onReloadInput,
     onUnreadable: (reply, message) => {
       setUnreadable({ reply, message });
-      setOutside(deepSeekReplace.current);
+      setOutside(queuedReplace.current);
     },
   });
   const [pickedEngine, setPickedEngine] = useState<Engine | null>(null);
-  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, deepseek: deepSeek.available, outside: true };
+  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, queue: queued.available, outside: true };
   // The Creator's pick, or the first engine that can run when that one cannot.
   const engine: Engine = pickedEngine && engineAvailable[pickedEngine] ? pickedEngine : (ENGINES.find((e) => engineAvailable[e.id])?.id ?? "outside");
   // The dialog that shows what the AI reads.
@@ -200,21 +201,21 @@ export function QuestionsCard({
     setOutside(replaceEdited);
   }
 
-  function startDeepSeek(replaceEdited: boolean) {
-    deepSeekReplace.current = replaceEdited;
-    void deepSeek.start();
+  function startQueued(replaceEdited: boolean) {
+    queuedReplace.current = replaceEdited;
+    void queued.start();
   }
 
-  function startGenerate(via: "system" | "outside" | "deepseek") {
+  function startGenerate(via: "system" | "outside" | "queue") {
     if (mine.length > 0) setRegenerating(via);
     else if (via === "system") void onGenerate(false);
     else if (via === "outside") startOutside(false);
-    else startDeepSeek(false);
+    else startQueued(false);
   }
 
   function chooseGenerate(replaceEdited: boolean) {
     if (regenerating === "outside") startOutside(replaceEdited);
-    else if (regenerating === "deepseek") startDeepSeek(replaceEdited);
+    else if (regenerating === "queue") startQueued(replaceEdited);
     else void onGenerate(replaceEdited);
   }
 
@@ -289,7 +290,7 @@ export function QuestionsCard({
             Sinh bằng
           </span>
           <div className={styles.seg} role="radiogroup" aria-labelledby="question-engine-label">
-            {ENGINES.filter((e) => e.id !== "deepseek" || deepSeek.available).map((e) => (
+            {ENGINES.filter((e) => e.id !== "queue" || queued.available).map((e) => (
               <button
                 key={e.id}
                 type="button"
@@ -297,7 +298,7 @@ export function QuestionsCard({
                 aria-checked={engine === e.id}
                 className={engine === e.id ? `${styles.segItem} ${styles.segOn}` : styles.segItem}
                 onClick={() => setPickedEngine(e.id)}
-                disabled={locked || running || deepSeek.busy || !engineAvailable[e.id]}
+                disabled={locked || running || queued.busy || !engineAvailable[e.id]}
                 title={engineAvailable[e.id] ? undefined : "Chưa cấu hình AI"}
                 data-testid={`question-engine-${e.id}`}
               >
@@ -309,23 +310,23 @@ export function QuestionsCard({
             <AiModelSelect projectId={projectId} step="research" label="Model AI sinh câu hỏi" testId="research-model" />
           )}
           <span className={styles.grow} />
-          {deepSeek.stage !== null ? (
-            <AiBridgeRunStatus stage={deepSeek.stage} modes={deepSeek.modes} onCancel={deepSeek.cancel} testId="question-generate-deepseek" />
+          {queued.busy ? (
+            <AiBridgeRunStatus item={queued.item} ahead={queued.ahead} onCancel={queued.cancel} testId="question-generate-queue" />
           ) : (
             <Button
               variant={mine.length > 0 && questions.length > 0 ? "impact" : "run"}
               className={styles.sm}
               onClick={() => startGenerate(engine)}
-              disabled={locked || running || deepSeek.busy}
+              disabled={locked || running}
               data-testid="question-generate"
             >
-              {deepSeek.busy ? "Đang chạy…" : generateLabel}
+              {generateLabel}
             </Button>
           )}
         </div>
-        {deepSeek.error && (
-          <p className={styles.error} role="alert" data-testid="question-generate-deepseek-error">
-            {deepSeek.error}
+        {queued.error && (
+          <p className={styles.error} role="alert" data-testid="question-generate-queue-error">
+            {queued.error}
           </p>
         )}
         <AiOperationCard run={run} active={running} testId="research-progress" title="AI đang sinh câu hỏi" />
