@@ -6,7 +6,7 @@ import {
   type StoryboardAsset,
   type StoryboardState,
 } from "../../api/client";
-import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import type { StoryboardControls } from "../../hooks/useStoryboard";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, FormField, TextArea } from "../ui";
@@ -33,7 +33,7 @@ interface StoryboardAssetDetailCardProps {
 /**
  * The second phase of the asset list: writing the detail of each asset the list named.
  * One run on the system's AI writes every asset without detail, one turn per asset; the
- * same work can be queued on DeepSeek through the extension, one item per asset without
+ * same work can be queued on DeepSeek, Gemini or Grok through the extension, one item per asset without
  * detail. One asset's detail is written from its own card.
  */
 export function StoryboardAssetDetailCard({
@@ -46,7 +46,7 @@ export function StoryboardAssetDetailCard({
   const [note, setNote] = useState("");
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/storyboard`)) void storyboard.reload();
   });
   const missing = assetsWithoutDetail(state);
@@ -79,7 +79,7 @@ export function StoryboardAssetDetailCard({
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} tài sản vào hàng đợi DeepSeek${already > 0 ? `, ${already} tài sản đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi tài sản một prompt; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} tài sản vào hàng đợi AI${already > 0 ? `, ${already} tài sản đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi tài sản một prompt; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({
@@ -119,7 +119,7 @@ export function StoryboardAssetDetailCard({
               disabled={disabled || queueing}
               data-testid="sb-detail-queue"
             >
-              Chạy tất cả bằng DeepSeek ({missing.length})
+              Chạy tất cả qua hàng đợi AI ({missing.length})
             </Button>
           )}
         </div>
@@ -135,7 +135,7 @@ export function StoryboardAssetDetailCard({
         {queue.counts &&
           (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
             <p className={researchStyles.hint} data-testid="sb-detail-queue-counts">
-              Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
+              Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
               {queue.counts.failed} lỗi
               {queue.counts.paused ? " · đang tạm dừng" : ""}.
             </p>

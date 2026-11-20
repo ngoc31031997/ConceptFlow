@@ -17,8 +17,8 @@ import type { Project } from "../../src/types";
 const queueAdd = vi.fn();
 let queueAvailable = true;
 
-vi.mock("../../src/hooks/useDeepSeekQueue", () => ({
-  useDeepSeekQueue: () => ({
+vi.mock("../../src/hooks/useAiQueue", () => ({
+  useAiQueue: () => ({
     available: queueAvailable,
     counts: { waiting: 2, running: 1, done: 0, failed: 0, paused: false },
     add: queueAdd,
@@ -283,7 +283,7 @@ describe("StoryboardStepPage", () => {
     );
   });
 
-  it("queues one DeepSeek item per unit not approved, in sequence order, and shows the queue counts", async () => {
+  it("queues one AI item per unit not approved, in sequence order, and shows the queue counts", async () => {
     state = baseState({
       assets: allApprovedAssets(),
     });
@@ -295,7 +295,7 @@ describe("StoryboardStepPage", () => {
     renderPage();
     expect(await screen.findByTestId("sb-queue-counts")).toHaveTextContent("1 đang chạy · 2 chờ · 0 lỗi");
     const button = screen.getByTestId("sb-queue");
-    expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (3)");
+    expect(button).toHaveTextContent("Chạy tất cả qua hàng đợi AI (3)");
     fireEvent.click(button);
     await waitFor(() => expect(queueAdd).toHaveBeenCalledTimes(3));
     expect(queueAdd.mock.calls.map((c) => c[0].label)).toEqual([
@@ -305,7 +305,7 @@ describe("StoryboardStepPage", () => {
     ]);
     expect(describe.mock.calls.map((c) => c[1])).toEqual(["VP-002", "VP-003", "VP-004"]);
     expect(describe.mock.calls.every((c) => (c[3] as { external: { mode: string } }).external.mode === "describe")).toBe(true);
-    expect(await screen.findByTestId("sb-queue-note")).toHaveTextContent("Đã thêm 3 unit vào hàng đợi DeepSeek");
+    expect(await screen.findByTestId("sb-queue-note")).toHaveTextContent("Đã thêm 3 unit vào hàng đợi AI");
   });
 
   it("stops queueing at the unit the extension refuses and says which one", async () => {
@@ -322,7 +322,7 @@ describe("StoryboardStepPage", () => {
     expect(queueAdd).toHaveBeenCalledTimes(2);
   });
 
-  it("hides the DeepSeek queue button when the extension has no queue", async () => {
+  it("hides the AI queue button when the extension has no queue", async () => {
     queueAvailable = false;
     renderPage();
     await screen.findByTestId("sb-run");
@@ -546,7 +546,7 @@ describe("StoryboardStepPage", () => {
         expect(screen.queryByTestId("sb-detail-queue")).toBeNull();
       });
 
-      it("queues one DeepSeek item per asset without detail, in list order, and shows the queue counts", async () => {
+      it("queues one AI item per asset without detail, in list order, and shows the queue counts", async () => {
         state = withoutDetail(["AST-OBSERVER-001", "AST-DISK-001"]);
         const request = { gateway: "http://gw", method: "POST", path: "/v1/projects/p1/storyboard/assets/AST-OBSERVER-001/detail", body: "{}" };
         const describe = vi
@@ -556,7 +556,7 @@ describe("StoryboardStepPage", () => {
         renderPage();
         expect(await screen.findByTestId("sb-detail-queue-counts")).toHaveTextContent("1 đang chạy · 2 chờ · 0 lỗi");
         const button = screen.getByTestId("sb-detail-queue");
-        expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (2)");
+        expect(button).toHaveTextContent("Chạy tất cả qua hàng đợi AI (2)");
         fireEvent.click(button);
         await waitFor(() => expect(queueAdd).toHaveBeenCalledTimes(2));
         expect(queueAdd.mock.calls.map((c) => c[0].label)).toEqual([
@@ -565,7 +565,7 @@ describe("StoryboardStepPage", () => {
         ]);
         expect(describe.mock.calls.map((c) => c[1])).toEqual(["AST-OBSERVER-001", "AST-DISK-001"]);
         expect(describe.mock.calls.every((c) => (c[3] as { external: { mode: string } }).external.mode === "describe")).toBe(true);
-        expect(await screen.findByTestId("sb-detail-queue-note")).toHaveTextContent("Đã thêm 2 tài sản vào hàng đợi DeepSeek");
+        expect(await screen.findByTestId("sb-detail-queue-note")).toHaveTextContent("Đã thêm 2 tài sản vào hàng đợi AI");
       });
 
       it("stops queueing at the asset the extension refuses and says which one", async () => {
@@ -579,7 +579,7 @@ describe("StoryboardStepPage", () => {
         expect(await screen.findByTestId("sb-detail-queue-note")).toHaveTextContent("Dừng ở tài sản 2/2: Extension không phản hồi");
       });
 
-      it("hides the DeepSeek button when the extension has no queue", async () => {
+      it("hides the AI button when the extension has no queue", async () => {
         state = withoutDetail(["AST-DISK-001"]);
         queueAvailable = false;
         renderPage();

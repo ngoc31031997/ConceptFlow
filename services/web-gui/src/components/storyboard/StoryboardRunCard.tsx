@@ -6,7 +6,7 @@ import {
   type StoryboardState,
   type StoryboardUnit,
 } from "../../api/client";
-import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import type { StoryboardControls } from "../../hooks/useStoryboard";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, Dropdown, FormField, TextArea } from "../ui";
@@ -33,7 +33,7 @@ interface StoryboardRunCardProps {
 /**
  * "Chạy AI" of step 11: the model the step runs on, the run that writes the
  * shots of every unit with none in sequence order on the system's AI, and the
- * same work queued on DeepSeek through the extension, one item per unit not
+ * same work queued on DeepSeek, Gemini or Grok through the extension, one item per unit not
  * approved yet. Drawing assets and frames runs on the system and is not queued.
  */
 export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: StoryboardRunCardProps) {
@@ -41,7 +41,7 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
   const [note, setNote] = useState("");
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/storyboard`)) void storyboard.reload();
   });
   const toWrite = unitsToWrite(state);
@@ -83,7 +83,7 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} unit vào hàng đợi DeepSeek${already > 0 ? `, ${already} unit đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi unit một prompt và đọc shot của unit liền trước; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} unit vào hàng đợi AI${already > 0 ? `, ${already} unit đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi unit một prompt và đọc shot của unit liền trước; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({
@@ -132,7 +132,7 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
               title={blocker || undefined}
               data-testid="sb-queue"
             >
-              Chạy tất cả bằng DeepSeek ({toWrite.length})
+              Chạy tất cả qua hàng đợi AI ({toWrite.length})
             </Button>
           )}
         </div>
@@ -148,7 +148,7 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
         {queue.counts &&
           (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
             <p className={researchStyles.hint} data-testid="sb-queue-counts">
-              Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
+              Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ ·{" "}
               {queue.counts.failed} lỗi
               {queue.counts.paused ? " · đang tạm dừng" : ""}.
             </p>
@@ -160,7 +160,7 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
         )}
         <p className={researchStyles.hint}>
           Vẽ tài sản và dựng khung chạy trên hệ thống (bộ vẽ AI và Remotion), không đi qua AI ngoài.
-          Chỉ các lượt AI viết chữ (lập tài sản, viết shot, rà soát) dùng được AI ngoài và DeepSeek.
+          Chỉ các lượt AI viết chữ (lập tài sản, viết shot, rà soát) dùng được AI ngoài và hàng đợi AI.
         </p>
       </div>
 
