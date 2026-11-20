@@ -126,7 +126,7 @@ func TestParsePlanReviewReply_AcceptsOnlyUnitsAndFieldsOfThePlan(t *testing.T) {
 
 func TestPlanSystemPromptsShipWithTheConceptOnes(t *testing.T) {
 	ps := SystemPrompts()
-	if len(ps) != 15 || ps[10].Role != "visual_plan_beat" || ps[11].Role != "visual_plan_review" {
+	if len(ps) != 19 || ps[10].Role != "visual_plan_beat" || ps[11].Role != "visual_plan_review" {
 		t.Fatalf("%d prompts", len(ps))
 	}
 	for _, p := range ps[10:12] {

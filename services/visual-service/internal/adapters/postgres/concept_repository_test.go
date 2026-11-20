@@ -60,21 +60,25 @@ func TestConceptRepository(t *testing.T) {
 	if err := repo.SetPicks(ctx, p, []string{r1, "TEST112B-none"}); !errors.Is(err, domain.ErrUnknownReference) {
 		t.Errorf("unknown: %v", err)
 	}
-	if err := repo.SetPicks(ctx, p, []string{r2, r1}); err != nil {
+	if err := repo.SetPicks(ctx, p, []string{r2, r1}); err == nil {
+		t.Fatal("a video picks one style: the unique index must refuse two")
+	}
+	if err := repo.SetPicks(ctx, p, []string{r2}); err != nil {
 		t.Fatal(err)
 	}
 	picked, _ := repo.PickedReferences(ctx, p)
-	if len(picked) != 2 || picked[0].ID != r2 || picked[0].Tags[0] != "a" || picked[0].Intent != "d" || picked[0].Drawing.Shape != "" || picked[0].Avoid == nil || picked[0].CoreRules == nil {
+	if len(picked) != 1 || picked[0].ID != r2 || picked[0].Tags[0] != "a" || picked[0].Intent != "d" || picked[0].Drawing.Shape != "" || picked[0].Avoid == nil || picked[0].CoreRules == nil {
 		t.Errorf("picks in library order: %+v", picked)
-	}
-	if picked[1].Drawing.Shape != "tròn" || picked[1].Drawing.Light != "a" || picked[1].Composition.Layering != "ba lớp" || picked[1].Composition.OptionalDevices[0] != "inset" || picked[1].Avoid[0] != "sharp corners" || picked[1].Source.URL != "u" {
-		t.Errorf("detail read: %+v", picked[1])
 	}
 	if err := repo.SetPicks(ctx, p, []string{r1}); err != nil {
 		t.Fatal(err)
 	}
-	if picked, _ = repo.PickedReferences(ctx, p); len(picked) != 1 {
-		t.Error("picks are replaced")
+	picked, _ = repo.PickedReferences(ctx, p)
+	if len(picked) != 1 || picked[0].ID != r1 {
+		t.Fatalf("picks are replaced: %+v", picked)
+	}
+	if picked[0].Drawing.Shape != "tròn" || picked[0].Drawing.Light != "a" || picked[0].Composition.Layering != "ba lớp" || picked[0].Composition.OptionalDevices[0] != "inset" || picked[0].Avoid[0] != "sharp corners" || picked[0].Source.URL != "u" {
+		t.Errorf("detail read: %+v", picked[0])
 	}
 
 	at := time.Now().UTC().Truncate(time.Second)

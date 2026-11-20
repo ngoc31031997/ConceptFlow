@@ -22,6 +22,9 @@ type MachineCheck struct {
 	Label  string `json:"label"`
 	OK     bool   `json:"ok"`
 	Detail string `json:"detail"`
+	// Items are the individual failures behind Detail, one per unit, shot or
+	// asset, so a summary can count and name them without parsing Detail.
+	Items []string `json:"items,omitempty"`
 }
 
 // Parts are the decoded parts of a concept that exist.

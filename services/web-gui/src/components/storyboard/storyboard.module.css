@@ -1,0 +1,279 @@
+/* Step 11 "Storyboard": asset cards, shot cards with their frame, the grid of the whole film. */
+
+.grid {
+  display: grid;
+  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: var(--space-sm);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.cardStale {
+  outline: 3px dashed var(--warning);
+  outline-offset: -3px;
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.cardHead h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: #1b2142;
+  object-fit: contain;
+}
+
+.thumbSquare {
+  aspect-ratio: 1 / 1;
+}
+
+.thumbStale {
+  outline: 3px dashed var(--warning);
+  outline-offset: -3px;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  padding: var(--space-xs);
+  text-align: center;
+  color: #f5f0e6;
+  font-size: 12px;
+}
+
+.placeholderError {
+  background: var(--danger-soft);
+  color: var(--ink);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.kv dt {
+  color: var(--ink-soft);
+}
+
+.kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag {
+  padding: 1px 8px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 99px;
+  background: var(--card);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.tagBad {
+  background: var(--danger-soft);
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.folded {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.summary {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.noticeWarn {
+  background: var(--warn-soft);
+}
+
+.noticeBad {
+  background: var(--danger-soft);
+}
+
+.noticeList {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.libRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.libRow select {
+  max-width: 100%;
+}
+
+.beat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.beatHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: var(--border-w) solid var(--border-color);
+}
+
+.beatTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.unit {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin-left: 4px;
+  padding-left: 12px;
+  border-left: var(--border-w) solid var(--border-color);
+}
+
+.unitHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.unitTitle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.sheet {
+  display: grid;
+  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.sheetItem {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheetItem:focus-visible {
+  outline: 3px solid var(--run);
+  outline-offset: 2px;
+}
+
+.checks {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.checks label {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  font-size: 13px;
+}
+
+.sticky {
+  position: sticky;
+  top: var(--space-xs);
+  z-index: 5;
+  box-shadow: var(--shadow-sm);
+}
+
+.versions {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.blockerList {
+  min-width: 0;
+  margin: 4px 0;
+  padding-left: 20px;
+  overflow-wrap: anywhere;
+}

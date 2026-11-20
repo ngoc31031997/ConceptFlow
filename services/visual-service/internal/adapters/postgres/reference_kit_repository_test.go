@@ -17,7 +17,7 @@ func TestReferenceStyles_KitRoundTripAndProjectKit(t *testing.T) {
 	if _, _, err := repo.ProjectKit(ctx, project); !errors.Is(err, application.ErrNoReferencePicked) {
 		t.Fatalf("no pick: err %v", err)
 	}
-	plain, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{StyleName: referenceTestPrefix + "-nokit", Intent: "d"})
+	plain, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{StyleName: referenceTestPrefix + "-nokit", Intent: "d", Tags: []string{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestReferenceStyles_KitRoundTripAndProjectKit(t *testing.T) {
 		t.Fatalf("style without kit: %+v, %v", kit, err)
 	}
 	withKit, err := repo.CreateReferenceStyle(ctx, domain.ReferenceStyleInput{
-		StyleName: referenceTestPrefix + "-kit", Intent: "d", Kit: &domain.ReferenceKit{Ink: "#112233", Grain: 0.25},
+		StyleName: referenceTestPrefix + "-kit", Intent: "d", Tags: []string{}, Kit: &domain.ReferenceKit{Ink: "#112233", Grain: 0.25},
 	})
 	if err != nil {
 		t.Fatal(err)

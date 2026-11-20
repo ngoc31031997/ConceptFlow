@@ -20,9 +20,9 @@ import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useVisualSequence, type SequenceNotOpen } from "../hooks/useVisualSequence";
 import {
   VIEW_VISUAL_SEQUENCE,
-  comingRoute,
   lockRoute,
   readOnlyReason,
+  storyboardRoute,
   visualConceptRoute,
   visualPlanRoute,
 } from "../utils/flow";
@@ -276,7 +276,7 @@ export function VisualSequenceStepPage() {
               : "Chốt chuỗi hình để sang Storyboard."
         }
         onBack={() => navigate(visualPlanRoute(projectId))}
-        onNext={() => navigate(comingRoute(VIEW_VISUAL_SEQUENCE + 1, projectId))}
+        onNext={() => navigate(storyboardRoute(projectId))}
         nextDisabled={!state || state.locked_version === 0}
         nextLabel="Sang Storyboard"
         nextTestId="seq-next"

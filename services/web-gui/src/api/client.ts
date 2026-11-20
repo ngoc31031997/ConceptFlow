@@ -4133,3 +4133,367 @@ export function lockVisualSequence(projectId: string, note: string): Promise<Vis
 export function getVisualSequenceVersion(projectId: string, version: number): Promise<SequenceVersion> {
   return apiFetch<SequenceVersion>(`${visualSequencePath(projectId)}/versions/${version}`);
 }
+
+// --- Step 11 · Storyboard (visual-service, docs/contracts/storyboard-v1.md) ---
+
+/** What an asset is: a figure placed in a frame, or a backdrop behind it. */
+export type StoryboardAssetKind = "figure" | "backdrop";
+
+/** How much detail an asset is drawn with and how large it is placed. */
+export type StoryboardAssetTier = "hero" | "support" | "background";
+
+/** Where an asset stands: described, drawn, or approved for use in shots. */
+export type StoryboardAssetStatus = "planned" | "drawn" | "approved";
+
+/** One asset of the video as rendering holds it, with its place in the Creator's list and the shots using it. */
+export interface StoryboardAsset {
+  asset_id: string;
+  concept_id: string;
+  name: string;
+  kind: StoryboardAssetKind;
+  tier: StoryboardAssetTier;
+  portrayal: string;
+  must_not_imply: string[];
+  palette_tokens: string[];
+  expressions: string[];
+  /** The library illustration the AI starts from; "" for none. */
+  base_illustration_id: string;
+  /** The plan units (VP ids) the asset appears in; the Creator can edit them. */
+  units: string[];
+  /** Whether the asset has its detail (a portrayal); it cannot be drawn before. */
+  has_detail: boolean;
+  version: number;
+  /** Where the preview PNG is; "" until the asset is drawn. */
+  preview_path: string;
+  status: StoryboardAssetStatus;
+  /** Whether approving also puts the drawing in the illustration library. */
+  to_library: boolean;
+  /** The library folder it goes to; "" is the system folder "Từ dự án". */
+  library_folder_id: string;
+  library_illustration_id: string;
+  warnings: { message: string; line: number | null }[];
+  /** Whether the Creator approved the list with this asset in it. */
+  list_status: string;
+  creator_fields: string[];
+  /** The shots that use the asset. */
+  used_by: string[];
+}
+
+/** The closed positions of a subject or main object in a frame. */
+export const SHOT_POSITIONS = [
+  "upper_left", "upper_center", "upper_right",
+  "center_left", "center", "center_right",
+  "lower_left", "lower_center", "lower_right",
+  "split_left", "split_right", "full",
+] as const;
+
+/** The closed camera views of a shot. */
+export const SHOT_CAMERA_VIEWS = ["wide", "medium", "close", "comparison"] as const;
+
+/** What is where in a frame; the positions and the camera view come from the closed lists. */
+export interface ShotComposition {
+  /** An asset id or a free name. */
+  subject: string;
+  subject_position: string;
+  /** Empty together with its position when the frame has no main object. */
+  main_object: string;
+  main_object_position: string;
+  camera_view: string;
+}
+
+/** The frame last drawn for a shot. */
+export interface ShotFrame {
+  drawn: boolean;
+  /** The shot or an asset it uses changed since the frame was drawn. */
+  stale: boolean;
+  /** Relative to `/shared/{project}`; "" when none. */
+  path: string;
+  /** Why the last drawing failed; "" when it did not. */
+  error: string;
+}
+
+/** One shot of a unit with its machine problems and its frame. */
+export interface StoryboardShot {
+  shot_id: string;
+  script_refs: string[];
+  shot_purpose: string;
+  composition: ShotComposition;
+  action_summary: string;
+  on_screen_text: string[];
+  asset_refs: string[];
+  notes: string[];
+  status: "pending" | "approved";
+  unit_id: string;
+  beat_id: string;
+  creator_fields: string[];
+  problems: { check: string; detail: string }[];
+  /** Assets the shot names that are not approved or do not exist. */
+  missing_assets: string[];
+  frame: ShotFrame;
+}
+
+/** One unit of the locked sequence with its shots. */
+export interface StoryboardUnit {
+  unit_id: string;
+  order: number;
+  beat_id: string;
+  script_refs: string[];
+  lines: { id: string; text: string; facts: string[] }[];
+  planned_s: number;
+  communication_goal: string;
+  visual_approach: { method: string; description: string; concept_rule_refs: string[] };
+  planned_text: string[];
+  purpose_in_flow: string;
+  written: boolean;
+  approved: boolean;
+  stale: boolean;
+  stale_sources: string[];
+  shots: StoryboardShot[];
+  creator_fields: string[];
+}
+
+/** One beat with its units. */
+export interface StoryboardBeat {
+  key: string;
+  number: number;
+  fn: string;
+  title: string;
+  written: boolean;
+  approved: boolean;
+  units: StoryboardUnit[];
+}
+
+/** The whole screen of step 11. */
+export interface StoryboardState {
+  input: {
+    sequence_version: number;
+    plan_version: number;
+    concept_version: number;
+    script_version: number;
+    units_count: number;
+    outdated: string[];
+  };
+  kit: { ref_id: string; missing: boolean; message: string };
+  assets: {
+    approved: boolean;
+    items: StoryboardAsset[];
+    approved_count: number;
+    /** How many assets have their detail, and how many wait for it. */
+    with_detail: number;
+    without_detail: number;
+  };
+  beats: StoryboardBeat[];
+  shots_approved: number;
+  shots_total: number;
+  checks: VisualPlanCheck[];
+  review: {
+    reviewed: boolean;
+    rounds: number;
+    /** `unit_key` is a shot (`SH-003`), a unit (`VP-002`) or an asset (`AST-HERO-001`). */
+    findings: VisualPlanFinding[];
+    notes: string[];
+    open_count: number;
+  };
+  blockers: string[];
+  can_lock: boolean;
+  locked_version: number;
+  locked_note: string;
+  locked_at: string | null;
+  next_version: number;
+  /** What changed since the locked version; empty when nothing did or another reason blocks the lock. */
+  draft: string[];
+  pending_units: string[];
+  empty_units: string[];
+  model: string;
+  default_model: string;
+  models: { id: string; label: string; local: boolean }[];
+}
+
+/** One locked storyboard with its document. */
+export interface StoryboardVersion {
+  version: number;
+  sequence_version: number;
+  note: string;
+  locked_at: string;
+  document?: Record<string, unknown>;
+}
+
+const storyboardPath = (projectId: string) => `/v1/projects/${projectId}/storyboard`;
+
+/** The URL of the frame last drawn for a shot (a PNG; 404 when none). */
+export function storyboardFrameUrl(projectId: string, shotId: string): string {
+  return `${GATEWAY_URL}${storyboardPath(projectId)}/frames/${shotId}`;
+}
+
+/** The URL of an asset's preview PNG; `version` busts the browser cache after a redraw. */
+export function storyboardAssetPreviewUrl(projectId: string, assetId: string, version: number): string {
+  return `${GATEWAY_URL}${storyboardPath(projectId)}/assets/${assetId}/preview?v=${version}`;
+}
+
+/**
+ * The screen of step 11; rejects with code `sequence_not_locked`, `plan_not_locked`,
+ * `concept_not_locked` or `script_not_locked` while an earlier step is not locked.
+ */
+export function getStoryboard(projectId: string): Promise<StoryboardState> {
+  return apiFetch<StoryboardState>(storyboardPath(projectId));
+}
+
+function sendStoryboard(
+  projectId: string,
+  method: string,
+  sub: string,
+  body?: object,
+  call?: AiCall,
+): Promise<StoryboardState> {
+  const init = operationInit(call);
+  return apiFetch<StoryboardState>(`${storyboardPath(projectId)}${sub}`, {
+    method,
+    headers: { ...JSON_HEADERS, ...init.headers },
+    signal: init.signal,
+    body: operationBody(body ?? {}, call),
+  });
+}
+
+/** Sets the model of step 11 for this video; "" is the step default. */
+export function setStoryboardModel(projectId: string, model: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "PUT", "/model", { model });
+}
+
+/** Has the AI list the assets the video needs. */
+export function generateStoryboardAssets(projectId: string, note: string, call?: AiCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/assets/generate", { note }, call);
+}
+
+/** Has the AI write the detail (portrayal, what it must not imply, colours, expressions) of one asset. */
+export function generateStoryboardAssetDetail(
+  projectId: string,
+  assetId: string,
+  note: string,
+  call?: AiCall,
+): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/assets/${assetId}/detail`, { note }, call);
+}
+
+/** Has the AI write the detail of every asset that has none, one asset per turn. */
+export function generateStoryboardAssetDetails(
+  projectId: string,
+  note: string,
+  call?: OperationCall,
+): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/assets/detail", { note }, call);
+}
+
+/** Adds an asset by hand. */
+export function addStoryboardAsset(projectId: string, fields: Record<string, unknown>): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/assets", { fields });
+}
+
+/** Edits the given fields of an asset. */
+export function editStoryboardAsset(projectId: string, assetId: string, fields: Record<string, unknown>): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "PUT", `/assets/${assetId}`, { fields });
+}
+
+/** Deletes an asset no shot uses. */
+export function deleteStoryboardAsset(projectId: string, assetId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "DELETE", `/assets/${assetId}`);
+}
+
+/** Draws an asset from its description. */
+export function drawStoryboardAsset(projectId: string, assetId: string, call?: OperationCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/assets/${assetId}/draw`, undefined, call);
+}
+
+/** Draws an asset again from its code, with a note. */
+export function redrawStoryboardAsset(projectId: string, assetId: string, note: string, call?: OperationCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/assets/${assetId}/redraw`, { note }, call);
+}
+
+/** Approves a drawn asset; `projectName` goes into the description of the library illustration. */
+export function approveStoryboardAsset(projectId: string, assetId: string, projectName: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/assets/${assetId}/approve`, { project_name: projectName });
+}
+
+/** Takes an asset back to "drawn". */
+export function unapproveStoryboardAsset(projectId: string, assetId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/assets/${assetId}/unapprove`);
+}
+
+/** Approves the list of assets as a whole. */
+export function approveStoryboardAssetList(projectId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/assets/approve");
+}
+
+/** Reopens the list of assets. */
+export function unapproveStoryboardAssetList(projectId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/assets/unapprove");
+}
+
+/** Has the AI write the shots of every unit that has none, one unit per turn. */
+export function generateStoryboard(projectId: string, note: string, call?: OperationCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/generate", { note }, call);
+}
+
+/** Has the AI write the shots of one unit. */
+export function generateStoryboardUnit(projectId: string, unitId: string, note: string, call?: AiCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/units/${unitId}/generate`, { note }, call);
+}
+
+/** Adds a shot at the end of a unit. */
+export function addStoryboardShot(projectId: string, unitId: string, fields: Record<string, unknown>): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/units/${unitId}/shots`, { fields });
+}
+
+/** Edits the given fields of a shot. */
+export function editStoryboardShot(projectId: string, unitId: string, shotId: string, fields: Record<string, unknown>): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "PUT", `/units/${unitId}/shots/${shotId}`, { fields });
+}
+
+/** Deletes a shot; the last shot of a unit cannot be deleted. */
+export function deleteStoryboardShot(projectId: string, unitId: string, shotId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "DELETE", `/units/${unitId}/shots/${shotId}`);
+}
+
+/** Draws the frame of a shot again from the shot as it is. */
+export function redrawStoryboardFrame(projectId: string, unitId: string, shotId: string, call?: OperationCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/units/${unitId}/shots/${shotId}/frame`, undefined, call);
+}
+
+/** Approves a shot; rejects with the reasons when a blocking check fails. */
+export function approveStoryboardShot(projectId: string, unitId: string, shotId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/units/${unitId}/shots/${shotId}/approve`);
+}
+
+/** Takes a shot back to pending. */
+export function unapproveStoryboardShot(projectId: string, unitId: string, shotId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/units/${unitId}/shots/${shotId}/unapprove`);
+}
+
+/** Approves every pending shot that passes the checks. */
+export function approveAllStoryboard(projectId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/approve-all");
+}
+
+/** Has the AI review the whole storyboard. */
+export function reviewStoryboard(projectId: string, note: string, call?: AiCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/review", { note }, call);
+}
+
+/** Writes a finding's suggested fix into the field it points to. */
+export function applyStoryboardFinding(projectId: string, findingId: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/findings/${findingId}/apply`);
+}
+
+/** Accepts a finding or a warning of a machine check with a reason. */
+export function acceptStoryboardFinding(projectId: string, findingId: string, why: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/findings/${findingId}/accept`, { why });
+}
+
+/** Locks the storyboard as the next version. */
+export function lockStoryboard(projectId: string, note: string): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", "/lock", { note });
+}
+
+/** One locked version with its document. */
+export function getStoryboardVersion(projectId: string, version: number): Promise<StoryboardVersion> {
+  return apiFetch<StoryboardVersion>(`${storyboardPath(projectId)}/versions/${version}`);
+}

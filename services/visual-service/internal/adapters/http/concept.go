@@ -93,8 +93,29 @@ type codedError struct {
 }
 
 func writeConceptError(w http.ResponseWriter, err error) {
+	var refused *application.RenderingError
+	if errors.As(err, &refused) {
+		writeRenderingError(w, err, refused)
+		return
+	}
 	status, code := http.StatusInternalServerError, ""
 	switch {
+	case errors.Is(err, domain.ErrSequenceNotLocked):
+		status, code = http.StatusConflict, "sequence_not_locked"
+	case errors.Is(err, domain.ErrSequenceOutdated):
+		status, code = http.StatusConflict, "sequence_outdated"
+	case errors.Is(err, domain.ErrNoKit):
+		status, code = http.StatusConflict, "no_kit"
+	case errors.Is(err, domain.ErrAssetsMissing):
+		status, code = http.StatusConflict, "assets_missing"
+	case errors.Is(err, domain.ErrAssetNoDetail):
+		status, code = http.StatusConflict, "asset_no_detail"
+	case errors.Is(err, domain.ErrAssetInUse):
+		status, code = http.StatusConflict, "asset_in_use"
+	case errors.Is(err, domain.ErrLastShot):
+		status, code = http.StatusConflict, "last_shot"
+	case errors.Is(err, domain.ErrUnknownAsset), errors.Is(err, domain.ErrUnknownShot):
+		status = http.StatusNotFound
 	case errors.Is(err, application.ErrExternalAIPromptBuilt):
 		// The external-AI middleware answers with the prompt.
 		status = http.StatusOK

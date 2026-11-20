@@ -22,6 +22,10 @@ import (
 	"visual/internal/domain"
 )
 
+// storyboardRenderingTimeout bounds one call of step 11 to rendering: drawing an
+// asset runs up to three turns of the drawing AI.
+const storyboardRenderingTimeout = 20 * time.Minute
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -40,9 +44,13 @@ func main() {
 	}
 	defer pool.Close()
 
-	deleteProject := application.NewDeleteProjectUseCase(postgres.NewProjectDataRepository(pool))
+	// Step 11 draws and locks at rendering; an asset draws on the AI for minutes, so
+	// its client waits longer than the one that lists fonts.
+	storyboardRendering := rendering.NewClient(cfg.RenderingURL, storyboardRenderingTimeout)
+	referenceLibrary := application.NewReferenceLibraryUseCase(postgres.NewReferenceStyleRepository(pool))
+	deleteProject := application.NewDeleteProjectUseCase(postgres.NewProjectDataRepository(pool)).WithStoryboardPurge(storyboardRendering, logger)
 	router := httpadapter.NewRouter(deleteProject)
-	router.WithReferenceLibrary(application.NewReferenceLibraryUseCase(postgres.NewReferenceStyleRepository(pool)))
+	router.WithReferenceLibrary(referenceLibrary)
 
 	llmClient := llm.NewClient(cfg.LLMServiceURL, time.Duration(cfg.LLMTimeoutSeconds)*time.Second)
 	conceptRepo := postgres.NewConceptRepository(pool)
@@ -56,6 +64,9 @@ func main() {
 	router.WithPlan(application.NewPlanDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewPlanRepository(pool)).
 		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
 	router.WithSequence(application.NewSequenceDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewSequenceRepository(pool)).
+		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
+	router.WithStoryboard(application.NewStoryboardDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewStoryboardRepository(pool),
+		storyboardRendering, referenceLibrary).
 		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
 	go pushSystemPrompts(ctx, logger, llmClient)
 
@@ -77,7 +88,7 @@ func main() {
 	}
 }
 
-// pushSystemPrompts sends the shipped prompts of steps 8 and 9 to llm-service,
+// pushSystemPrompts sends the shipped prompts of steps 8 to 11 to llm-service,
 // retrying with a growing pause until it accepts them or the process stops.
 func pushSystemPrompts(ctx context.Context, logger *slog.Logger, client *llm.Client) {
 	pause := 2 * time.Second

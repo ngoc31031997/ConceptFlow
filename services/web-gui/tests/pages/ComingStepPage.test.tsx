@@ -50,8 +50,8 @@ describe("ComingStepPage", () => {
   });
 
   it("names the step before it", async () => {
-    renderAt("/projects/p1/coming/11", draft);
-    expect(await screen.findByTestId("coming-step-back")).toHaveTextContent("Bước trước: Chuỗi hình");
+    renderAt("/projects/p1/coming/12", draft);
+    expect(await screen.findByTestId("coming-step-back")).toHaveTextContent("Bước trước: Storyboard");
   });
 
   it("offers another not-developed step as the step before, when that is what precedes it", async () => {
@@ -83,10 +83,12 @@ describe("ComingStepPage", () => {
     await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/story")).toBe(true));
     renderAt("/projects/p1/coming/8", draft);
     await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/visual-concept")).toBe(true));
+    renderAt("/projects/p1/coming/11", draft);
+    await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/storyboard")).toBe(true));
   });
 
   it("says a step whose screen was taken out is not developed, even though a running step stands behind it", async () => {
-    for (const n of [11, 15, 16]) {
+    for (const n of [15, 16]) {
       renderAt(`/projects/p1/coming/${n}`, draft);
       await waitFor(() => expect(screen.getAllByTestId("coming-step-notice").length).toBeGreaterThan(0));
     }

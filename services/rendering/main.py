@@ -19,6 +19,8 @@ import uvicorn
 from adapters.http.check_metrics import CheckMetrics
 from adapters.http.check_server import create_check_app
 from adapters.http.illustrations import create_illustration_router
+from adapters.http.project_assets import create_project_asset_router
+from adapters.http.storyboard import create_storyboard_router
 from adapters.llm.client import LLMServiceClient, push_system_prompts_until_accepted
 from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import (
@@ -33,7 +35,9 @@ from adapters.persistence.db import create_pool
 from adapters.persistence.illustration_repository import IllustrationRepository
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
+from adapters.persistence.project_asset_repository import ProjectAssetRepository
 from adapters.persistence.relay import OutboxRelay
+from adapters.persistence.storyboard_repository import StoryboardRepository
 from adapters.rendering.illustration_previewer import IllustrationPreviewer
 from adapters.rendering.layout_checker import LayoutChecker
 from adapters.rendering.library_renderer import InProcessIllustrationRenderer
@@ -45,14 +49,18 @@ from adapters.rendering.remotion_renderer import (
 from adapters.rendering.typescript_checker import TypeScriptChecker
 from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.storage.illustration_files import ILLUSTRATIONS_ROOT, IllustrationFiles
+from adapters.storage.project_asset_files import ProjectAssetFiles
+from adapters.storage.storyboard_files import StoryboardFiles
 from adapters.visual.client import VisualServiceClient
 from application.check_script import CheckScriptUseCase
 from application.illustration_backup import IllustrationBackup
 from application.illustration_drawer import IllustrationDrawer
 from application.illustration_library import IllustrationLibrary
 from application.preview_illustration import PreviewIllustrationUseCase
+from application.project_assets import ProjectAssets
 from application.render_script import RenderScriptUseCase
 from application.stills import StillsUseCase
+from application.storyboard import Storyboard
 from application.validate_script import ValidateScriptUseCase
 from domain import lottie_catalog
 from domain.drawer_prompts import load_system_prompts
@@ -187,6 +195,11 @@ async def run() -> None:
         library, llm, llm, visual, int(os.environ.get("ILLUSTRATION_MAX_OUTPUT_TOKENS", "128000")))
     library_router = create_illustration_router(
         library, drawer, IllustrationBackup(library, illustration_files.read), visual)
+    library_router.include_router(create_project_asset_router(ProjectAssets(
+        ProjectAssetRepository(pool), ProjectAssetFiles(), library, drawer)))
+    library_router.include_router(create_storyboard_router(Storyboard(
+        StoryboardRepository(pool), ProjectAssetRepository(pool), StoryboardFiles(), previewer,
+        preview_gate)))
     system_prompts, missing_prompts = load_system_prompts(Path(__file__).parent / "domain" / "system_prompts")
     if missing_prompts:
         logger.error(

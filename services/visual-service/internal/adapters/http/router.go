@@ -23,6 +23,7 @@ type Router struct {
 	concept          conceptDesk
 	plan             planDesk
 	sequence         sequenceDesk
+	storyboard       storyboardDesk
 	referenceLibrary referenceLibraryUseCase
 }
 
@@ -44,6 +45,9 @@ func (rt *Router) Handler() http.Handler {
 	}
 	if rt.sequence != nil {
 		rt.mountSequence(r)
+	}
+	if rt.storyboard != nil {
+		rt.mountStoryboard(r)
 	}
 	rt.mountReferenceLibrary(r)
 	return r

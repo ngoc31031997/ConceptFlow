@@ -6,10 +6,11 @@ visual-service giữ các bước tiền kỳ hình ảnh (bước 8–14) và D
 
 | Bên gọi | Phương thức | Đường dẫn | Việc |
 |---|---|---|---|
-| orchestrator | DELETE | `/internal/v1/visual/{id}` | Xoá mọi dữ liệu của dự án đã xoá: `review_units`, `visual_concept_versions`, `visual_plan_versions`, `visual_plan_seq`, `visual_sequence_versions`, `project_reference_picks`, `project_visual`, trong một transaction. `204`; dự án chưa có dữ liệu cũng `204`. Thư viện `reference_styles` dùng chung nên giữ nguyên |
+| orchestrator | DELETE | `/internal/v1/visual/{id}` | Xoá mọi dữ liệu của dự án đã xoá: `review_units`, `visual_concept_versions`, `visual_plan_versions`, `visual_plan_seq`, `visual_sequence_versions`, `project_reference_picks`, `project_visual`, trong một transaction, rồi gọi rendering `DELETE /internal/v1/projects/{id}/storyboard` để xoá tài sản, khung và bản chốt bước 11 (cố gắng một lần, lỗi thì ghi log, không làm hỏng việc xoá). `204`; dự án chưa có dữ liệu cũng `204`. Thư viện `reference_styles` dùng chung nên giữ nguyên |
 | bước sau bước 8 | GET | `/internal/v1/visual/{id}/concept` | Tài liệu ngôn ngữ hình ảnh của phiên bản chốt mới nhất ([`visual-concept-v1.md`](visual-concept-v1.md)). `404` khi chưa chốt. `?step=` dành cho các bước 9–14 khi chúng có; hiện chưa bước nào đọc theo tên nên mọi `step` khác rỗng trả `400` |
 | bước sau bước 9 | GET | `/internal/v1/visual/{id}/plan` | Tài liệu kế hoạch hình của phiên bản chốt mới nhất ([`visual-plan-v1.md`](visual-plan-v1.md)). `404` khi chưa chốt |
 | bước sau bước 10 | GET | `/internal/v1/visual/{id}/sequence` | Tài liệu chuỗi hình của phiên bản chốt mới nhất ([`visual-sequence-v1.md`](visual-sequence-v1.md)). `404` khi chưa chốt |
+| bước sau bước 11 | GET | `/internal/v1/visual/{id}/storyboard` | Tài liệu storyboard của phiên bản chốt mới nhất, đọc từ rendering ([`storyboard-v1.md`](storyboard-v1.md)). `404` khi chưa chốt |
 | orchestrator (lệnh `render_scenes`) | GET | `/internal/v1/visual/{id}/kit` | Bộ thông số vẽ của phong cách mà dự án đã chọn: `200 {"ref_id":"R12","kit":ReferenceKit}`. Mỗi dự án chỉ chọn một phong cách (`project_reference_picks` có chỉ mục duy nhất theo `project_id`), nên đây là phong cách duy nhất đó. `404` khi dự án chưa chọn phong cách nào; `409` khi phong cách đó chưa có kit (lỗi `{"error":"…"}`) |
 | rendering | GET | `/internal/v1/reference-styles/{id}/kit` | Bộ thông số vẽ của một phong cách: `200 {"ref_id":"R12","kit":ReferenceKit}`. `404` khi không có phong cách `{id}`; `409` khi phong cách chưa có kit |
 | compose healthcheck | GET | `/health` | `{"status":"ok"}` |
@@ -87,16 +88,16 @@ Lỗi `{"error":"…"}`: `400` khi sai luật (thông báo nêu trường sai, v
 
 | Bảng | Khoá | Nội dung |
 |---|---|---|
-| `review_units` | `(project_id, kind, unit_key)` | Đơn vị duyệt của các bước hình ảnh, cùng dạng với authoring, thêm `input_hashes` (hash từng input lúc viết). Bước 8: `kind` `visual_concept` (mỗi phần của tài liệu visual-concept một đơn vị), `visual_review` (`main`). Bước 9: `visual_plan` (mỗi beat), `visual_plan_review` (`main`). Bước 10: `visual_sequence` (mỗi beat), `visual_sequence_motifs` (`main`), `visual_sequence_review` (`main`) |
+| `review_units` | `(project_id, kind, unit_key)` | Đơn vị duyệt của các bước hình ảnh, cùng dạng với authoring, thêm `input_hashes` (hash từng input lúc viết). Bước 8: `kind` `visual_concept` (mỗi phần của tài liệu visual-concept một đơn vị), `visual_review` (`main`). Bước 9: `visual_plan` (mỗi beat), `visual_plan_review` (`main`). Bước 10: `visual_sequence` (mỗi beat), `visual_sequence_motifs` (`main`), `visual_sequence_review` (`main`). Bước 11: `storyboard_assets` (`main`: duyệt danh sách tài sản), `storyboard_unit` (mỗi unit `VP-xxx`: các shot và bản ghi khung đã vẽ), `storyboard_review` (`main`) |
 | `visual_concept_versions` | `(project_id, version)` | Bản chốt bất biến: `script_version`, `document` (tài liệu visual-concept), `note`, `locked_at` |
 | `visual_plan_versions` | `(project_id, version)` | Bản chốt bất biến của bước 9 ([`visual-plan-v1.md`](visual-plan-v1.md)) |
 | `visual_plan_seq` | `project_id` | Số kế tiếp của mã unit `VP-…`, không dùng lại |
 | `visual_sequence_versions` | `(project_id, version)` | Bản chốt bất biến của bước 10 ([`visual-sequence-v1.md`](visual-sequence-v1.md)) |
-| `project_visual` | `project_id` | Thiết lập riêng từng video: `concept_model`, `plan_model` (`''` = mặc định của bước) |
+| `project_visual` | `project_id` | Thiết lập riêng từng video: `concept_model`, `plan_model`, `sequence_model`, `storyboard_model` (`''` = mặc định của bước) |
 | `reference_styles` | `id` (`R01`…) | Thư viện mô tả phong cách dùng chung (tên, `description` = tóm tắt, `detail` JSONB: `source`, `drawing`, `layout`, `kit`); `seq` không dùng lại. Bước 8 chỉ đọc |
 | `project_reference_picks` | `(project_id, ref_id)` | Mô tả video chọn; xoá mô tả thì xoá theo (`ON DELETE CASCADE`) |
 
-Route công khai của bước 8: [`visual-concept-v1.md`](visual-concept-v1.md); bước 9: [`visual-plan-v1.md`](visual-plan-v1.md); bước 10: [`visual-sequence-v1.md`](visual-sequence-v1.md).
+Route công khai của bước 8: [`visual-concept-v1.md`](visual-concept-v1.md); bước 9: [`visual-plan-v1.md`](visual-plan-v1.md); bước 10: [`visual-sequence-v1.md`](visual-sequence-v1.md); bước 11: [`storyboard-v1.md`](storyboard-v1.md) (đơn vị `storyboard_assets`, `storyboard_unit`, `storyboard_review`; bản chốt giữ ở rendering, không có bảng version ở `visual-db`).
 
 ## Cấu hình
 

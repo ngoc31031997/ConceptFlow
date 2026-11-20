@@ -26,6 +26,7 @@
   min-width: 0;
   font-size: 13px;
   color: var(--ink-soft);
+  overflow-wrap: anywhere;
 }
 
 .hintBlocked {

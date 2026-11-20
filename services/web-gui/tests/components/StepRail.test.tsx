@@ -149,14 +149,14 @@ describe("StepRail — second-layer vertical menu", () => {
     expect(screen.getByTestId("rail-phase-count-1")).toHaveTextContent("7/7");
     expect(screen.getByTestId("rail-phase-count-2")).toHaveTextContent("4/7");
     expect(screen.getByTestId("rail-phase-count-4")).toHaveTextContent("0/5");
-    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("12/23 bước xong");
+    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("13/23 bước xong");
   });
 
   it("marks the built steps where the Creator approves with ◆", async () => {
     renderRail(rendering);
     await waitForStepRail();
-    for (const step of [1, 2, 3, 4, 5, 6, 7, 8, 18]) expect(screen.getByTestId(`rail-gate-${step}`)).toHaveTextContent("◆");
-    for (const step of [11, 15, 16, 17, 19, 21, 22, 23]) {
+    for (const step of [1, 2, 3, 4, 5, 6, 7, 8, 11, 18]) expect(screen.getByTestId(`rail-gate-${step}`)).toHaveTextContent("◆");
+    for (const step of [15, 16, 17, 19, 21, 22, 23]) {
       expect(screen.queryByTestId(`rail-gate-${step}`)).not.toBeInTheDocument();
     }
   });

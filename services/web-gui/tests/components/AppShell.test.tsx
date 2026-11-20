@@ -103,8 +103,8 @@ describe("AppShell — the 23-step flow", () => {
     expect(screen.queryByTestId("status-strip")).not.toBeInTheDocument();
     await waitForStepRail();
     for (const step of [2, 3, 4]) expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
-    // The storyboard screen was taken out: it reads as a step that is coming, not as one that is locked.
-    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "coming");
+    // The storyboard has a screen of its own that opens once the visual sequence is locked: before a video exists it is closed.
+    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "pending");
   });
 
   it("names the phase and the step on the sidebar's resume link, not a bare step count", async () => {

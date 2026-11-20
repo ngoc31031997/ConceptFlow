@@ -67,6 +67,70 @@ CREATE TABLE IF NOT EXISTS illustrations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_illustrations_folder ON illustrations (folder_id);
+
+-- Tài sản của một dự án ở bước Storyboard; base_illustration_id và library_illustration_id trỏ tới
+-- illustrations.id (chuỗi rỗng = không có).
+CREATE TABLE IF NOT EXISTS project_assets (
+    project_id TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    concept_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'figure',
+    tier TEXT NOT NULL DEFAULT 'support',
+    portrayal TEXT NOT NULL DEFAULT '',
+    must_not_imply TEXT[] NOT NULL DEFAULT '{}',
+    palette_tokens TEXT[] NOT NULL DEFAULT '{}',
+    expressions TEXT[] NOT NULL DEFAULT '{}',
+    base_illustration_id TEXT NOT NULL DEFAULT '',
+    code TEXT NOT NULL DEFAULT '',
+    version INTEGER NOT NULL DEFAULT 0,
+    preview_path TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'planned',
+    to_library BOOLEAN NOT NULL DEFAULT true,
+    library_folder_id TEXT NOT NULL DEFAULT '',
+    library_illustration_id TEXT NOT NULL DEFAULT '',
+    warnings JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, asset_id)
+);
+
+-- Các unit kế hoạch hình (VP-…) mà tài sản xuất hiện; thêm cho bảng đã có từ trước.
+ALTER TABLE project_assets ADD COLUMN IF NOT EXISTS units TEXT[] NOT NULL DEFAULT '{}';
+
+-- Bộ đếm mã tài sản theo (dự án, tên viết hoa): chỉ tăng, nên mã đã cấp không bao giờ được dùng lại.
+CREATE TABLE IF NOT EXISTS project_asset_counters (
+    project_id TEXT NOT NULL,
+    name_key TEXT NOT NULL,
+    last_number INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (project_id, name_key)
+);
+
+-- Khung đã vẽ gần nhất của mỗi shot Storyboard: frame_path tương đối so với /shared/{project_id}, rỗng (NULL)
+-- khi lần vẽ gần nhất lỗi (error giữ thông báo); spec_hash do người gọi tính, frame_hash là SHA-256 của PNG.
+CREATE TABLE IF NOT EXISTS storyboard_shots (
+    project_id TEXT NOT NULL,
+    shot_id TEXT NOT NULL,
+    unit_id TEXT NOT NULL,
+    beat_id TEXT NOT NULL,
+    frame_path TEXT,
+    frame_hash TEXT NOT NULL DEFAULT '',
+    spec_hash TEXT NOT NULL,
+    drawn_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    error TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (project_id, shot_id)
+);
+
+-- Các bản chốt Storyboard: chỉ thêm, không sửa; sequence_version là số bản chốt bước 10 mà bản này dựa vào.
+CREATE TABLE IF NOT EXISTS storyboard_versions (
+    project_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    document JSONB NOT NULL,
+    sequence_version INTEGER NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    locked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, version)
+);
 """
 
 

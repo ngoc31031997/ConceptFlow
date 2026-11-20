@@ -8,6 +8,7 @@ import {
   VIEW_STORY,
   VIEW_VISUAL_CONCEPT,
   VIEW_VISUAL_PLAN,
+  VIEW_STORYBOARD,
   VIEW_VISUAL_SEQUENCE,
   beatsRoute,
   comingRoute,
@@ -18,6 +19,7 @@ import {
   screenRoute,
   screenStatus,
   scriptRoute,
+  storyboardRoute,
   storyRoute,
   visualConceptRoute,
   visualPlanRoute,
@@ -46,7 +48,7 @@ describe("steps with a screen of their own", () => {
 
   it("leaves the steps nobody has built as not built", () => {
     const notBuilt = FLOW_VIEW.filter((v) => !isBuilt(v)).map((v) => v.n);
-    expect(notBuilt).toEqual([11, 12, 13, 14, 15, 16, 20]);
+    expect(notBuilt).toEqual([12, 13, 14, 15, 16, 20]);
   });
 
   it("addresses the research screen under its video and a not-developed step under a video or alone", () => {
@@ -55,7 +57,7 @@ describe("steps with a screen of their own", () => {
     expect(comingRoute(7, "")).toBe("/create/coming/7");
   });
 
-  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, conceptLocked: false, planLocked: false, sequenceLocked: false };
+  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, conceptLocked: false, planLocked: false, sequenceLocked: false, storyboardLocked: false };
   const researched = { ...none, researchResolved: true };
   const storied = { ...researched, storyApproved: true };
   const beaten = { ...storied, beatsApproved: true };
@@ -122,7 +124,7 @@ describe("steps with a screen of their own", () => {
 
 describe("the visual concept step", () => {
   const concept = FLOW_VIEW[VIEW_VISUAL_CONCEPT - 1];
-  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: false, conceptLocked: false, planLocked: false, sequenceLocked: false };
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: false, conceptLocked: false, planLocked: false, sequenceLocked: false, storyboardLocked: false };
 
   it("is step 8 with a screen of its own", () => {
     expect(concept.label).toBe("Ngôn ngữ hình ảnh");
@@ -141,7 +143,7 @@ describe("the visual concept step", () => {
 
 describe("the visual plan step", () => {
   const plan = FLOW_VIEW[VIEW_VISUAL_PLAN - 1];
-  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: false, planLocked: false, sequenceLocked: false };
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: false, planLocked: false, sequenceLocked: false, storyboardLocked: false };
 
   it("is step 9 with a screen of its own", () => {
     expect(plan.label).toBe("Kế hoạch hình");
@@ -160,7 +162,7 @@ describe("the visual plan step", () => {
 
 describe("the visual sequence step", () => {
   const seq = FLOW_VIEW[VIEW_VISUAL_SEQUENCE - 1];
-  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: true, planLocked: false, sequenceLocked: false };
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: true, planLocked: false, sequenceLocked: false, storyboardLocked: false };
 
   it("is step 10 with a screen of its own", () => {
     expect(seq.label).toBe("Chuỗi hình");
@@ -174,5 +176,26 @@ describe("the visual sequence step", () => {
     expect(screenStatus(seq, 3, none)).toBe("pending");
     expect(screenStatus(seq, 3, { ...none, planLocked: true })).toBe("waiting");
     expect(screenStatus(seq, 3, { ...none, planLocked: true, sequenceLocked: true })).toBe("done");
+  });
+});
+
+describe("the storyboard step", () => {
+  const board = FLOW_VIEW[VIEW_STORYBOARD - 1];
+  const none = { researchResolved: true, storyApproved: true, beatsApproved: true, scriptApproved: true, scriptLocked: true, conceptLocked: true, planLocked: true, sequenceLocked: false, storyboardLocked: false };
+
+  it("is step 11 with a screen of its own, and keeps the running step it shows", () => {
+    expect(board.label).toBe("Storyboard");
+    expect(board.phase).toBe(1);
+    expect(board.comingSoon).toBeUndefined();
+    expect(board.server).toEqual([4]);
+    expect(isBuilt(board)).toBe(true);
+    expect(screenRoute(board, "p1")).toBe("/projects/p1/storyboard");
+    expect(storyboardRoute("p1")).toBe("/projects/p1/storyboard");
+  });
+
+  it("opens once the visual sequence is locked and passes once a storyboard is locked", () => {
+    expect(screenStatus(board, 3, none)).toBe("pending");
+    expect(screenStatus(board, 3, { ...none, sequenceLocked: true })).toBe("waiting");
+    expect(screenStatus(board, 3, { ...none, sequenceLocked: true, storyboardLocked: true })).toBe("done");
   });
 });

@@ -60,6 +60,25 @@ class DrawRequest:
 
 
 @dataclass
+class CodeDrawRequest:
+    """Một lượt vẽ lấy code, không lưu vào thư viện: người gọi giữ kết quả (tài sản của dự án)."""
+
+    description: str
+    name: str  # tên component bắt buộc
+    ref_id: str  # phong cách tham chiếu: luật vẽ của nó vào prompt
+    kit: dict  # bộ thông số của dự án, người gọi gửi kèm
+    kind: IllustrationKind = IllustrationKind.FIGURE
+    tier: str = "support"
+    model: str = ""
+    #: Code đang có khi vẽ lại; AI giữ tên và prop của nó.
+    current_code: str = ""
+    note: str = ""
+    #: Code của hình gốc làm Hình mẫu để AI chỉnh.
+    base_code: str = ""
+    base_label: str = ""
+
+
+@dataclass
 class DrawnReply:
     name: str
     title: str
@@ -96,10 +115,12 @@ class IllustrationDrawer:
         self._references = references
         self._max_tokens = max_tokens
 
-    async def _reference_text(self, folder_id: str, skip_id: str, kind: IllustrationKind) -> str:
+    async def _reference_text(
+        self, folder_id: str, skip_id: str, kind: IllustrationKind, base: str = "",
+    ) -> str:
         """Hình tham chiếu: Hình mẫu Creator đã chọn (cho hình), rồi các hình đã duyệt cùng loại và cùng
         thư mục của Creator."""
-        parts: list[str] = []
+        parts: list[str] = [base] if base else []
 
         def add(i: Illustration, why: str) -> bool:
             if not i.code or i.id == skip_id:
@@ -122,6 +143,7 @@ class IllustrationDrawer:
 
     async def _system_prompt(
         self, folder_id: str, skip_id: str, kind: IllustrationKind, style: dict, tier: str,
+        base: str = "",
     ) -> tuple[str, str]:
         """Prompt hệ thống của bộ vẽ, đã điền biến, và role của nó. Template đọc từ llm-service mỗi lần vẽ."""
         role = drawer_prompts.role_for(kind)
@@ -134,7 +156,8 @@ class IllustrationDrawer:
         values = drawer_prompts.style_values(style)
         values["tier"] = drawer_prompts.tier_instruction(tier)
         values["helpers"] = drawer_prompts.helpers_text(kind)
-        values["references"] = await self._reference_text(folder_id, skip_id, kind) or NO_REFERENCES_TEXT
+        references = await self._reference_text(folder_id, skip_id, kind, base)
+        values["references"] = references or NO_REFERENCES_TEXT
         text = drawer_prompts.fill(template, values)
         return text, role
 
@@ -230,3 +253,36 @@ class IllustrationDrawer:
             status=IllustrationStatus.DRAFT, version=existing.version + 1, warnings=tuple(out.warnings)))
         await self._library.save_preview(illustration_id, saved.version, out)
         return saved.with_(has_preview=True)
+
+    async def draw_code(self, req: CodeDrawRequest) -> tuple[DrawnReply, RenderedIllustration]:
+        """Vẽ (hoặc vẽ lại, khi có `current_code`) một component với kit của người gọi và trả code cùng
+        kết quả dựng; không ghi gì vào thư viện. Component phải mang đúng tên `req.name`."""
+        description = req.description.strip()
+        if not description:
+            raise IllustrationError("mô tả hình cần vẽ là bắt buộc")
+        if not req.ref_id:
+            raise RefStyleRequiredError()
+        kind = kind_or_figure(req.kind)
+        tier = tier_or_support(req.tier)
+        if req.current_code.strip():
+            user = (
+                f"Vẽ lại hình {req.name}: {description}\n"
+                f"Giữ nguyên tên component {req.name} và các prop đang có.\n"
+                f"Code hiện tại:\n```tsx\n{req.current_code}```")
+            user += ("\nYêu cầu sửa của Creator: " + req.note.strip()) if req.note.strip() else (
+                "\nCreator chưa ưng hình này: vẽ một phiên bản khác, đúng luật style hơn.")
+        else:
+            user = f"Vẽ hình: {description}\nTên component bắt buộc: {req.name}"
+        base = ""
+        if req.base_code.strip():
+            label = req.base_label or "hình gốc"
+            base = (
+                f"### {label} (hình gốc của tài sản: chỉnh từ hình này thay vì vẽ lại từ đầu)\n"
+                f"```tsx\n{req.base_code}```\n\n")
+        style = await self._references.get_style(req.ref_id)
+        system, role = await self._system_prompt("", "", kind, style, tier, base)
+        reply, out = await self._draw(system, role, user, req.model, req.ref_id, req.kit, kind, tier)
+        if reply.name != req.name:
+            raise IllustrationError(
+                f"AI đặt tên component là {reply.name} — phải giữ tên {req.name}")
+        return reply, out

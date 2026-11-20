@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { PlanMethod, PlanRelationship, VisualPlanUnit } from "../../api/client";
 import { visualErrorText } from "../../hooks/useVisualConcept";
 import researchStyles from "../research/research.module.css";
-import { Button, Dialog, FormField, Select, TextArea, TextInput } from "../ui";
+import { Button, Dialog, FormField, Select, TextArea, TextInput, type DialogProps } from "../ui";
 import { METHODS, METHOD_LABELS, RELATIONSHIPS, RELATIONSHIP_LABELS, refsLabel, seconds } from "./planModel";
 import styles from "./plan.module.css";
 
@@ -16,7 +16,7 @@ export interface FormDialogProps {
   /** Runs the change; a throw is shown in the dialog and keeps it open. */
   onConfirm: () => Promise<void>;
   testId: string;
-  size?: "sm" | "md" | "lg" | "full";
+  size?: DialogProps["size"];
   /** The main action's colour; yellow by default. */
   confirmVariant?: "primary" | "danger" | "impact";
   /** Whether the dialog holds a form; a confirmation without one closes on a backdrop click. */

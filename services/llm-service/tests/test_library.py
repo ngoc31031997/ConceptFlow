@@ -267,6 +267,15 @@ async def test_the_visual_plan_step_has_a_default_model(lib):
     assert (await lib.step_models())["step_models"]["visual_plan"] == "zai-org/glm-5.3-flash"
 
 
+async def test_the_visual_storyboard_step_is_apart_from_the_authoring_storyboard_step(lib):
+    before = (await lib.step_models())["step_models"]
+    assert "visual_storyboard" in before and "storyboard" in before
+    await lib.set_step_model("visual_storyboard", "zai-org/glm-5.3-flash")
+    after = (await lib.step_models())["step_models"]
+    assert after["visual_storyboard"] == "zai-org/glm-5.3-flash"
+    assert after["storyboard"] == before["storyboard"]
+
+
 async def test_the_visual_sequence_step_has_a_default_model(lib):
     assert "visual_sequence" in (await lib.step_models())["step_models"]
     await lib.set_step_model("visual_sequence", "zai-org/glm-5.3-flash")

@@ -141,3 +141,24 @@ class IllustrationPreviewer:
             reply = self._await(lambda r: r.get("id") == rid)
         if not reply.get("ok"):
             raise IllustrationPreviewError(str(reply.get("error", "lỗi không rõ")))
+
+    def frame(self, spec: dict, output: str) -> None:
+        """Dựng một khung storyboard 1280x720 (nhiều hình + chữ) ra file `output` (PNG).
+
+        `spec` mang kit, background, placements, camera_view, on_screen_text, text_color.
+        """
+        with self._lock:
+            if self._proc is None or self._proc.poll() is not None:
+                self._start()
+            assert self._proc is not None and self._proc.stdin is not None
+            rid = uuid.uuid4().hex
+            msg = {**spec, "id": rid, "op": "frame", "output": output}
+            try:
+                self._proc.stdin.write(json.dumps(msg) + "\n")
+                self._proc.stdin.flush()
+            except OSError as exc:
+                self._stop()
+                raise IllustrationPreviewError(f"bộ dựng xem trước không nhận input: {exc}") from exc
+            reply = self._await(lambda r: r.get("id") == rid)
+        if not reply.get("ok"):
+            raise IllustrationPreviewError(str(reply.get("error", "lỗi không rõ")))

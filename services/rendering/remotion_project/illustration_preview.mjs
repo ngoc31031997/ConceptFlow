@@ -9,6 +9,9 @@
  *   <- {"id", "ok": true, "png": base64, "gif"?: base64}
  *   -> {"id", "op": "still", "kit": {drawing tokens}, "composition": id of a sample composition, "frame"?: n, "output": path}
  *   <- {"id", "ok": true, "path": output}
+ *   -> {"id", "op": "frame", "kit", "background": {color, backdrop?: {code, name, props}}, "placements": [{code?, name, props?, position, tier?}],
+ *       "camera_view", "on_screen_text": [{text, min_px}], "text_color", "output": path}   (1280x720 storyboard frame)
+ *   <- {"id", "ok": true, "path": output}
  *   <- {"id", "ok": false, "error": "..."}
  *
  * `code` absent means a built-in kit component. The TSX is compiled here with
@@ -41,7 +44,36 @@ async function handleStill(req) {
   return {id: req.id, ok: true, path: req.output};
 }
 
+/** esbuild a drawing's TSX to CommonJS; a syntax error names the drawing and its line. */
+async function compile(code, name) {
+  try {
+    return (await transform(code, {loader: 'tsx', format: 'cjs', jsx: 'automatic', sourcefile: `${name}.tsx`})).code;
+  } catch (err) {
+    const msgs = (err.errors ?? []).map((e) => `${e.location?.line}:${e.location?.column}: ${e.text}`);
+    throw new Error(`syntax error in ${name}: ${msgs.join('; ') || err.message}`);
+  }
+}
+
+/** One storyboard frame (several drawings on a grid plus text), written to `req.output`. */
+async function handleFrame(req) {
+  if (!req.kit) throw new Error('thiếu kit: lượt vẽ không nhận được bộ thông số vẽ');
+  const placements = [];
+  for (const pl of req.placements ?? []) {
+    placements.push({name: pl.name, props: pl.props ?? {}, position: pl.position, tier: pl.tier,
+      js: pl.code ? await compile(pl.code, pl.name) : ''});
+  }
+  const bd = req.background?.backdrop;
+  const background = {color: req.background?.color ?? '#FFFFFF',
+    backdrop: bd ? {js: await compile(bd.code, bd.name), name: bd.name, props: bd.props ?? {}} : null};
+  const inputProps = {kit: req.kit, background, placements, camera_view: req.camera_view,
+    on_screen_text: req.on_screen_text ?? [], text_color: req.text_color ?? '#FFFFFF'};
+  const composition = await selectComposition({serveUrl, id: 'frame', inputProps, puppeteerInstance: browser});
+  await renderStill({composition, serveUrl, inputProps, frame: 20, output: req.output, puppeteerInstance: browser});
+  return {id: req.id, ok: true, path: req.output};
+}
+
 async function handle(req) {
+  if (req.op === 'frame') return handleFrame(req);
   if (req.op === 'still') return handleStill(req);
   if (!req.kit) throw new Error('thiếu kit: lượt vẽ không nhận được bộ thông số vẽ');
   let js = '';
