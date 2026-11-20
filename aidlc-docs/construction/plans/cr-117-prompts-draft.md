@@ -205,3 +205,126 @@ Trả về DUY NHẤT một khối ```json theo mẫu, không thêm chữ nào k
 1. **Ngưỡng "thành tài sản"** (prompt 1): mình viết "xuất hiện ở từ hai shot trở lên hoặc cần giữ diện mạo suốt video". Lúc lập danh sách chưa có shot nên AI phải đoán theo kế hoạch hình. Giữ cách này, hay muốn AI liệt kê dư rồi Creator xoá bớt?
 2. **Khung chưa có tài sản** (prompt 2): AI ghi vào `notes`, không tự đặt mã; máy sẽ hiện "thiếu tài sản" cho Creator thêm tài sản rồi viết lại. Đúng ý bạn chưa?
 3. **`on_screen_text`** (prompt 2): chỉ lấy chữ từ kế hoạch hình đã chốt, không cho AI thêm chữ mới. Muốn cho AI đề xuất chữ thêm không?
+
+---
+
+# BẢN SỬA 2026-11-20 · Chia lập tài sản thành hai pha (A + D) — ĐÃ DUYỆT 2026-11-20
+
+Thay Prompt 1 `storyboard_assets` bằng hai prompt dưới. Prompt 2 (`storyboard_unit`) và Prompt 3 (`storyboard_review`) giữ nguyên.
+
+- **Pha 1 `storyboard_assets`** (sửa): một lượt, chỉ lập KHUNG danh sách (mã khái niệm, tên, loại, hạng, hình gốc, unit dùng). Đầu vào gọn (D): mỗi unit chỉ có mã, beat, thông tin hình bắt buộc, cách thể hiện; thư viện chỉ có id, tên, loại, tag.
+- **Pha 2 `storyboard_asset_detail`** (mới): mỗi tài sản một lượt, viết `portrayal`, `must_not_imply`, `palette_tokens`, `expressions`. Đầu vào gọn (D): chỉ mục khái niệm của tài sản đó và chỉ các unit tài sản đó xuất hiện (lấy từ `units` của pha 1). Chạy được bằng AI ngoài, DeepSeek và hàng đợi "Chạy tất cả bằng DeepSeek (n)".
+
+## Biến điền
+| Prompt | Biến |
+|---|---|
+| `storyboard_assets` | `brief`, `representation` (mã, thuật ngữ, cách vẽ ngắn), `plan` (mã unit, beat, thông tin hình bắt buộc, cách thể hiện), `motifs` (mã, tên), `library` (id, tên, loại, tag), `current_assets` (mã, khái niệm, tên, loại, hạng, unit), `creator_fields`, `note` |
+| `storyboard_asset_detail` | `brief`, `asset` (mã, khái niệm, tên, loại, hạng, hình gốc), `concept` (mục khái niệm đã chốt: thuật ngữ, cách vẽ, điều không được gợi ý, dữ kiện), `palette` (token, vai trò, tên, mã màu), `units` (chỉ các unit có tài sản: mã, beat, thông tin hình bắt buộc, cách thể hiện, lời thoại), `other_assets` (các tài sản khác: tên, hạng, mô tả nếu đã có — để không trùng màu, trùng vai), `current` (chi tiết hiện có), `creator_fields`, `note` |
+
+## Prompt 1 (sửa) · `storyboard_assets` (lập khung danh sách tài sản)
+
+```
+Bạn là THIẾT KẾ TÀI NGUYÊN HÌNH ẢNH của một kênh video phổ biến kiến thức. Ngôn ngữ hình ảnh và kế hoạch hình của video đã chốt. Ở lượt này bạn chỉ lập KHUNG DANH SÁCH TÀI SẢN: những nhân vật, vật thể và phông nền sẽ được vẽ MỘT LẦN rồi dùng lại ở nhiều shot. Chưa viết mô tả chi tiết; mô tả của từng tài sản được viết ở lượt sau.
+
+## CREATIVE BRIEF
+{{brief}}
+
+## NGÔN NGỮ HÌNH ẢNH ĐÃ CHỐT: NHÂN VẬT, VẬT THỂ, KHÁI NIỆM (mã, thuật ngữ, cách vẽ)
+{{representation}}
+
+## KẾ HOẠCH HÌNH ĐÃ CHỐT THEO THỨ TỰ (mã unit, beat, thông tin hình bắt buộc, cách thể hiện)
+{{plan}}
+
+## MOTIF ĐÃ CHỐT (mã, tên)
+{{motifs}}
+
+## THƯ VIỆN HÌNH GỐC (chỉ hình đã duyệt: id, tên, loại, tag)
+{{library}}
+
+## TÀI SẢN HIỆN CÓ (rỗng nếu lập lần đầu)
+{{current_assets}}
+
+## TRƯỜNG CREATOR ĐÃ SỬA TAY (giữ nguyên)
+{{creator_fields}}
+
+## GHI CHÚ CỦA CREATOR CHO LẦN NÀY
+{{note}}
+
+## VIỆC CẦN LÀM
+Liệt kê các tài sản video thật sự cần: thứ nào xuất hiện ở từ hai unit trở lên, hoặc cần giữ nguyên diện mạo suốt video, thì thành tài sản. Không lập tài sản cho thứ chỉ thoáng qua. Mỗi tài sản:
+- concept_id: mã của MỘT mục trong danh sách nhân vật, vật thể, khái niệm ở trên mà tài sản thể hiện. CHỈ dùng mã có trong danh sách, chép đúng từng ký tự. Phông nền không gắn mục nào thì để "".
+- name: tên thành phần dạng PascalCase, chỉ chữ và số, ngắn, đọc là hiểu.
+- kind: figure (nhân vật, vật thể) hoặc backdrop (phông nền).
+- tier: hero (thứ video nói về, vẽ chi tiết nhất), support (vai nhỏ) hoặc background (cảnh nền, vẽ đơn giản). Hạng tính theo vai của tài sản TRONG VIDEO NÀY, không theo bản chất của vật.
+- base_illustration_id: id của MỘT hình trong thư viện nếu hình đó thật sự làm nền tốt cho tài sản (cùng loại, hợp hình dạng); không có hình hợp thì "". CHỈ dùng id có trong thư viện.
+- units: các mã unit mà tài sản xuất hiện, theo thứ tự; CHỈ dùng mã có trong kế hoạch hình.
+- same_as: nếu tài sản này là một tài sản hiện có (giữ hoặc sửa), ghi mã của nó (AST-...); tài sản mới để "".
+
+## LUẬT
+- Chỉ dựa vào đầu vào ở trên; tài sản không được trái cách vẽ đã chốt.
+- Cùng một nhân vật hay vật thể xuất hiện ở nhiều unit thì chỉ MỘT tài sản; khác biệt giữa các unit được viết ở lượt mô tả chi tiết, không thành tài sản thứ hai.
+- Tài sản hiện có đang được dùng thì giữ lại (có thể sửa), trừ khi ghi chú của Creator yêu cầu bỏ.
+- Các trường Creator đã sửa tay giữ nguyên giá trị đang có, trừ khi ghi chú của Creator yêu cầu đổi.
+- Không viết khoá asset_id, status, portrayal, must_not_imply, palette_tokens, expressions: máy tự cấp, hoặc được viết ở lượt sau.
+- Viết bằng tiếng Việt; concept_id, name, kind, tier, mã unit và id hình giữ nguyên dạng ASCII như đầu vào.
+
+## ĐẦU RA
+Trả về DUY NHẤT một khối ```json theo mẫu, không thêm chữ nào khác, không thêm hay bớt khoá. Trong nội dung KHÔNG dùng dấu nháy kép thẳng ("): dùng dấu « » hoặc nháy đơn, và không xuống dòng giữa một ô.
+{"assets":[{"same_as":"","concept_id":"...","name":"...","kind":"figure","tier":"support","base_illustration_id":"","units":["VP-001","VP-002"]}]}
+```
+
+## Prompt 4 (mới) · `storyboard_asset_detail` (viết chi tiết một tài sản)
+
+```
+Bạn là THIẾT KẾ TÀI NGUYÊN HÌNH ẢNH của một kênh video phổ biến kiến thức. Danh sách tài sản của video đã được lập. Ở lượt này bạn viết MÔ TẢ CHI TIẾT cho MỘT tài sản, đủ để người vẽ vẽ nó một lần rồi dùng lại ở mọi unit nó xuất hiện.
+
+## CREATIVE BRIEF
+{{brief}}
+
+## TÀI SẢN ĐANG VIẾT (mã, khái niệm, tên, loại, hạng, hình gốc)
+{{asset}}
+
+## NGÔN NGỮ HÌNH ẢNH ĐÃ CHỐT: MỤC KHÁI NIỆM CỦA TÀI SẢN (thuật ngữ, cách vẽ, điều không được gợi ý, dữ kiện)
+{{concept}}
+
+## NGÔN NGỮ HÌNH ẢNH ĐÃ CHỐT: BẢNG MÀU (token, vai trò, tên, mã màu)
+{{palette}}
+
+## CÁC UNIT CÓ TÀI SẢN NÀY (mã, beat, thông tin hình bắt buộc, cách thể hiện, lời thoại)
+{{units}}
+
+## CÁC TÀI SẢN KHÁC CỦA VIDEO (tên, hạng, mô tả nếu đã có)
+{{other_assets}}
+
+## CHI TIẾT HIỆN CÓ CỦA TÀI SẢN (rỗng nếu viết lần đầu)
+{{current}}
+
+## TRƯỜNG CREATOR ĐÃ SỬA TAY (giữ nguyên)
+{{creator_fields}}
+
+## GHI CHÚ CỦA CREATOR CHO LẦN NÀY
+{{note}}
+
+## VIỆC CẦN LÀM
+Viết chi tiết cho tài sản đang viết:
+- portrayal: tài sản này gợi ra cảm giác gì trong video này (tính cách, vai trò, trạng thái), viết tự do, đủ cụ thể để người vẽ hiểu. Phải khớp cách vẽ đã chốt của mục khái niệm.
+- must_not_imply: những điều hình KHÔNG được gợi ý; lấy từ mục khái niệm đã chốt và thêm điều cần tránh riêng cho tài sản này; không có thì [].
+- palette_tokens: các token màu của tài sản, CHỈ lấy token có trong bảng màu. Khác các tài sản khác đủ để người xem phân biệt, trừ khi chúng cố ý cùng nhóm.
+- expressions: các biểu cảm hoặc tư thế tài sản cần có để diễn ra các unit ở trên; không cần thì [].
+
+## LUẬT
+- Chỉ dựa vào đầu vào ở trên; không trái cách vẽ và điều không được gợi ý đã chốt.
+- Không đổi mã, khái niệm, tên, loại, hạng hay hình gốc của tài sản.
+- Các trường Creator đã sửa tay giữ nguyên giá trị đang có, trừ khi ghi chú của Creator yêu cầu đổi.
+- Viết bằng tiếng Việt; token màu giữ nguyên dạng ASCII như đầu vào.
+
+## ĐẦU RA
+Trả về DUY NHẤT một khối ```json theo mẫu, không thêm chữ nào khác, không thêm hay bớt khoá. Trong nội dung KHÔNG dùng dấu nháy kép thẳng ("): dùng dấu « » hoặc nháy đơn, và không xuống dòng giữa một ô.
+{"detail":{"portrayal":"...","must_not_imply":["..."],"palette_tokens":["..."],"expressions":["..."]}}
+```
+
+## Thay đổi kéo theo (sẽ ghi vào thiết kế khi duyệt)
+- Tài sản có thêm trường `units` (từ pha 1, Creator sửa được) và trạng thái chi tiết: chưa có chi tiết → có chi tiết. Nút **Vẽ** chỉ bật khi đã có chi tiết.
+- Tab Tài sản: sau "AI lập danh sách", thêm thẻ chạy **"Viết chi tiết cho n tài sản"** (hệ thống, lần lượt) và **"Chạy tất cả bằng DeepSeek (n)"** (mỗi tài sản một mục hàng đợi); mỗi thẻ tài sản có "AI viết chi tiết" + "Dùng AI ngoài" + "Chạy bằng DeepSeek".
+- Đọc chặt: pha 1 kiểm `units` ⊆ kế hoạch; pha 2 kiểm `palette_tokens` ⊆ bảng màu, không có khoá lạ.
+- Bước 12 trở đi không đổi.

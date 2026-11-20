@@ -78,17 +78,17 @@ Máy kiểm (không lưu, tính mỗi lần đọc), lỗi chặn duyệt shot: 
 ## 5. Dựng khung (rendering)
 **`spec`** do visual-service dựng từ shot và gửi:
 ```jsonc
-{ "project_id", "shot_id", "kit": {…}, "size": {"w":1280,"h":720},
+{ "project_id", "shot_id", "unit_id", "beat_id", "spec_hash", "kit": {…}, "size": {"w":1280,"h":720},
   "background": {"asset_id": "AST-SPACE-001" | null, "color": "#0F1B3D"},   // màu journey của beat
-  "placements": [{"asset_id","role":"subject"|"main","position":"lower_left","scale":0.45}],
+  "placements": [{"asset_id","role":"subject"|"main","position":"lower_left"}],
   "camera_view": "wide", "on_screen_text": [{"text":"Góc nhìn A","min_px":28}],
   "text_color": "#FFFFFF" }
 ```
 **Từ vựng đóng** (kiểm bằng code, ở cả hai service; AI trả giá trị lạ → 502):
 - `position`: `upper_left, upper_center, upper_right, center_left, center, center_right, lower_left, lower_center, lower_right, split_left, split_right, full`. `split_screen` của mẫu JSON là cách gọi chung khi bố cục chia đôi: hai đối tượng nhận `split_left`/`split_right`; AI viết `split_screen` thì máy đổi thành cặp này khi có đúng hai đối tượng, ngược lại 502.
-- `camera_view`: `wide, medium, close, comparison`. Hệ số `scale` theo tier và góc máy (bảng cố định trong code, ví dụ hero/close lớn hơn support/wide).
+- `camera_view`: `wide, medium, close, comparison`. **Kích thước từng hình do rendering quyết**, spec không có `scale`: bộ dựng đo hộp thật của từng hình (Người cao hơn rộng, Vi khuẩn vuông) rồi cho vừa ô lưới theo tier của tài sản (đọc từ `project_assets`) và góc máy (bảng `CAMERA_SCALE` cố định trong `host.tsx`), giữ hình trong vùng vẽ phía trên dải chữ nên không bị cắt và không chạm dải chữ.
 
-**Cách dựng:** mở rộng host xem trước hiện có (`illustration_preview.mjs`, `host.tsx`): thêm lệnh `frame`, nhận `placements` kèm `js` đã biên dịch của từng tài sản (esbuild như hình xem trước) và đặt mỗi tài sản tại ô lưới theo `position`; nền là backdrop tài sản hoặc màu; chữ vẽ ở dải dưới theo `min_px`. Cùng tiến trình Node, cùng hàng đợi một yêu cầu một lúc với xem trước hình. Cache theo `spec_hash` (cùng spec trả lại ảnh cũ).
+**Cách dựng:** mở rộng host xem trước hiện có (`illustration_preview.mjs`, `host.tsx`): thêm lệnh `frame`, nhận `placements` kèm `js` đã biên dịch của từng tài sản (esbuild như hình xem trước) và đặt mỗi tài sản tại ô lưới theo `position`; nền là backdrop tài sản hoặc màu; chữ vẽ ở dải dưới theo `min_px`. Cùng tiến trình Node, cùng hàng đợi một yêu cầu một lúc với xem trước hình. `spec_hash` do người gọi (visual-service) tính trên composition, chữ, tài sản + version, kit, màu nền và gửi kèm; rendering dùng nó làm khoá cache (cùng `spec_hash` và file còn thì trả ảnh cũ), lưu vào `storyboard_shots.spec_hash` và trả lại; `frame_hash` là SHA-256 của PNG, chỉ để tham khảo.
 
 **Rủi ro kỹ thuật:** dựng nhiều tài sản trong một khung là việc mới so với "một hình một ảnh". **Bước đầu của kế hoạch là một thử nghiệm nhỏ (spike)**: dựng một khung hai tài sản + chữ bằng kit R12 và đọc ảnh ra; nếu không đạt thì dừng và báo.
 
@@ -161,3 +161,9 @@ Mockup: `cr-117-storyboard-mockup.html` (artifact https://claude.ai/artifact/5D3
 
 ## 14. Gập mục đã duyệt (bổ sung theo mockup v3)
 Như bước 10: tài sản, shot, unit và beat đã duyệt **gập thành một dòng tóm tắt** (mã, nội dung chính, chip trạng thái, nút "Mở"). Bấm "Duyệt" thì mục gập lại ngay; "Mở" mở ra, "Thu gọn" gập lại; "Bỏ duyệt" mở mục ra để sửa. Unit gập khi mọi shot đã duyệt, beat gập khi mọi unit đã duyệt. Trạng thái mở/gập chỉ nằm ở trang, không lưu. Hiệu ứng theo quy tắc 3 của `docs/ux-ui-design-rules.md` (dùng `.reveal`/`.revealOut`, `usePresence`).
+
+## 15. Lập tài sản hai pha (bản sửa 2026-11-20, đã duyệt)
+Thay §3 bước 1: **pha 1** `storyboard_assets` lập khung (concept_id, name, kind, tier, base_illustration_id, `units`), đầu vào gọn; **pha 2** `storyboard_asset_detail` mỗi tài sản một lượt viết portrayal, must_not_imply, palette_tokens, expressions, chỉ nhận mục khái niệm của tài sản, bảng màu, các unit có tài sản đó và tóm tắt các tài sản khác. Prompt nguyên văn: `cr-117-prompts-draft.md`, phần "BẢN SỬA 2026-11-20".
+- Tài sản thêm `units` (Creator sửa được) và trạng thái chi tiết (chưa có / đã có); **Vẽ** chỉ bật khi đã có chi tiết; sửa `units` hoặc chi tiết của tài sản đã vẽ đưa nó về chưa vẽ như sửa mô tả.
+- Route mới: `POST /assets/{aid}/detail` (`{note}` + `X-External-AI`), `POST /assets/detail` (mọi tài sản chưa có chi tiết, lần lượt). web-gui: thẻ chạy "Viết chi tiết cho n tài sản", "Chạy tất cả bằng DeepSeek (n)" (mỗi tài sản một mục hàng đợi), nút AI/AI ngoài/DeepSeek trên từng thẻ tài sản.
+- Đọc chặt: pha 1 `units` ⊆ kế hoạch, không khoá lạ; pha 2 `palette_tokens` ⊆ bảng màu, không khoá lạ, không đổi trường khung.
