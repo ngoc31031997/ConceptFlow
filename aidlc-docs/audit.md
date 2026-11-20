@@ -3774,3 +3774,11 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **User Input**: "xoá"
 **AI Response**: Đã chạy: DROP 6 bảng hình + trigger/hàm pin_visual_language + 4 cột ở authoring; xoá mọi dự án trừ 335da643 (orchestrator 7, authoring 579 project_authoring + bảng con, llm_calls 229, outbox đã gửi tts 1013/rendering 1264/video-assembly 1023); ghi kit phatsang vào R12; xoá /shared/stills và /shared/1332cd4d…. Kiểm: kit dự án = R12, vẽ khung tĩnh thật thành công (ảnh thử đã xoá).
 **Context**: Construction CR-116, chờ Creator review.
+
+---
+
+## CR-118 · AI Bridge chỉ qua hàng đợi, DeepSeek / Gemini / Grok — yêu cầu và thiết kế
+**Timestamp**: 2026-11-20
+**User Input**: "sửa lại theo dạng chạy AI Extension bằng cách add task vào queue default chạy deepseek có thể đổi qua kimi" / "dùng qua kimi.com bổ sung thêm gemini" / "bỏ kimi" (thêm Grok, gửi HTML Gemini/Grok) / "ok chỉ dùng hàng đợi. mỗi lượt mở lượt chat mới" / "trong hàng đợi có thể cho thay đổi model cho 1 task. còn trong cài đặt là thay đổi model default cho toàn bộ task" / "go"
+**AI Response**: Mở worktree feature/cr-118-ai-bridge-providers. Không chồng lấn CR-117. Viết cr-118-ai-bridge-providers.md (FR-1..9), ADR-0051 (Proposed), cr-118-ai-bridge-providers-design.md. Chưa code.
+**Context**: Inception + Application Design CR-118, chờ Creator duyệt.
