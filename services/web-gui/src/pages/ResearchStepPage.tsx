@@ -1,6 +1,6 @@
 import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import type { ResearchFact, ResearchState } from "../api/client";
+import { researchPasteRequest, type ResearchFact, type ResearchState } from "../api/client";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import type { StepStripProps } from "../components/StepStrip";
@@ -14,15 +14,16 @@ import { QuestionsCard } from "../components/research/QuestionsCard";
 import styles from "../components/research/research.module.css";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
-import { useAiBridge, type AiBridgeModes } from "../hooks/useAiBridge";
+import type { AiBridgeModes } from "../hooks/useAiBridge";
 import { useLlmStatus } from "../hooks/useLlmStatus";
+import { useQueuedExternalRun } from "../hooks/useQueuedExternalRun";
 import { useResearch } from "../hooks/useResearch";
 import { VIEW_RESEARCH, readOnlyReason, storyRoute } from "../utils/flow";
 
 const SUBTITLE =
   "Sinh câu hỏi cần tra, chép prompt ra công cụ nghiên cứu bên ngoài, rồi dán kết quả lại. Hệ thống tải từng link và kiểm đoạn trích có thật trong trang không.";
 
-/** Research needs sources, so DeepSeek reasons and searches the web. */
+/** Research needs sources, so on DeepSeek the run reasons and searches the web. */
 const RESEARCH_MODES: AiBridgeModes = { deepThink: true, search: true };
 
 const ROLE =
@@ -79,8 +80,18 @@ export function ResearchStepPage() {
   const [editing, setEditing] = useState<ResearchFact | null>(null);
   const [adding, setAdding] = useState(false);
   const [pasteText, setPasteText] = useState("");
-  const [bridgeError, setBridgeError] = useState<string | null>(null);
-  const bridge = useAiBridge();
+  // Why the answer put back in the box could not be read.
+  const [unreadable, setUnreadable] = useState<string | null>(null);
+  // The research prompt runs through the AI queue: the extension reads the answer and the step reloads its facts.
+  const queued = useQueuedExternalRun({
+    label: "Tra cứu dữ kiện",
+    modes: RESEARCH_MODES,
+    onDone: research.reload,
+    onUnreadable: (reply, message) => {
+      setPasteText(reply);
+      setUnreadable(message);
+    },
+  });
 
   if (!projectId) return <Navigate to="/" replace />;
 
@@ -94,16 +105,10 @@ export function ResearchStepPage() {
     return read;
   }
 
-  /** Runs the prompt on DeepSeek, puts the answer in the box of section 2 and reads it, as a paste by hand would be. */
-  async function runOnDeepSeek(prompt: string) {
-    setBridgeError(null);
-    const outcome = await bridge.run("deepseek", prompt, RESEARCH_MODES);
-    if (!outcome.ok) {
-      setBridgeError(outcome.cancelled ? null : outcome.message);
-      return;
-    }
-    setPasteText(outcome.text);
-    await readPaste(outcome.text);
+  /** Queues the prompt; the extension runs it and has the server read the answer as a paste by hand would be. */
+  function runQueued(prompt: string) {
+    setUnreadable(null);
+    void queued.start({ prompt, request: researchPasteRequest(projectId) });
   }
 
   function content(s: ResearchState) {
@@ -162,13 +167,10 @@ export function ResearchStepPage() {
           onTextChange={setPasteText}
           onRead={() => readPaste(pasteText)}
           bridge={{
-            available: bridge.providers.includes("deepseek"),
-            stage: bridge.stage,
-            modes: RESEARCH_MODES,
-            error: bridgeError,
+            run: queued,
+            error: queued.error ?? unreadable,
             enabled: !locked && !research.busy,
-            onRun: (prompt) => void runOnDeepSeek(prompt),
-            onCancel: bridge.cancel,
+            onRun: runQueued,
           }}
         />
         <FactsCard

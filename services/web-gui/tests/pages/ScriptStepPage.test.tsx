@@ -159,28 +159,31 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(generate).toHaveBeenCalledWith(expect.any(String), "", { external: { mode: "prompt" } });
   });
 
-  it("tạo project rồi chạy ý tưởng trên DeepSeek; câu trả lời được đọc như dán tay, không tự đánh giá", async () => {
-    const bridge = installFakeAiBridge();
+  it("tạo project rồi thêm ý tưởng vào hàng đợi AI; extension đọc câu trả lời, trang chỉ tải lại", async () => {
+    const bridge = installFakeAiBridge({ queue: true });
+    const request = { gateway: "http://localhost:8080", method: "POST", path: "/v1/projects/p1/idea/generate", body: "{}" };
     try {
       generate.mockImplementation(async (_id, _note, call) => {
         if (call && "external" in call) {
+          if (call.external.mode === "describe") throw new apiClient.ExternalRequestDescribed(request);
           if (call.external.mode === "prompt") throw new apiClient.ExternalPromptReady("PROMPT Ý TƯỞNG");
-          server = { ...server, idea: ideaOf() };
         }
         return ideaOf() as never;
       });
       renderPage();
       await screen.findByText("Tạo project và viết ý tưởng →");
       typeText(SUBJECT);
-      fireEvent.click(await screen.findByTestId("script-step-create-deepseek"));
+      fireEvent.click(await screen.findByTestId("script-step-create-queue"));
 
-      await waitFor(() => expect(bridge.runs).toHaveLength(1));
+      await waitFor(() => expect(bridge.queued).toHaveLength(1));
       expect(createDraft).toHaveBeenCalledWith(expect.any(String), SUBJECT, "vi");
-      expect(bridge.runs[0]).toMatchObject({ provider: "deepseek", prompt: "PROMPT Ý TƯỞNG" });
-      act(() => bridge.send({ type: "result", request_id: bridge.runs[0].requestId, text: "ý tưởng của DeepSeek" }));
+      expect(bridge.queued[0].item).toMatchObject({ label: "Ý tưởng", request });
+      expect(generate).toHaveBeenCalledWith(expect.any(String), "", { external: { mode: "describe" } });
+      server = { ...server, idea: ideaOf() };
+      act(() => bridge.announce("q1", { status: "done", provider: "gemini" }));
 
       expect(await screen.findByTestId("idea-field-central_question")).toHaveTextContent("Người rơi thấy gì");
-      expect(generate).toHaveBeenLastCalledWith(expect.any(String), "", { external: { mode: "paste", reply: "ý tưởng của DeepSeek" } });
+      expect(generate).not.toHaveBeenCalledWith(expect.any(String), "", { external: expect.objectContaining({ mode: "paste" }) });
       expect(review).not.toHaveBeenCalled();
     } finally {
       bridge.remove();

@@ -2177,6 +2177,11 @@ export async function editResearchQuestion(projectId: string, id: string, text: 
   await editUnit(projectId, researchQuestionUnit(id), { text });
 }
 
+/** The request that reads a pasted research answer (`{raw}`), for the extension to make once it has the answer. */
+export function researchPasteRequest(projectId: string): ExternalRequest {
+  return { gateway: GATEWAY_URL, method: "POST", path: `/v1/projects/${projectId}/research/paste` };
+}
+
 /** The prompt to copy into an outside research tool. */
 export async function getResearchPrompt(projectId: string): Promise<string> {
   return (await apiFetch<{ prompt: string }>(`/v1/projects/${projectId}/research/prompt`)).prompt;

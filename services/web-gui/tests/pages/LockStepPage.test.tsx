@@ -238,19 +238,19 @@ describe("LockStepPage", () => {
     expect(screen.queryByTestId("handoff-review-b1-unapprove")).not.toBeInTheDocument();
   });
 
-  it("queues the notes still to write on DeepSeek, one item per beat, without calling the AI", async () => {
+  it("queues the notes still to write on the AI queue, one item per beat, without calling the AI", async () => {
     const bridge = installFakeAiBridge({ queue: true });
     const generate = vi.spyOn(apiClient, "generateHandoff");
     await ready();
     fireEvent.click(screen.getByTestId("lock-tab-handoff"));
     const button = await screen.findByTestId("handoff-queue-all");
-    expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (1)");
+    expect(button).toHaveTextContent("Thêm tất cả vào hàng đợi AI (1)");
     fireEvent.click(button);
     await waitFor(() => expect(bridge.queued).toHaveLength(1));
     const request = bridge.queued[0].item.request as { path: string; body: string };
     expect(request.path).toBe("/v1/projects/p1/script-lock/handoff/generate");
     expect(JSON.parse(request.body)).toEqual({ beat: "b3" });
-    expect(await screen.findByTestId("handoff-queue-note")).toHaveTextContent("Đã thêm 1 beat vào hàng đợi DeepSeek");
+    expect(await screen.findByTestId("handoff-queue-note")).toHaveTextContent("Đã thêm 1 beat vào hàng đợi AI");
     generate.mock.calls.forEach((call) => expect(call[2]).toEqual({ external: { mode: "describe" } }));
     bridge.remove();
   });

@@ -337,14 +337,14 @@ describe("ScriptWriteStepPage", () => {
       const generate = vi.spyOn(apiClient, "generateScript");
       await ready();
       const button = await screen.findByTestId("script-queue-all");
-      expect(button).toHaveTextContent("Chạy tất cả bằng DeepSeek (2)");
+      expect(button).toHaveTextContent("Thêm tất cả vào hàng đợi AI (2)");
       fireEvent.click(button);
       await waitFor(() => expect(bridge.queued).toHaveLength(2));
       expect(bridge.queued.map((q) => q.item.label)).toEqual(["B2 · Beat b2", "B3 · Beat b3"]);
       const first = bridge.queued[0].item.request as { method: string; path: string; body: string };
       expect(first.path).toBe("/v1/projects/p1/script/generate");
       expect(JSON.parse(first.body)).toEqual({ beat: "b2", note: "" });
-      expect(await screen.findByTestId("script-queue-note")).toHaveTextContent("Đã thêm 2 beat vào hàng đợi DeepSeek");
+      expect(await screen.findByTestId("script-queue-note")).toHaveTextContent("Đã thêm 2 beat vào hàng đợi AI");
       generate.mock.calls.forEach((call) => expect(call[3]).toEqual({ external: { mode: "describe" } }));
     });
   });

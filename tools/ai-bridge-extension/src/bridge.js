@@ -6,14 +6,21 @@
  */
 (function () {
   const P = globalThis.AiBridgeProtocol;
+  const PR = globalThis.AiBridgeProviders;
   const version = chrome.runtime.getManifest().version;
 
   function post(message) {
     window.postMessage(message, window.location.origin);
   }
 
-  function pong() {
-    post(P.toPage("pong", { providers: P.PROVIDERS, version: version }));
+  async function pong() {
+    let stored = {};
+    try {
+      stored = await chrome.storage.local.get(PR.DEFAULT_KEY);
+    } catch (err) {
+      console.warn("ai-bridge: could not read the default provider:", err);
+    }
+    post(P.toPage("pong", { providers: PR.IDS, default_provider: PR.readDefault(stored[PR.DEFAULT_KEY]), version: version }));
     chrome.runtime.sendMessage({ kind: "queue_get" }).then(function (counts) {
       if (counts) post(P.toPage("queue_state", counts));
     }).catch(function (err) {
@@ -32,23 +39,19 @@
     const msg = P.parsePageMessage(event.data);
     if (!msg) return;
     if (msg.type === "ping") {
-      pong();
+      void pong();
       return;
     }
     if (msg.type === "cancel") {
-      sendToWorker({ kind: "cancel", requestId: msg.requestId });
+      sendToWorker({ kind: "page_cancel", itemId: msg.itemId });
       return;
     }
-    if (msg.type === "queue_add") {
-      sendToWorker({ kind: "queue_add", requestId: msg.requestId, item: msg.item }, msg.requestId);
-      return;
-    }
-    sendToWorker({ kind: "run", requestId: msg.requestId, provider: msg.provider, prompt: msg.prompt, modes: msg.modes }, msg.requestId);
+    sendToWorker({ kind: "queue_add", requestId: msg.requestId, item: msg.item }, msg.requestId);
   });
 
   chrome.runtime.onMessage.addListener(function (message) {
     if (message && message.kind === "to-page" && message.payload) post(message.payload);
   });
 
-  pong();
+  void pong();
 })();

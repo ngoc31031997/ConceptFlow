@@ -6,7 +6,7 @@ import {
   type VisualPlanBeat,
   type VisualPlanState,
 } from "../../api/client";
-import { useDeepSeekQueue } from "../../hooks/useDeepSeekQueue";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import type { VisualPlanControls } from "../../hooks/useVisualPlan";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, Dropdown, FormField, TextArea } from "../ui";
@@ -33,7 +33,7 @@ interface PlanHeadCardProps {
 
 /**
  * The head of step 9: the inputs the AI reads, the model, the actions on every
- * beat at once (plan the empty beats, queue them on DeepSeek, approve the rest)
+ * beat at once (plan the empty beats, queue them on an outside AI, approve the rest)
  * and the state of a run in flight.
  */
 export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardProps) {
@@ -41,7 +41,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
   const [note, setNote] = useState("");
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const queue = useDeepSeekQueue((path) => {
+  const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/visual-plan`)) void plan.reload();
   });
   const disabled = readOnly || plan.busy || plan.running !== null;
@@ -78,7 +78,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
       }
       setQueueNote({
         tone: "ok",
-        text: `Đã thêm ${added} beat vào hàng đợi DeepSeek${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi beat đọc các beat trước nó; bấm icon extension để xem.`,
+        text: `Đã thêm ${added} beat vào hàng đợi AI${already > 0 ? `, ${already} beat đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi beat đọc các beat trước nó; bấm icon extension để xem.`,
       });
     } catch (err) {
       setQueueNote({ tone: "error", text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi." });
@@ -140,7 +140,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
           </Button>
           {queue.available && notApproved.length > 0 && (
             <Button variant="run" onClick={() => void queueAll()} disabled={disabled || queueing} data-testid="plan-queue">
-              Chạy tất cả bằng DeepSeek ({notApproved.length})
+              Thêm tất cả vào hàng đợi AI ({notApproved.length})
             </Button>
           )}
           <span className={researchStyles.grow} />
@@ -176,7 +176,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
         )}
         {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
           <p className={researchStyles.hint} data-testid="plan-queue-counts">
-            Hàng đợi DeepSeek: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi
+            Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi
             {queue.counts.paused ? " · đang tạm dừng" : ""}.
           </p>
         )}

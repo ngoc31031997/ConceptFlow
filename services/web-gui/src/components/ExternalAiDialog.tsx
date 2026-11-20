@@ -1,82 +1,76 @@
 import { useEffect, useState } from "react";
 import { ExternalPromptReady, type ExternalAi } from "../api/client";
-import { useAiBridge, type AiBridgeModes } from "../hooks/useAiBridge";
-import { DEFAULT_DEEPSEEK_MODES, messageOf } from "../hooks/useDeepSeekRun";
-import { AiBridgeRunStatus } from "./AiBridgeRunStatus";
+import type { AiBridgeModes } from "../hooks/useAiBridge";
+import { DEFAULT_AI_MODES, messageOf, useQueuedExternalRun } from "../hooks/useQueuedExternalRun";
+import { QueuedRunButton } from "./QueuedRunButton";
 import { Button, CopyBox, Dialog, TextArea } from "./ui";
 import styles from "./ExternalAiDialog.module.css";
 
-interface ExternalAiDialogProps<T> {
+interface ExternalAiDialogBaseProps<T> {
   open: boolean;
   onClose: () => void;
-  /** Names the item and the task ("Câu chuyện · AI ngoài"). */
+  /** Names the item and the task ("Câu chuyện · AI ngoài"); also names the item in the extension's queue. */
   title: string;
   /**
    * Makes the step's own AI request in the given external mode. In "prompt" mode it rejects with
-   * `ExternalPromptReady`; in "paste" mode it resolves once the step has stored the result.
+   * `ExternalPromptReady`; in "paste" mode it resolves once the step has stored the result; in "describe" mode
+   * it rejects with `ExternalRequestDescribed`, which is how the queue gets the request.
    */
   run: (external: ExternalAi) => Promise<T>;
-  /** The reply was read and the step ran on it; gets what the request returned. The screen loads what changed. */
-  onDone: (result: T) => void | Promise<void>;
-  /** DeepSeek modes for "Chạy bằng DeepSeek"; reasoning only unless the step needs web sources. */
-  deepSeekModes?: AiBridgeModes;
-  /** A reply to show in the reply box on opening, e.g. DeepSeek's answer the step could not read. */
+  /** Modes for the item queued on DeepSeek; reasoning only unless the step needs web sources. */
+  modes?: AiBridgeModes;
+  /** A reply to show in the reply box on opening, e.g. an answer the step could not read. */
   initialReply?: string;
   /** Why `initialReply` could not be read, shown under the reply box on opening. */
   initialError?: string;
   testId: string;
 }
 
-interface DeepSeekRunProps {
-  prompt: string;
+/**
+ * What happens once the reply was read. By default the dialog also offers "Thêm vào hàng đợi AI", whose answer
+ * is read in the extension, so `onDone` gets nothing and the screen loads what changed. A step whose result is
+ * not stored but shown (`queued: false`) gets the result of the pasted reply and has no queue button.
+ */
+type ExternalAiDialogProps<T> = ExternalAiDialogBaseProps<T> &
+  ({ queued?: true; onDone: () => void | Promise<void> } | { queued: false; onDone: (result: T) => void | Promise<void> });
+
+interface QueuedSectionProps<T> {
+  title: string;
+  run: (external: ExternalAi) => Promise<T>;
   modes: AiBridgeModes;
   disabled: boolean;
-  /** DeepSeek's whole answer, to put in the reply box and read. */
-  onAnswer: (text: string) => void;
+  /** The item is done: the step stored the answer and the screen loads what changed. */
+  onDone: () => void | Promise<void>;
+  /** The item failed with an answer the step could not read: it goes in the reply box with the reason. */
+  onUnreadable: (reply: string, message: string) => void;
   testId: string;
 }
 
 /**
- * "Chạy bằng DeepSeek": the AI Bridge extension runs the prompt on DeepSeek in
- * a new tab and hands the answer back. Rendered only while the dialog
- * is open, so closing the dialog stops waiting for a run. Without the
- * extension it shows nothing and the dialog stays copy-and-paste.
+ * "Thêm vào hàng đợi AI": the step's request goes into the AI Bridge extension's queue, which runs the prompt
+ * on an outside AI (the provider chosen in the extension) and has the step read the answer. Rendered only while
+ * the dialog is open; closing the dialog stops following the item but does not take it out of the queue.
+ * Without the extension it says how to install it and the dialog stays copy-and-paste.
  */
-function DeepSeekRun({ prompt, modes, disabled, onAnswer, testId }: DeepSeekRunProps) {
-  const bridge = useAiBridge();
-  const [error, setError] = useState<string | null>(null);
-  if (!bridge.providers.includes("deepseek")) {
+function QueuedSection<T>({ title, run, modes, disabled, onDone, onUnreadable, testId }: QueuedSectionProps<T>) {
+  const queued = useQueuedExternalRun({ run, label: title, onDone, onUnreadable, modes });
+  if (!queued.available && !queued.outdated) {
     return (
-      <p className={styles.hint} data-testid={`${testId}-deepseek-missing`}>
-        Cài extension ConceptFlow AI Bridge (tools/ai-bridge-extension) để chạy prompt bằng DeepSeek và tự dán kết quả.
+      <p className={styles.hint} data-testid={`${testId}-extension-missing`}>
+        Cài extension ConceptFlow AI Bridge (tools/ai-bridge-extension) để chạy prompt bằng DeepSeek, Gemini hoặc Grok và tự dán kết quả.
       </p>
     );
   }
-
-  async function start() {
-    setError(null);
-    const outcome = await bridge.run("deepseek", prompt, modes);
-    if (outcome.ok) onAnswer(outcome.text);
-    else if (!outcome.cancelled) setError(outcome.message);
-  }
-
   return (
     <div className={styles.section}>
-      {bridge.stage === null ? (
-        <div>
-          <Button variant="run" onClick={() => void start()} disabled={disabled} data-testid={`${testId}-deepseek`}>
-            Chạy bằng DeepSeek
-          </Button>
-          <p className={styles.hint}>Extension chạy prompt trên DeepSeek ở một tab mới, dán câu trả lời vào ô bên dưới rồi tự đọc kết quả.</p>
-        </div>
-      ) : (
-        <AiBridgeRunStatus stage={bridge.stage} modes={modes} onCancel={bridge.cancel} testId={`${testId}-deepseek`} />
-      )}
-      {error && (
-        <p className={styles.error} role="alert" data-testid={`${testId}-deepseek-error`}>
-          {error}
-        </p>
-      )}
+      <div>
+        <QueuedRunButton run={queued} disabled={disabled} testId={`${testId}-queue`} />
+        {!queued.busy && queued.available && (
+          <p className={styles.hint}>
+            Extension chạy prompt trên AI ngoài ở một tab mới (nhà cung cấp chọn trong extension), tự đọc câu trả lời và lưu vào bước này. Đóng hộp thoại không huỷ mục.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -95,20 +89,11 @@ export interface ExternalRedo {
  * to paste the other AI's answer into; "Đọc kết quả" then runs the step on that
  * answer exactly as it would on the model's own. A reply the step cannot use is
  * explained here and the pasted text stays, so the Creator fixes it or pastes again.
- * With the AI Bridge extension installed, "Chạy bằng DeepSeek" does the copy,
- * the run and the paste, then reads the answer the same way.
+ * With the AI Bridge extension installed, "Thêm vào hàng đợi AI" has the extension
+ * do the copy, the run and the paste, then read the answer the same way.
  */
-export function ExternalAiDialog<T>({
-  open,
-  onClose,
-  title,
-  run,
-  onDone,
-  deepSeekModes = DEFAULT_DEEPSEEK_MODES,
-  initialReply = "",
-  initialError,
-  testId,
-}: ExternalAiDialogProps<T>) {
+export function ExternalAiDialog<T>(props: ExternalAiDialogProps<T>) {
+  const { open, onClose, title, run, modes = DEFAULT_AI_MODES, initialReply = "", initialError, testId } = props;
   const [prompt, setPrompt] = useState<string | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
@@ -152,7 +137,8 @@ export function ExternalAiDialog<T>({
       return;
     }
     setReading(false);
-    await onDone(result);
+    if (props.queued === false) await props.onDone(result);
+    else await props.onDone();
     onClose();
   }
 
@@ -200,14 +186,19 @@ export function ExternalAiDialog<T>({
           </CopyBox>
         )}
       </div>
-      {open && prompt !== null && (
-        <DeepSeekRun
-          prompt={prompt}
-          modes={deepSeekModes}
+      {open && props.queued !== false && (
+        <QueuedSection
+          title={title}
+          run={run}
+          modes={modes}
           disabled={reading}
-          onAnswer={(text) => {
-            setReply(text);
-            void read(text);
+          onDone={async () => {
+            await props.onDone();
+            onClose();
+          }}
+          onUnreadable={(reply, message) => {
+            setReply(reply);
+            setReadError(message);
           }}
           testId={testId}
         />

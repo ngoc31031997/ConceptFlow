@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ResearchStepPage } from "../../src/pages/ResearchStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
@@ -203,78 +203,94 @@ describe("ResearchStepPage", () => {
     expect(screen.getByTestId("research-paste-input")).toHaveValue("chỉ là văn bản");
   });
 
-  it("without the AI Bridge extension shows how to install it instead of the DeepSeek button", async () => {
+  it("without the AI Bridge extension shows how to install it instead of the queue button", async () => {
     await ready();
     await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());
     expect(screen.getByTestId("research-bridge-missing")).toHaveTextContent("ConceptFlow AI Bridge");
     expect(screen.queryByTestId("research-bridge-run")).not.toBeInTheDocument();
   });
 
-  it("runs the prompt on DeepSeek, puts the answer in section 3 and reads it", async () => {
-    const fake = installFakeAiBridge();
-    const paste = vi.spyOn(apiClient, "pasteResearch").mockResolvedValue({
-      added: ["F13"],
-      updated: [],
-      rejected: [],
-      log: { n: 2, at: "", added: ["F13"], updated: [], rejected: [] },
-    });
+  it("says to update an extension of the old protocol", async () => {
+    const fake = installFakeAiBridge({ legacy: true });
     try {
       await ready();
-      fireEvent.click(await screen.findByTestId("research-bridge-run"));
-      await waitFor(() => expect(fake.runs).toHaveLength(1));
-      expect(fake.runs[0]).toMatchObject({ provider: "deepseek", prompt: "PROMPT NGHIÊN CỨU\nQ1. Quả sung có phải là hoa không?" });
-      fake.send({ type: "progress", request_id: fake.runs[0].requestId, stage: "answering" });
-      await waitFor(() => expect(screen.getByTestId("research-bridge-stage")).toHaveTextContent("DeepSeek đang suy nghĩ"));
-      fake.send({ type: "result", request_id: fake.runs[0].requestId, text: "```json\n{}\n```" });
-      await waitFor(() => expect(paste).toHaveBeenCalledWith("p1", "```json\n{}\n```"));
-      await waitFor(() => expect(screen.getByTestId("research-paste-input")).toHaveValue(""));
-      expect(screen.getByTestId("research-paste-message")).toHaveTextContent("Đã đọc 1 dữ kiện");
-      expect(screen.getByTestId("research-bridge-run")).toBeInTheDocument();
+      expect(await screen.findByTestId("research-bridge-outdated")).toHaveTextContent("Cập nhật extension ConceptFlow AI Bridge");
+      expect(screen.queryByTestId("research-bridge-run")).not.toBeInTheDocument();
     } finally {
       fake.remove();
     }
   });
 
-  it("keeps DeepSeek's answer in section 3 when the server cannot read it", async () => {
-    const fake = installFakeAiBridge();
-    vi.spyOn(apiClient, "pasteResearch").mockRejectedValue(new apiClient.ApiError("không tìm thấy khối JSON", undefined, undefined, 400));
-    try {
-      await ready();
-      fireEvent.click(await screen.findByTestId("research-bridge-run"));
-      await waitFor(() => expect(fake.runs).toHaveLength(1));
-      fake.send({ type: "result", request_id: fake.runs[0].requestId, text: "chỉ là văn bản" });
-      await waitFor(() => expect(screen.getByTestId("research-paste-message")).toHaveTextContent("không tìm thấy khối JSON"));
-      expect(screen.getByTestId("research-paste-input")).toHaveValue("chỉ là văn bản");
-    } finally {
-      fake.remove();
-    }
-  });
-
-  it("shows the extension's error and fills nothing", async () => {
-    const fake = installFakeAiBridge();
+  it("queues the prompt of section 2 as an item that pastes to the research step, then reloads the facts when it is done", async () => {
+    const fake = installFakeAiBridge({ queue: true });
     const paste = vi.spyOn(apiClient, "pasteResearch");
     try {
       await ready();
+      await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());
       fireEvent.click(await screen.findByTestId("research-bridge-run"));
-      await waitFor(() => expect(fake.runs).toHaveLength(1));
-      fake.send({ type: "error", request_id: fake.runs[0].requestId, code: "not_logged_in", message: "Chưa đăng nhập DeepSeek." });
-      await waitFor(() => expect(screen.getByTestId("research-bridge-error")).toHaveTextContent("Chưa đăng nhập DeepSeek."));
-      expect(screen.getByTestId("research-paste-input")).toHaveValue("");
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      expect(fake.queued[0].item).toMatchObject({
+        label: "Tra cứu dữ kiện",
+        project: "p1",
+        kind: "prompt",
+        prompt: "PROMPT NGHIÊN CỨU\nQ1. Quả sung có phải là hoa không?",
+        modes: { deepThink: true, search: true },
+      });
+      expect((fake.queued[0].item.request as { path: string }).path).toBe("/v1/projects/p1/research/paste");
+      act(() => fake.announce("q1", { status: "running", stage: "answering", provider: "deepseek" }));
+      await waitFor(() => expect(screen.getByTestId("research-bridge-stage")).toHaveTextContent("Đang chạy trên DeepSeek"));
+      const reloads = vi.mocked(apiClient.getResearch).mock.calls.length;
+      act(() => fake.announce("q1", { status: "done", provider: "deepseek" }));
+      await waitFor(() => expect(vi.mocked(apiClient.getResearch).mock.calls.length).toBeGreaterThan(reloads));
       expect(paste).not.toHaveBeenCalled();
+      expect(screen.getByTestId("research-bridge-run")).toBeInTheDocument();
     } finally {
       fake.remove();
     }
   });
 
-  it("cancels a DeepSeek run without an error", async () => {
-    const fake = installFakeAiBridge();
+  it("puts an answer the server cannot read back in section 3 with the reason", async () => {
+    const fake = installFakeAiBridge({ queue: true });
     try {
       await ready();
+      await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());
       fireEvent.click(await screen.findByTestId("research-bridge-run"));
-      await waitFor(() => expect(fake.runs).toHaveLength(1));
-      fireEvent.click(screen.getByTestId("research-bridge-cancel"));
-      await waitFor(() => expect(fake.cancels).toEqual([fake.runs[0].requestId]));
-      expect(screen.getByTestId("research-bridge-run")).toBeInTheDocument();
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      act(() => fake.announce("q1", { status: "failed", provider: "grok", error: "không tìm thấy khối JSON", reply: "chỉ là văn bản" }));
+      await waitFor(() => expect(screen.getByTestId("research-paste-input")).toHaveValue("chỉ là văn bản"));
+      expect(screen.getByTestId("research-bridge-error")).toHaveTextContent("không tìm thấy khối JSON");
+    } finally {
+      fake.remove();
+    }
+  });
+
+  it("shows why the item failed when there is no answer and fills nothing", async () => {
+    const fake = installFakeAiBridge({ queue: true });
+    try {
+      await ready();
+      await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());
+      fireEvent.click(await screen.findByTestId("research-bridge-run"));
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      act(() => fake.announce("q1", { status: "failed", provider: "gemini", error: "Chưa đăng nhập Gemini." }));
+      await waitFor(() => expect(screen.getByTestId("research-bridge-error")).toHaveTextContent("Chưa đăng nhập Gemini."));
+      expect(screen.getByTestId("research-paste-input")).toHaveValue("");
+    } finally {
+      fake.remove();
+    }
+  });
+
+  it("takes the item out of the queue on cancel without an error", async () => {
+    const fake = installFakeAiBridge({ queue: true });
+    try {
+      await ready();
+      await waitFor(() => expect(screen.getByTestId("research-prompt-open")).not.toBeDisabled());
+      fireEvent.click(await screen.findByTestId("research-bridge-run"));
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      act(() => fake.announce("q1", { status: "running", stage: "answering" }));
+      fireEvent.click(await screen.findByTestId("research-bridge-cancel"));
+      await waitFor(() => expect(fake.cancels).toEqual(["q1"]));
+      act(() => fake.announce("q1", { status: "cancelled" }));
+      await waitFor(() => expect(screen.getByTestId("research-bridge-run")).toBeInTheDocument());
       expect(screen.queryByTestId("research-bridge-error")).not.toBeInTheDocument();
     } finally {
       fake.remove();
@@ -382,7 +398,7 @@ describe("ResearchStepPage", () => {
     it("picks where the questions are generated and keeps the model choice for the system AI only", async () => {
       await ready();
       expect(screen.getByTestId("question-engine-system")).toHaveAttribute("aria-checked", "true");
-      expect(screen.queryByTestId("question-engine-deepseek")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("question-engine-queue")).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId("question-engine-outside"));
       expect(screen.getByTestId("question-engine-outside")).toHaveAttribute("aria-checked", "true");
       expect(screen.getByTestId("question-engine-system")).toHaveAttribute("aria-checked", "false");

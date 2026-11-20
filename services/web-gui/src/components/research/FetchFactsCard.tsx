@@ -1,28 +1,26 @@
 import { useEffect, useState } from "react";
 import { getResearchPrompt, type PasteLog, type ResearchQuestion } from "../../api/client";
-import type { AiBridgeModes, AiBridgeStage } from "../../hooks/useAiBridge";
+import type { QueuedExternalRun } from "../../hooks/useQueuedExternalRun";
 import type { PasteMessage } from "../../hooks/useResearch";
 import { usePresence } from "../../hooks/usePresence";
 import glass from "../../styles/glass.module.css";
 import { AiBridgeRunStatus } from "../AiBridgeRunStatus";
+import { UPDATE_EXTENSION_TEXT } from "../QueuedRunButton";
 import { Button, Card, CopyButton, TextArea } from "../ui";
 import { errorText } from "./errorText";
 import { describePaste, pasteTime } from "./pasteText";
 import { PromptModal } from "./PromptModal";
 import styles from "./research.module.css";
 
-/** The "Chạy bằng DeepSeek" control, shown when the AI Bridge extension is installed. */
+/** The "Thêm vào hàng đợi AI" control, shown when the AI Bridge extension is installed. */
 export interface FetchFactsBridge {
-  available: boolean;
-  stage: AiBridgeStage | null;
-  /** The DeepSeek modes the run turns on. */
-  modes: AiBridgeModes;
-  /** Why the last run gave no answer, or null. */
+  /** The queued run this control follows (its item, errors and availability). */
+  run: QueuedExternalRun;
+  /** Why the last run gave nothing the step could read (its own error, or the reason an answer put in the box was unreadable), or null. */
   error: string | null;
   /** False while the step is locked or a paste is being read. */
   enabled: boolean;
   onRun: (prompt: string) => void;
-  onCancel: () => void;
 }
 
 interface FetchFactsCardProps {
@@ -32,7 +30,7 @@ interface FetchFactsCardProps {
   message: PasteMessage | null;
   busy: boolean;
   locked: boolean;
-  /** The text in the box; the page holds it so a DeepSeek run can fill it. */
+  /** The text in the box; the page holds it so an answer the step could not read can be put back for fixing. */
   text: string;
   onTextChange: (text: string) => void;
   /** Reads `text`; resolves true when it was read, so the box can be emptied. */
@@ -43,9 +41,9 @@ interface FetchFactsCardProps {
 /**
  * Section 2 of the research step: getting facts into the table. The prompt is
  * built from the brief and the questions and read again whenever a question
- * changes. The Creator either has DeepSeek run it (the answer lands in the box
- * and is read by itself) or copies it to an outside research tool and pastes
- * the whole answer back, as many times as they like. The server finds the JSON
+ * changes. The Creator either queues it for the AI Bridge extension (an outside
+ * AI runs it and the step reads the answer by itself) or copies it to an outside
+ * research tool and pastes the whole answer back, as many times as they like. The server finds the JSON
  * block, merges the facts by code and logs each paste with what it read and
  * left out.
  */
@@ -109,27 +107,31 @@ export function FetchFactsCard({ projectId, questions, pastes, message, busy, lo
         <div className={styles.split}>
           <div className={styles.option} data-testid="research-bridge">
             <b>Tự động</b>
-            {bridge.available ? (
+            {bridge.run.available ? (
               <>
-                <span className={styles.hint}>DeepSeek chạy prompt và tự điền câu trả lời vào ô bên dưới.</span>
+                <span className={styles.hint}>Extension chạy prompt trên AI ngoài (DeepSeek bật DeepThink và Search), tự đọc câu trả lời và đưa vào bảng dữ kiện.</span>
                 <div className={styles.actions}>
-                  {bridge.stage === null ? (
+                  {!bridge.run.busy ? (
                     <Button
                       variant="run"
                       onClick={() => prompt !== null && bridge.onRun(prompt)}
                       disabled={!bridge.enabled || prompt === null}
                       data-testid="research-bridge-run"
                     >
-                      Chạy bằng DeepSeek
+                      Thêm vào hàng đợi AI
                     </Button>
                   ) : (
-                    <AiBridgeRunStatus stage={bridge.stage} modes={bridge.modes} onCancel={bridge.onCancel} testId="research-bridge" />
+                    <AiBridgeRunStatus item={bridge.run.item} ahead={bridge.run.ahead} onCancel={bridge.run.cancel} testId="research-bridge" />
                   )}
                 </div>
               </>
+            ) : bridge.run.outdated ? (
+              <p className={styles.hint} data-testid="research-bridge-outdated">
+                {UPDATE_EXTENSION_TEXT}
+              </p>
             ) : (
               <p className={styles.hint} data-testid="research-bridge-missing">
-                Cài extension ConceptFlow AI Bridge (tools/ai-bridge-extension) để chạy prompt bằng DeepSeek và tự dán kết quả.
+                Cài extension ConceptFlow AI Bridge (tools/ai-bridge-extension) để chạy prompt bằng DeepSeek, Gemini hoặc Grok và tự đọc kết quả.
               </p>
             )}
           </div>

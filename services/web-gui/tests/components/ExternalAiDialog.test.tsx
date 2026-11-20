@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ApiError, ExternalPromptReady, type ExternalAi } from "../../src/api/client";
+import { ApiError, ExternalPromptReady, ExternalRequestDescribed, type ExternalAi } from "../../src/api/client";
 import { ExternalAiDialog } from "../../src/components/ExternalAiDialog";
 import { installFakeAiBridge } from "../helpers/fakeAiBridge";
 
@@ -33,7 +33,7 @@ describe("ExternalAiDialog", () => {
     expect(screen.getByTestId("ext-read")).toBeEnabled();
   });
 
-  it("reads the pasted reply, hands the result on and closes", async () => {
+  it("reads the pasted reply, tells the screen to load what changed and closes", async () => {
     const run = vi
       .fn()
       .mockImplementation((external: ExternalAi) =>
@@ -45,7 +45,7 @@ describe("ExternalAiDialog", () => {
     await screen.findByTestId("ext-prompt");
     fireEvent.change(screen.getByTestId("ext-reply"), { target: { value: '{"a":1}' } });
     fireEvent.click(screen.getByTestId("ext-read"));
-    await waitFor(() => expect(onDone).toHaveBeenCalledWith("xong"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith());
     expect(run).toHaveBeenLastCalledWith({ mode: "paste", reply: '{"a":1}' });
     expect(onClose).toHaveBeenCalled();
   });
@@ -79,47 +79,61 @@ describe("ExternalAiDialog", () => {
     expect(screen.getByTestId("ext-read")).toBeDisabled();
   });
 
-  it("without the AI Bridge extension has no DeepSeek button", async () => {
+  it("without the AI Bridge extension says how to install it and has no queue button", async () => {
     renderDialog(vi.fn().mockRejectedValue(new ExternalPromptReady("P")));
     await screen.findByTestId("ext-prompt");
-    expect(screen.queryByTestId("ext-deepseek")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ext-queue")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("ext-extension-missing")).toHaveTextContent("ConceptFlow AI Bridge");
   });
 
-  it("runs the prompt on DeepSeek with reasoning only, pastes the answer and reads it", async () => {
-    const fake = installFakeAiBridge();
+  it("with an extension of the old protocol says to update it", async () => {
+    const fake = installFakeAiBridge({ legacy: true });
     try {
-      const run = vi
-        .fn()
-        .mockImplementation((external: ExternalAi) =>
-          external.mode === "prompt" ? Promise.reject(new ExternalPromptReady("PROMPT")) : Promise.resolve("xong"),
-        );
-      const { onDone, onClose } = renderDialog(run);
-      fireEvent.click(await screen.findByTestId("ext-deepseek"));
-      await waitFor(() => expect(fake.runs).toHaveLength(1));
-      expect(fake.runs[0]).toMatchObject({ prompt: "PROMPT", modes: { deep_think: true, search: false } });
-      fake.send({ type: "progress", request_id: fake.runs[0].requestId, stage: "answering" });
-      expect(await screen.findByTestId("ext-deepseek-stage")).toHaveTextContent("DeepSeek đang suy nghĩ");
-      fake.send({ type: "result", request_id: fake.runs[0].requestId, text: "```json\n{}\n```" });
-      await waitFor(() => expect(onDone).toHaveBeenCalledWith("xong"));
-      expect(run).toHaveBeenLastCalledWith({ mode: "paste", reply: "```json\n{}\n```" });
+      renderDialog(vi.fn().mockRejectedValue(new ExternalPromptReady("P")));
+      expect(await screen.findByTestId("ext-queue-outdated")).toHaveTextContent("Cập nhật extension ConceptFlow AI Bridge");
+      expect(screen.queryByTestId("ext-queue")).not.toBeInTheDocument();
+    } finally {
+      fake.remove();
+    }
+  });
+
+  /** A step whose prompt can be copied and whose request can be described for the queue. */
+  const queueable = () =>
+    vi.fn().mockImplementation((external: ExternalAi) => {
+      if (external.mode === "prompt") return Promise.reject(new ExternalPromptReady("PROMPT"));
+      if (external.mode === "describe") return Promise.reject(new ExternalRequestDescribed(REQUEST));
+      return Promise.resolve("xong");
+    });
+
+  const REQUEST = { gateway: "http://localhost:8080", method: "POST", path: "/v1/projects/p1/story/generate", body: "{}" };
+
+  it("queues the request, shows where the item stands and reloads when it is done", async () => {
+    const fake = installFakeAiBridge({ queue: true });
+    try {
+      const { onDone, onClose } = renderDialog(queueable());
+      fireEvent.click(await screen.findByTestId("ext-queue"));
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      expect(fake.queued[0].item).toMatchObject({ label: "Câu chuyện · AI ngoài", project: "p1", request: REQUEST, modes: { deepThink: true, search: false } });
+      act(() => fake.announce("q1", { status: "waiting", provider: "gemini" }));
+      expect(await screen.findByTestId("ext-queue-stage")).toHaveTextContent("Đang chờ trong hàng đợi AI · sẽ chạy trên Gemini");
+      act(() => fake.announce("q1", { status: "running", stage: "answering", provider: "gemini" }));
+      expect(await screen.findByTestId("ext-queue-stage")).toHaveTextContent("Đang chạy trên Gemini");
+      expect(onDone).not.toHaveBeenCalled();
+      act(() => fake.announce("q1", { status: "done", provider: "gemini" }));
+      await waitFor(() => expect(onDone).toHaveBeenCalledWith());
       expect(onClose).toHaveBeenCalled();
     } finally {
       fake.remove();
     }
   });
 
-  it("keeps DeepSeek's answer in the box when the step cannot use it", async () => {
-    const fake = installFakeAiBridge();
+  it("keeps the answer in the box when the step cannot use it", async () => {
+    const fake = installFakeAiBridge({ queue: true });
     try {
-      const run = vi
-        .fn()
-        .mockImplementation((external: ExternalAi) =>
-          external.mode === "prompt" ? Promise.reject(new ExternalPromptReady("P")) : Promise.reject(new ApiError("khối JSON không đọc được")),
-        );
-      const { onClose } = renderDialog(run);
-      fireEvent.click(await screen.findByTestId("ext-deepseek"));
-      await waitFor(() => expect(fake.runs).toHaveLength(1));
-      fake.send({ type: "result", request_id: fake.runs[0].requestId, text: "chỉ là văn bản" });
+      const { onClose } = renderDialog(queueable());
+      fireEvent.click(await screen.findByTestId("ext-queue"));
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      act(() => fake.announce("q1", { status: "failed", provider: "grok", error: "khối JSON không đọc được", reply: "chỉ là văn bản" }));
       expect(await screen.findByTestId("ext-read-error")).toHaveTextContent("khối JSON không đọc được");
       expect(screen.getByTestId("ext-reply")).toHaveValue("chỉ là văn bản");
       expect(onClose).not.toHaveBeenCalled();
@@ -128,17 +142,47 @@ describe("ExternalAiDialog", () => {
     }
   });
 
-  it("shows the extension's error and fills nothing", async () => {
-    const fake = installFakeAiBridge();
+  it("shows why the item failed when there is no answer to keep", async () => {
+    const fake = installFakeAiBridge({ queue: true });
     try {
-      const run = vi.fn().mockRejectedValue(new ExternalPromptReady("P"));
-      renderDialog(run);
-      fireEvent.click(await screen.findByTestId("ext-deepseek"));
-      await waitFor(() => expect(fake.runs).toHaveLength(1));
-      fake.send({ type: "error", request_id: fake.runs[0].requestId, code: "not_logged_in", message: "Chưa đăng nhập DeepSeek." });
-      expect(await screen.findByTestId("ext-deepseek-error")).toHaveTextContent("Chưa đăng nhập DeepSeek.");
+      renderDialog(queueable());
+      fireEvent.click(await screen.findByTestId("ext-queue"));
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      act(() => fake.announce("q1", { status: "failed", provider: "gemini", error: "Chưa đăng nhập Gemini." }));
+      expect(await screen.findByTestId("ext-queue-error")).toHaveTextContent("Chưa đăng nhập Gemini.");
       expect(screen.getByTestId("ext-reply")).toHaveValue("");
-      expect(run).toHaveBeenCalledTimes(1);
+    } finally {
+      fake.remove();
+    }
+  });
+
+  it("closing the dialog does not take the item out of the queue", async () => {
+    const fake = installFakeAiBridge({ queue: true });
+    try {
+      const onClose = vi.fn();
+      renderDialog(queueable(), vi.fn(), onClose);
+      fireEvent.click(await screen.findByTestId("ext-queue"));
+      await waitFor(() => expect(fake.queued).toHaveLength(1));
+      fireEvent.click(screen.getByTestId("ext-cancel"));
+      expect(onClose).toHaveBeenCalled();
+      expect(fake.cancels).toEqual([]);
+    } finally {
+      fake.remove();
+    }
+  });
+
+  it("a step that shows its result instead of storing it has no queue button and gets the result of the pasted reply", async () => {
+    const fake = installFakeAiBridge({ queue: true });
+    try {
+      const onDone = vi.fn();
+      const run = queueable();
+      render(<ExternalAiDialog open onClose={vi.fn()} title="Gợi ý" run={run} queued={false} onDone={onDone} testId="ext" />);
+      await screen.findByTestId("ext-prompt");
+      expect(screen.queryByTestId("ext-queue")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ext-extension-missing")).not.toBeInTheDocument();
+      fireEvent.change(screen.getByTestId("ext-reply"), { target: { value: "gợi ý" } });
+      fireEvent.click(screen.getByTestId("ext-read"));
+      await waitFor(() => expect(onDone).toHaveBeenCalledWith("xong"));
     } finally {
       fake.remove();
     }

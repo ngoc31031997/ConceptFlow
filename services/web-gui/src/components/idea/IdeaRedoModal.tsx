@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { sanitizeIdeaText } from "../../utils/sanitizeIdeaText";
 import { ExternalAiDialog, type ExternalRedo } from "../ExternalAiDialog";
-import { ExternalRedoDeepSeek } from "../ExternalRedoDeepSeek";
+import { ExternalRedoQueued } from "../ExternalRedoQueued";
 import { Button, Dialog, FormField, TextArea } from "../ui";
 import unitStyles from "../units/units.module.css";
 
@@ -76,7 +76,8 @@ export function IdeaRedoModal({
                 >
                   Dùng AI ngoài
                 </Button>
-                <ExternalRedoDeepSeek
+                <ExternalRedoQueued
+                  label="Làm lại kèm ghi chú · Ý tưởng"
                   external={external}
                   note={note.trim()}
                   onClose={onClose}
@@ -85,7 +86,7 @@ export function IdeaRedoModal({
                     setOutside(true);
                   }}
                   disabled={note.trim().length === 0}
-                  testId="idea-redo-deepseek"
+                  testId="idea-redo-queue"
                 />
               </>
             )}

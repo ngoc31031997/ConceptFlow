@@ -3,23 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ConceptFlow AI Bridge · Selector DeepSeek</title>
+<title>ConceptFlow AI Bridge · Cài đặt</title>
 <link rel="stylesheet" href="options.css">
 </head>
 <body>
 <main>
-  <h1>Selector DeepSeek</h1>
-  <p class="hint">Khi DeepSeek đổi giao diện, mở tab DeepSeek, nhấn F12, chuột phải vào phần cần tìm → Inspect → chuột phải dòng HTML → Copy → Copy selector, rồi dán vào ô tương ứng. Ô để trống dùng giá trị mặc định (chữ mờ trong ô).</p>
-  <form id="form"></form>
-  <div class="actions">
-    <button type="button" id="check">Kiểm tra trên tab DeepSeek</button>
-    <button type="button" id="reset" class="ghost">Về mặc định</button>
-    <button type="button" id="save" class="primary">Lưu</button>
-  </div>
+  <h1>Cài đặt AI Bridge</h1>
+  <section aria-labelledby="default-heading">
+    <h2 id="default-heading">Nhà cung cấp mặc định</h2>
+    <p class="hint">Mục trong hàng đợi không chọn nhà cung cấp riêng sẽ chạy trên nhà cung cấp này. Đổi cho từng mục ở popup của extension.</p>
+    <label for="default-provider">Mặc định</label>
+    <select id="default-provider"></select>
+  </section>
+  <section aria-labelledby="selectors-heading">
+    <h2 id="selectors-heading">Selector</h2>
+    <p class="hint">Khi một trang AI đổi giao diện, mở tab của nhà cung cấp đó, nhấn F12, chuột phải vào phần cần tìm → Inspect → chuột phải dòng HTML → Copy → Copy selector, rồi dán vào ô tương ứng. Ô để trống dùng giá trị mặc định (chữ mờ trong ô).</p>
+    <label for="provider">Selector của</label>
+    <select id="provider"></select>
+    <form id="form"></form>
+    <div class="actions">
+      <button type="button" id="check">Kiểm tra trên tab của nhà cung cấp</button>
+      <button type="button" id="reset" class="ghost">Về mặc định</button>
+      <button type="button" id="save" class="primary">Lưu</button>
+    </div>
+  </section>
   <p id="status" role="status"></p>
   <pre id="result" hidden></pre>
 </main>
-<script src="../deepseek/selectors.js"></script>
+<script src="../providers.js"></script>
+<script src="../adapter/selector-kit.js"></script>
+<script src="../providers/deepseek/selectors.js"></script>
+<script src="../providers/gemini/selectors.js"></script>
+<script src="../providers/grok/selectors.js"></script>
 <script src="options.js"></script>
 </body>
 </html>
