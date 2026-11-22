@@ -47,7 +47,7 @@ test("Grok's defaults are the test ids of its page, and it has no settled marker
   assert.equal(S.answer, '[data-testid="assistant-message"]');
   assert.equal(S.doneMarker, '[data-testid="response-footer-actions"]');
   assert.equal(S.settledMarker, "");
-  assert.equal(S.copyButton, '[data-testid="response-footer-actions"] button[aria-label="Copy response"]');
+  assert.equal(S.copyButton, '[data-testid="response-footer-actions"] > div:first-of-type > button:first-of-type');
   assert.equal(XS.STORAGE_KEY, "grokSelectors");
 });
 

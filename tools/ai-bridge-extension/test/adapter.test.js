@@ -22,7 +22,7 @@ const GEMINI_HTML = `<body>
 const GROK_HTML = `<body>
 <main id="chat">
   <div data-testid="assistant-message"><p>câu trả lời cũ</p>
-    <div data-testid="response-footer-actions"><button aria-label="Copy response">copy</button></div></div>
+    <div data-testid="response-footer-actions"><div role="toolbar"><button aria-label="Copy response">copy</button><button aria-label="Good response">good</button></div></div></div>
 </main>
 <div data-testid="chat-input"><div class="ProseMirror" contenteditable="true"></div></div>
 <button data-testid="chat-submit" id="send">gửi</button>
@@ -48,7 +48,7 @@ function grokAnswers(page, finishAfterMs, copyText) {
   page.doc.getElementById("chat").append(turn);
   setTimeout(() => {
     turn.querySelector("p").textContent = "xong";
-    turn.insertAdjacentHTML("beforeend", '<div data-testid="response-footer-actions"><button aria-label="Copy response">copy</button></div>');
+    turn.insertAdjacentHTML("beforeend", '<div data-testid="response-footer-actions"><div role="toolbar"><button aria-label="Copy response">copy</button><button aria-label="Good response">good</button></div></div>');
     copyOnClick(page, turn.querySelector("button"), copyText, P.SOURCE);
   }, finishAfterMs);
 }

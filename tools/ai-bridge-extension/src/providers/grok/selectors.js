@@ -14,7 +14,7 @@
     { key: "answer", label: "Lượt trả lời", hint: "CSS selector của mỗi lượt trả lời; lượt cuối cùng là câu trả lời đang chờ", value: '[data-testid="assistant-message"]' },
     { key: "doneMarker", label: "Dấu hiệu đã xong", hint: "CSS selector, tìm trong lượt trả lời cuối; có là câu trả lời đã chạy xong", value: '[data-testid="response-footer-actions"]' },
     { key: "settledMarker", label: "Dấu hiệu nội dung đã ổn định", hint: "CSS selector tìm trong lượt trả lời cuối, cũng phải có; để trống nếu không dùng", value: "" },
-    { key: "copyButton", label: "Nút Copy", hint: "CSS selector của nút Copy, tìm trong lượt trả lời cuối. Nhãn \"Copy response\" là tiếng Anh: đổi nếu giao diện Grok không để tiếng Anh", value: '[data-testid="response-footer-actions"] button[aria-label="Copy response"]' },
+    { key: "copyButton", label: "Nút Copy", hint: "CSS selector của nút Copy, tìm trong lượt trả lời cuối; mặc định là nút đầu tiên của thanh công cụ dưới câu trả lời", value: '[data-testid="response-footer-actions"] > div:first-of-type > button:first-of-type' },
   ];
 
   const api = kit.make("grokSelectors", FIELDS);
