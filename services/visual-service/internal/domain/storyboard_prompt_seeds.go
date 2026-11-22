@@ -36,10 +36,10 @@ const storyboardAssetsVI = `Bạn là THIẾT KẾ TÀI NGUYÊN HÌNH ẢNH củ
 ## CREATIVE BRIEF
 {{brief}}
 
-## NGÔN NGỮ HÌNH ẢNH ĐÃ CHỐT: NHÂN VẬT, VẬT THỂ, KHÁI NIỆM (mã, thuật ngữ, cách vẽ)
+## NGÔN NGỮ HÌNH ẢNH ĐÃ CHỐT: NHÂN VẬT, VẬT THỂ, KHÁI NIỆM (mã, loại, thuật ngữ)
 {{representation}}
 
-## KẾ HOẠCH HÌNH ĐÃ CHỐT THEO THỨ TỰ (mã unit, beat, thông tin hình bắt buộc, cách thể hiện)
+## KẾ HOẠCH HÌNH ĐÃ CHỐT THEO THỨ TỰ (mã unit, beat, thông tin hình bắt buộc, kiểu thể hiện)
 {{plan}}
 
 ## MOTIF ĐÃ CHỐT (mã, tên)
@@ -63,12 +63,12 @@ Liệt kê các tài sản video thật sự cần: thứ nào xuất hiện ở
 - name: tên thành phần dạng PascalCase, chỉ chữ và số, ngắn, đọc là hiểu.
 - kind: figure (nhân vật, vật thể) hoặc backdrop (phông nền).
 - tier: hero (thứ video nói về, vẽ chi tiết nhất), support (vai nhỏ) hoặc background (cảnh nền, vẽ đơn giản). Hạng tính theo vai của tài sản TRONG VIDEO NÀY, không theo bản chất của vật.
-- base_illustration_id: id của MỘT hình trong thư viện nếu hình đó thật sự làm nền tốt cho tài sản (cùng loại, hợp hình dạng); không có hình hợp thì "". CHỈ dùng id có trong thư viện.
+- base_illustration_id: id của MỘT hình trong thư viện nếu hình đó thật sự làm nền tốt cho tài sản: loại của hình gốc phải trùng kind của tài sản (figure với figure, backdrop với backdrop) và tên, thẻ của hình hợp với thứ tài sản thể hiện; không có hình hợp thì "". CHỈ dùng id có trong thư viện.
 - units: các mã unit mà tài sản xuất hiện, theo thứ tự; CHỈ dùng mã có trong kế hoạch hình.
 - same_as: nếu tài sản này là một tài sản hiện có (giữ hoặc sửa), ghi mã của nó (AST-...); tài sản mới để "".
 
 ## LUẬT
-- Chỉ dựa vào đầu vào ở trên; tài sản không được trái cách vẽ đã chốt.
+- Chỉ dựa vào đầu vào ở trên.
 - Cùng một nhân vật hay vật thể xuất hiện ở nhiều unit thì chỉ MỘT tài sản; khác biệt giữa các unit được viết ở lượt mô tả chi tiết, không thành tài sản thứ hai.
 - Tài sản hiện có đang được dùng thì giữ lại (có thể sửa), trừ khi ghi chú của Creator yêu cầu bỏ.
 - Các trường Creator đã sửa tay giữ nguyên giá trị đang có, trừ khi ghi chú của Creator yêu cầu đổi.

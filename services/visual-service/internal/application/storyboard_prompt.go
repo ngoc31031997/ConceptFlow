@@ -10,28 +10,6 @@ import (
 
 // The variables the prompts of step 11 fill.
 
-// representationText lists the locked concept entries the writers may point an
-// asset at, one a line: id, kind, term and how it is drawn.
-func representationText(rr domain.RepresentationRules) string {
-	var lines []string
-	thing := func(kind string, t domain.RepresentedThing) {
-		lines = append(lines, fmt.Sprintf("%s · %s · %s · cách vẽ: %s", t.ConceptID, kind, t.Term, t.Draw))
-	}
-	for _, t := range rr.Characters.Items {
-		thing("nhân vật", t)
-	}
-	for _, t := range rr.Objects {
-		thing("vật thể", t)
-	}
-	for _, t := range rr.Invisible {
-		thing("điều vô hình", t)
-	}
-	for _, c := range rr.ScientificConcepts {
-		lines = append(lines, fmt.Sprintf("%s · khái niệm · %s · cách vẽ: %s", c.ConceptID, c.Term, c.Representation))
-	}
-	return orNone(strings.Join(lines, "\n"))
-}
-
 // conceptEntryText is the locked concept entry conceptID names, in full: term,
 // how it is drawn, what it must not imply and its facts. A backdrop with no entry
 // says so.
@@ -116,6 +94,45 @@ func libraryText(drawings []LibraryDrawing) string {
 	return orNone(strings.Join(lines, "\n"))
 }
 
+// conceptIndexText lists the locked concept entries as the asset list writer
+// needs them: code, kind and term. How each is drawn goes to the asset detail
+// writer, which reads the full entry of its own asset.
+func conceptIndexText(rr domain.RepresentationRules) string {
+	var lines []string
+	thing := func(kind string, t domain.RepresentedThing) {
+		lines = append(lines, fmt.Sprintf("%s · %s · %s", t.ConceptID, kind, t.Term))
+	}
+	for _, t := range rr.Characters.Items {
+		thing("nhân vật", t)
+	}
+	for _, t := range rr.Objects {
+		thing("vật thể", t)
+	}
+	for _, t := range rr.Invisible {
+		thing("điều vô hình", t)
+	}
+	for _, c := range rr.ScientificConcepts {
+		lines = append(lines, fmt.Sprintf("%s · khái niệm · %s", c.ConceptID, c.Term))
+	}
+	return orNone(strings.Join(lines, "\n"))
+}
+
+// planIndexText is the locked plan in order as the asset list writer needs it:
+// unit, beat, what the picture must carry and the name of the method that shows
+// it, without the method's description.
+func planIndexText(in domain.StoryboardInput) string {
+	var lines []string
+	for _, u := range in.Seq.Plan.Units {
+		var info []string
+		for _, e := range u.EssentialVisualInfo {
+			info = append(info, e.Item)
+		}
+		lines = append(lines, fmt.Sprintf("%s · %s · thông tin hình bắt buộc: %s · kiểu thể hiện: %s", u.UnitID, u.BeatID,
+			orNone(strings.Join(info, "; ")), orNone(u.VisualApproach.Method)))
+	}
+	return orNone(strings.Join(lines, "\n"))
+}
+
 // assetFrameText is the frame of an asset as the list writer revises it: id,
 // concept, name, kind, tier and the units it appears in.
 func assetFrameText(a domain.StoryboardAsset) string {
@@ -151,8 +168,8 @@ func assetsVars(data *storyboardData, library []LibraryDrawing, note string) map
 	in := data.in
 	return map[string]string{
 		"brief":          briefText(in.Seq.Script.Brief),
-		"representation": representationText(in.Seq.Concept.RepresentationRules.RepresentationRules),
-		"plan":           storyboardPlanText(in),
+		"representation": conceptIndexText(in.Seq.Concept.RepresentationRules.RepresentationRules),
+		"plan":           planIndexText(in),
 		"motifs":         documentMotifsText(in.Sequence.Motifs),
 		"library":        libraryText(library),
 		"current_assets": currentAssetsText(data.assets),
