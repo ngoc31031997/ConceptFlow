@@ -1,22 +1,25 @@
 /**
- * The part of the content script every provider shares. In a tab the service
- * worker opened for a queue item it waits for the chat box, lets the provider
- * adapter prepare the page (DeepSeek turns its modes on), types the prompt,
- * sends it, waits until the provider says the new answer is complete, presses
- * the Copy button under it and reports the text back. In any other tab of the
- * provider (the Creator's own) the worker has no work for it and it only
- * answers the settings page's selector check.
+ * The content script every provider runs. In a tab the service worker opened
+ * for a queue item it waits for the chat box, types the prompt, sends it, waits
+ * until the new answer is complete, presses its Copy button and reports the
+ * text back. In any other tab of the provider (the Creator's own) the worker
+ * has no work for it and it only answers the settings page's selector check.
  *
- * What differs per provider is described by an adapter definition (see
- * src/providers/<id>/adapter.js): its selectors, `turns` (the answer turns on
- * the page), `isDone` (is this answer complete), `findCopy`, and optionally
- * `prepare`, `findSendButton`, `readFromPage` and `probe`.
+ * A provider is described only by four CSS selectors (see
+ * src/providers/<id>/selectors.js and the settings page): the chat box, the
+ * send button, an answer and the Copy button. Each is looked up on the whole
+ * page. The answer to a run is the last answer once there are more answers
+ * than before the prompt was sent; its Copy button is the first Copy match
+ * inside that answer or after where it starts, so a button of an earlier
+ * answer never counts. The answer is complete when its Copy button is there
+ * and its text has stopped changing; with no Copy selector set, when its text
+ * has stopped changing for longer, and it is then read from the page.
  *
  * Every element it cannot find ends the run with `ui_changed` naming that
- * element, so a redesign shows up as a clear error, never as a wrong answer.
- * Each step is logged to the tab's console with the prefix "ai-bridge:".
- * `create` takes its environment (document, window, report, selector
- * overrides) as arguments so node tests can run it on a fake page.
+ * element and its selector, so a redesign shows up as a clear error, never as
+ * a wrong answer. Each step is logged to the tab's console with the prefix
+ * "ai-bridge:". `create` takes its environment (document, window, report,
+ * selector overrides) as arguments so node tests can run it on a fake page.
  */
 (function (root) {
   const P = root.AiBridgeProtocol || (typeof require === "function" ? require("../protocol.js") : null);
@@ -27,10 +30,8 @@
     READY_RETRY_MS: 1000,
     /** How long the chat box may take to appear before the run says the Creator is not signed in. */
     INPUT_WAIT_MS: 30 * 1000,
-    PAGE_WAIT_MS: 20 * 1000,
     SEND_ENABLE_MS: 3 * 1000,
     SEND_CHECK_MS: 5 * 1000,
-    TOGGLE_SETTLE_MS: 400,
     TYPE_SETTLE_MS: 300,
     COPY_WAIT_MS: 3000,
     ARM_SETTLE_MS: 50,
@@ -40,6 +41,16 @@
     HIGHLIGHT_MS: 4000,
     /** How often the wait for the answer logs what it sees. */
     DIAGNOSE_EVERY_MS: 15 * 1000,
+    /** How long the answer must stay unchanged with its Copy button shown to count as complete. */
+    STABLE_MS: A.STABLE_MS,
+    /** How long it must stay unchanged when no Copy selector is set. */
+    STABLE_WITHOUT_COPY_MS: A.STABLE_WITHOUT_ACTIONS_MS,
+    /**
+     * How long an answer that has text may stay unchanged without its Copy
+     * button before the run ends with `ui_changed` naming the Copy selector,
+     * instead of waiting for the full run timeout.
+     */
+    STALLED_MS: 2 * 60 * 1000,
   };
 
   /** Thrown inside the run to end it with an error code. */
@@ -93,8 +104,6 @@
       }
     }
 
-    const ctx = { document: doc, window: win, A: A, timing: T, log: log, wait: wait, waitFor: waitFor, queryAll: queryAll, textOf: textOf, RunError: RunError };
-
     async function loadSelectors() {
       const S = def.selectors.resolve(await env.readOverrides(), doc);
       if (S.invalid.length) log("override không dùng được, dùng mặc định:", S.invalid.join(", "));
@@ -144,10 +153,44 @@
       input.dispatchEvent(new win.KeyboardEvent("keyup", init));
     }
 
-    /** The send button: the adapter's own rule when it has one, else the sendButton selector. */
-    function findSendButton(S, input) {
-      if (def.findSendButton) return def.findSendButton(S, input, ctx);
+    /** The send button; with no selector set the prompt is sent with Enter. */
+    function findSendButton(S) {
       return S.sendButton ? queryAll(S.sendButton, "sendButton")[0] || null : null;
+    }
+
+    function answers(S) {
+      return queryAll(S.answer, "answer");
+    }
+
+    /** The Copy button of `answer`: the first Copy match inside it or after where it starts. */
+    function findCopy(S, answer) {
+      if (!S.copyButton) return null;
+      const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
+      return (
+        queryAll(S.copyButton, "copyButton").find(function (el) {
+          return answer.contains(el) || (answer.compareDocumentPosition(el) & FOLLOWING) !== 0;
+        }) || null
+      );
+    }
+
+    /** The answer read from the page, with code blocks fenced again; used when no Copy selector is set. */
+    function readFromPage(answer) {
+      const blocks = Array.from(answer.children).map(function (child) {
+        const pre = child.matches("pre") ? child : child.querySelector("pre");
+        if (!pre) return { kind: "text", text: textOf(child) };
+        const label = child.querySelector('[class*="banner"] span, [class*="lang"]');
+        return { kind: "code", lang: label ? label.textContent.trim() : "", code: pre.textContent };
+      });
+      return blocks.length ? A.joinBlocks(blocks) : textOf(answer).trim();
+    }
+
+    /** Why the new answer has no Copy button yet, naming the selector and what the page has. */
+    function copyMissing(S) {
+      const total = queryAll(S.copyButton, "copyButton").length;
+      return (
+        "không thấy \"Nút Copy\" (" + S.copyButton + ") ở câu trả lời mới (" + S.answer + ")" +
+        (total > 0 ? "; trên trang có " + total + " nút khớp nhưng đều nằm trước câu trả lời mới" : "; trên trang không có nút nào khớp")
+      );
     }
 
     function isEnabled(button) {
@@ -160,7 +203,7 @@
         return !current || inputText(current).trim() === "";
       };
       const button = await waitFor(function () {
-        const found = findSendButton(S, input);
+        const found = findSendButton(S);
         return found && isEnabled(found) ? found : null;
       }, T.SEND_ENABLE_MS);
       if (button) {
@@ -172,13 +215,13 @@
       }
       pressEnter(input);
       if (await waitFor(sent, T.SEND_CHECK_MS)) return;
-      throw new RunError("ui_changed", button ? "gửi prompt (đã bấm nút gửi và Enter)" : "nút gửi");
+      throw new RunError("ui_changed", button ? "gửi prompt (đã bấm nút gửi và Enter)" : "nút gửi (" + (S.sendButton || "để trống, đã thử Enter") + ")");
     }
 
-    /** The answer to this run: the last turn when there are more turns than before the prompt was sent, else null. */
+    /** The answer to this run: the last answer when there are more answers than before the prompt was sent, else null. */
     function findAnswer(S, countBefore) {
-      const turns = def.turns(S, ctx);
-      return turns.length > countBefore ? turns[turns.length - 1] : null;
+      const all = answers(S);
+      return all.length > countBefore ? all[all.length - 1] : null;
     }
 
     function copyViaButton(button) {
@@ -235,41 +278,45 @@
       let loggedAt = 0;
       for (;;) {
         checkStillRunning(deadline);
-        const turn = findAnswer(S, countBefore);
-        const text = turn ? textOf(turn) : "";
+        const answer = findAnswer(S, countBefore);
+        const text = answer ? textOf(answer) : "";
         if (text !== lastText) {
           lastText = text;
           changedAt = Date.now();
+        }
+        const copy = answer ? findCopy(S, answer) : null;
+        const quietMs = Date.now() - changedAt;
+        const hasText = text.trim() !== "";
+        if (hasText && (S.copyButton ? copy !== null && quietMs >= T.STABLE_MS : quietMs >= T.STABLE_WITHOUT_COPY_MS)) {
+          log("câu trả lời xong:", text.length, "ký tự");
+          return { answer: answer, copy: copy };
         }
         if (Date.now() - loggedAt >= T.DIAGNOSE_EVERY_MS) {
           loggedAt = Date.now();
           log(
             "đang chờ:",
-            "lượt trả lời=" + def.turns(S, ctx).length + " (trước khi gửi " + countBefore + ")",
-            "độ dài câu trả lời=" + text.length,
-            "đứng yên " + Math.round((Date.now() - changedAt) / 1000) + "s",
+            "câu trả lời=" + answers(S).length + " (trước khi gửi " + countBefore + ")",
+            "độ dài=" + text.length,
+            "đứng yên " + Math.round(quietMs / 1000) + "s",
+            S.copyButton ? "nút Copy " + (copy ? "đã có" : "chưa có") : "không đặt nút Copy",
             "tab " + (doc.hidden ? "nền" : "đang xem"),
           );
         }
-        if (turn && def.isDone(S, turn, { text: text, changedAt: changedAt, now: Date.now() }, ctx)) {
-          log("câu trả lời xong:", text.length, "ký tự");
-          return turn;
-        }
+        if (S.copyButton && !copy && hasText && quietMs >= T.STALLED_MS) throw new RunError("ui_changed", copyMissing(S));
         await waitForPageChange(T.TICK_MS);
       }
     }
 
     async function run(work) {
       const S = await loadSelectors();
-      log("bắt đầu lượt", work.requestId, "chế độ", JSON.stringify(work.modes));
+      log("bắt đầu lượt", work.requestId);
       const input = await waitFor(function () {
         return findInput(S);
       }, T.INPUT_WAIT_MS);
       if (!input) throw new RunError("not_logged_in");
       log("ô chat:", input.outerHTML.slice(0, 200));
       report({ kind: "progress", requestId: work.requestId, stage: "sending" });
-      if (def.prepare) await def.prepare(S, work, ctx);
-      const countBefore = def.turns(S, ctx).length;
+      const countBefore = answers(S).length;
       typeInto(input, work.prompt);
       await wait(T.TYPE_SETTLE_MS);
       if (inputText(input).trim() === "") throw new RunError("ui_changed", "ghi prompt vào ô chat");
@@ -278,15 +325,16 @@
       log("đã gửi");
 
       report({ kind: "progress", requestId: work.requestId, stage: "answering" });
-      const turn = await waitForAnswer(S, countBefore, work.deadline);
+      const done = await waitForAnswer(S, countBefore, work.deadline);
 
       report({ kind: "progress", requestId: work.requestId, stage: "reading" });
-      const button = def.findCopy(S, turn, ctx);
-      const copied = button ? await copyViaButton(button) : "";
-      let text = copied;
-      if (text.trim() === "" && def.readFromPage) text = def.readFromPage(turn, ctx);
-      log(copied.trim() !== "" ? "lấy câu trả lời qua nút Copy" : "lấy câu trả lời từ trang");
-      if (text.trim() === "") throw new RunError("ui_changed", button ? "nội dung câu trả lời (nút Copy không đưa văn bản)" : "nút Copy");
+      if (!done.copy) {
+        log("lấy câu trả lời từ trang (không đặt nút Copy)");
+        return readFromPage(done.answer);
+      }
+      const text = await copyViaButton(done.copy);
+      if (text.trim() === "") throw new RunError("ui_changed", "nội dung câu trả lời (nút Copy " + S.copyButton + " không đưa văn bản)");
+      log("lấy câu trả lời qua nút Copy");
       return text;
     }
 
@@ -301,7 +349,10 @@
       });
     }
 
-    /** The settings page's check: what each selector finds on this tab, outlined in red. */
+    /**
+     * The settings page's check: what each selector finds on this tab, outlined
+     * in red (the Copy button of the last answer in blue).
+     */
     function probe(overrides) {
       const S = def.selectors.resolve(overrides, doc);
       const result = {};
@@ -314,7 +365,24 @@
           result[key] = { error: String(err && err.message ? err.message : err) };
         }
       }
-      def.probe(S, ctx, one, result);
+      one("input", function () {
+        return queryAll(S.input, "input").slice(0, 1);
+      });
+      if (S.sendButton) {
+        one("sendButton", function () {
+          return queryAll(S.sendButton, "sendButton").slice(0, 1);
+        });
+      }
+      one("answer", function () {
+        return answers(S).slice(-1);
+      });
+      if (S.copyButton) {
+        one("copyButton", function () {
+          const last = answers(S).slice(-1)[0];
+          const copy = last ? findCopy(S, last) : null;
+          return copy ? [copy] : [];
+        }, "#2563eb");
+      }
       result.invalid = S.invalid;
       return result;
     }
@@ -326,50 +394,8 @@
     return { run, probe, cancel, askForWork, typeInto, findInput };
   }
 
-  // ---- helpers for providers described by plain selectors (Gemini, Grok) ----
-
-  const markers = {
-    /** Every answer turn on the page, oldest first. */
-    turns: function (S, ctx) {
-      return ctx.queryAll(S.answer, "answer");
-    },
-    /**
-     * Complete when the last turn holds the done marker (and the settled marker when
-     * one is set) and has text. The caller only offers a turn that is newer than the prompt.
-     */
-    isDone: function (S, turn, progress, ctx) {
-      if (progress.text.trim() === "") return false;
-      if (ctx.queryAll(S.doneMarker, "doneMarker", turn).length === 0) return false;
-      if (S.settledMarker && ctx.queryAll(S.settledMarker, "settledMarker", turn).length === 0) return false;
-      return true;
-    },
-    /** The Copy button inside the turn. */
-    findCopy: function (S, turn, ctx) {
-      return ctx.queryAll(S.copyButton, "copyButton", turn)[0] || null;
-    },
-    /** The settings page's check for a provider described by plain selectors. */
-    probe: function (S, ctx, one) {
-      one("input", function () {
-        return ctx.queryAll(S.input, "input").slice(0, 1);
-      });
-      one("sendButton", function () {
-        return ctx.queryAll(S.sendButton, "sendButton").slice(0, 1);
-      });
-      one("answer", function () {
-        return ctx.queryAll(S.answer, "answer").slice(-1);
-      });
-      const last = ctx.queryAll(S.answer, "answer").slice(-1)[0];
-      ["doneMarker", "settledMarker", "copyButton"].forEach(function (key) {
-        if (!S[key]) return;
-        one(key, function () {
-          return last ? ctx.queryAll(S[key], key, last).slice(0, 1) : [];
-        }, key === "copyButton" ? "#2563eb" : "#e11d48");
-      });
-    },
-  };
-
   /**
-   * Wires an adapter definition to its page: answers the worker's cancel and the
+   * Wires a provider (`{id, name, selectors}`) to its page: answers the worker's cancel and the
    * settings page's probe, and runs the work the worker hands out.
    */
   function start(def) {
@@ -418,7 +444,7 @@
     );
   }
 
-  const api = { DEFAULT_TIMING, RunError, textOf, create, markers, start };
+  const api = { DEFAULT_TIMING, RunError, textOf, create, start };
   root.AiBridgeAdapterCore = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : self);

@@ -8,7 +8,7 @@ Extension Chrome giúp ConceptFlow chạy prompt trên **DeepSeek**, **Gemini** 
 Extension lấy prompt, mở tab chat mới của nhà cung cấp, chờ câu trả lời rồi gọi API ConceptFlow để lưu kết quả. ConceptFlow chỉ việc tải lại màn hình khi mục xong.
 
 - Dùng tài khoản web của bạn ở từng nhà cung cấp, không cần API key, không tốn tiền API.
-- Hỗ trợ: **DeepSeek** (`chat.deepseek.com`, mặc định), **Gemini** (`gemini.google.com/app`), **Grok** (`grok.com`). DeepSeek tự bật hoặc tắt **DeepThink** và **Search** theo từng mục (DeepThink cho hầu hết bước, DeepThink + Search cho bước Nghiên cứu). Gemini và Grok: extension **không đổi** chế độ hay model, mục chạy theo lựa chọn hiện có trong trang của chúng.
+- Hỗ trợ: **DeepSeek** (`chat.deepseek.com`, mặc định), **Gemini** (`gemini.google.com/app`), **Grok** (`grok.com`). Extension **không đổi** chế độ hay model ở nhà cung cấp nào (kể cả DeepThink và Search của DeepSeek): mục chạy theo lựa chọn hiện có trong trang của họ.
 - Dùng được cả khi ConceptFlow chưa cấu hình AI (không có API key).
 - Không gửi dữ liệu đi đâu khác ngoài các tab nhà cung cấp và API của ConceptFlow. Extension không có server riêng, không đọc trang nào khác ngoài ConceptFlow (`localhost:3000`) và ba trang AI trên.
 
@@ -43,7 +43,7 @@ Mọi lượt AI ở bước 1–7 (viết ý tưởng, đánh giá, brief, câu
 ### Bước 3 · Nghiên cứu
 
 1. Mở project, vào bước **3 · Nghiên cứu**, tạo câu hỏi ở ô ①.
-2. Ở ô ② , bấm **Thêm vào hàng đợi AI**. Mục này mang sẵn prompt nghiên cứu; trên DeepSeek, extension bật DeepThink + Search. Trên Gemini hoặc Grok, hãy tự chọn chế độ có tra web trong trang đó trước khi chạy.
+2. Ở ô ② , bấm **Thêm vào hàng đợi AI**. Mục này mang sẵn prompt nghiên cứu. Hãy tự bật chế độ có tra web trong trang nhà cung cấp (Search của DeepSeek, chế độ tương ứng của Gemini hoặc Grok) trước khi chạy.
 3. Khi xong, bảng dữ kiện tự tải lại và hệ thống bắt đầu kiểm link như khi bạn dán tay.
 4. Nếu ConceptFlow không đọc được câu trả lời, câu trả lời được đưa vào ô ③ kèm lý do để bạn sửa rồi bấm **Đọc kết quả**.
 
@@ -73,7 +73,7 @@ Với mỗi mục, extension: (1) gọi API của ConceptFlow với `X-External-
 | "Cập nhật extension ConceptFlow AI Bridge lên bản mới…" | Extension còn là bản 1.x | Bấm ↻ trên thẻ extension ở `chrome://extensions`, tải lại tab ConceptFlow |
 | "Extension không phản hồi" | Extension vừa được tải lại nhưng trang thì chưa | Tải lại tab ConceptFlow |
 | "Chưa đăng nhập Gemini hoặc giao diện Gemini đã đổi (không thấy ô chat)" (hoặc DeepSeek, Grok) | Phiên hết hạn, hoặc trang hiện hộp thoại chặn (CAPTCHA, đồng ý điều khoản), hoặc giao diện đổi | Mở trang nhà cung cấp, đăng nhập và xử lý hộp thoại, chạy lại. Nếu vẫn lỗi, kiểm selector **Ô chat** ở Cài đặt |
-| "Giao diện Grok đã đổi… (nút Copy)" hoặc tên phần khác | Nhà cung cấp đổi giao diện, hoặc Grok không để tiếng Anh (nút Copy tìm theo nhãn "Copy response") | Dán selector mới ở trang Cài đặt (xem dưới) |
+| "Giao diện Grok đã đổi… (không thấy "Nút Copy" (…) ở câu trả lời mới…)" hoặc tên phần khác | Nhà cung cấp đổi giao diện; lỗi nêu tên ô và selector đang dùng, và nút Copy có trên trang nhưng thuộc câu trả lời cũ hay không có chút nào | Dán selector mới vào đúng ô đó ở trang Cài đặt (xem dưới) |
 | Tiến độ đứng ở "đang trả lời…" rất lâu | Bạn chuyển sang tab khác nên tab nhà cung cấp bị ẩn và Chrome làm chậm nó | Quay lại tab đó; câu trả lời sẽ được lấy khi xong |
 | "… chưa trả lời xong sau 15 phút" | Câu hỏi quá dài, mạng chậm, nhà cung cấp quá tải | Xem tab nhà cung cấp; có câu trả lời thì chép và dán tay |
 
@@ -92,9 +92,9 @@ ConceptFlow (localhost:3000)                    Chrome extension                
 
 1. Trang gửi `queue_add` (có `request_id`) qua `window.postMessage`; mỗi lần mục đổi trạng thái, extension gửi `queue_item` tới mọi tab ConceptFlow. Giao thức đầy đủ ở `docs/contracts/ai-bridge-v2.md`.
 2. `background.js` (service worker) giữ hàng đợi trong `chrome.storage.local`. Khi tới lượt một mục nó chọn nhà cung cấp, lưu lượt chạy vào `chrome.storage.session` (Chrome có thể tắt service worker trong lúc AI đang trả lời) và mở tab chat mới của nhà cung cấp.
-3. Adapter của nhà cung cấp (`providers/<id>/adapter.js` trên `adapter/core.js`) nạp xong thì xin việc (`ready`). Nó chờ ô chat (tối đa 30 giây, không có thì báo chưa đăng nhập), làm bước chuẩn bị riêng của nhà cung cấp (DeepSeek đặt DeepThink và Search), ghi prompt vào ô chat rồi bấm gửi (không được thì Enter).
-4. Câu trả lời được coi là xong chỉ khi **lượt trả lời mới** (số lượt trả lời trên trang tăng so với lúc gửi) có dấu hiệu "đã xong" của nhà cung cấp: DeepSeek, hàng nút dưới câu trả lời hiện và nội dung đứng yên 5 giây (20 giây nếu không thấy hàng nút); Gemini, chân trang `.response-footer.complete` và nội dung hết `aria-busy`; Grok, hàng nút `response-footer-actions`.
-5. Lấy câu trả lời bằng nút **Copy** dưới lượt cuối để giữ nguyên markdown và khối ```` ```json ````. `adapter/clipboard-hook.js` chạy trong trang nhà cung cấp và chặn đúng lần copy đó, nên **clipboard thật của bạn không bị ghi đè**. Các lần bạn tự copy vẫn đi qua bình thường. Nếu Copy không đưa được văn bản, DeepSeek đọc chữ trên trang (bỏ phần suy nghĩ, dựng lại khối code); Gemini và Grok báo lỗi `ui_changed` thay vì đoán.
+3. Adapter của nhà cung cấp (`providers/<id>/adapter.js` trên `adapter/core.js`) nạp xong thì xin việc (`ready`). Nó chờ ô chat (tối đa 30 giây, không có thì báo chưa đăng nhập), ghi prompt vào ô chat rồi bấm **Nút gửi** (để trống hoặc không được thì Enter).
+4. Mỗi nhà cung cấp chỉ cần bốn selector, tìm trên **cả trang**: **Ô chat**, **Nút gửi**, **Câu trả lời**, **Nút Copy**. Câu trả lời của lượt chạy là phần tử **Câu trả lời** cuối cùng, khi số câu trả lời trên trang đã tăng so với lúc gửi. Nút Copy của nó là nút **Nút Copy** đầu tiên nằm trong hoặc sau chỗ câu trả lời đó bắt đầu, nên nút Copy của câu trả lời cũ không bao giờ bị bấm. Câu trả lời xong khi đã có nút Copy đó và chữ đứng yên 5 giây; nếu ô **Nút Copy** để trống thì khi chữ đứng yên 20 giây. Chữ đã đứng yên 2 phút mà vẫn chưa có nút Copy thì lượt chạy dừng với lỗi nêu đúng ô và selector cần sửa.
+5. Lấy câu trả lời bằng nút **Copy** để giữ nguyên markdown và khối ```` ```json ````. `adapter/clipboard-hook.js` chạy trong trang nhà cung cấp và chặn đúng lần copy đó, nên **clipboard thật của bạn không bị ghi đè**. Các lần bạn tự copy vẫn đi qua bình thường. Nếu nút Copy không đưa được văn bản thì báo lỗi `ui_changed` thay vì đoán. Khi ô **Nút Copy** để trống (mặc định của DeepSeek), câu trả lời được đọc từ trang, có dựng lại khối code.
 6. Worker đóng tab, gọi API đưa câu trả lời về ConceptFlow, rồi báo `queue_item` `done` (hoặc `failed` kèm lý do và câu trả lời).
 
 | File | Vai trò |
@@ -107,12 +107,12 @@ ConceptFlow (localhost:3000)                    Chrome extension                
 | `src/queue-http.js` | Các lời gọi API quanh một lượt: `prompt`, `paste`, `raw` |
 | `src/bridge.js` | Content script trên ConceptFlow: chuyển message trang ↔ service worker |
 | `src/background.js` | Service worker: chạy hàng đợi, mở tab, giao prompt, báo trạng thái mục |
-| `src/adapter/core.js` | Phần chung của adapter: chờ ô chat, gõ, gửi, chờ xong, Copy, báo tiến độ, kiểm selector |
-| `src/adapter/answer.js` | Luật "đã trả lời xong" của DeepSeek, khớp nhãn nút, dựng lại khối code |
+| `src/adapter/core.js` | Toàn bộ việc điều khiển trang từ bốn selector: chờ ô chat, gõ, gửi, chờ xong, Copy, đọc từ trang, báo tiến độ, kiểm selector |
+| `src/adapter/answer.js` | Thời gian chữ phải đứng yên, dựng lại khối code |
 | `src/adapter/clipboard-hook.js` | Chặn lần copy của nút Copy trong lượt chạy (cả ba nhà cung cấp) |
-| `src/adapter/selector-kit.js` | Dựng bộ selector cho nhà cung cấp chỉ dùng CSS selector (Gemini, Grok) |
+| `src/adapter/selector-kit.js` | Dựng bộ bốn selector của một nhà cung cấp, ghép phần bạn dán và loại selector sai cú pháp |
 | `src/providers/<id>/selectors.js` | **Selector mặc định** của giao diện nhà cung cấp, ghép với phần bạn dán ở trang cài đặt |
-| `src/providers/<id>/adapter.js` | Khai báo của nhà cung cấp: các lượt trả lời, `isDone`, nút Copy; DeepSeek thêm bước đặt DeepThink/Search |
+| `src/providers/<id>/adapter.js` | Khai báo của nhà cung cấp: id, tên và bộ selector của nó |
 | `src/popup/` | Popup: hàng đợi, nhà cung cấp từng mục |
 | `src/options/` | Trang **Cài đặt**: nhà cung cấp mặc định; dán, kiểm tra, lưu selector cho từng nhà cung cấp |
 
@@ -122,7 +122,7 @@ Lỗi "Giao diện … đã đổi (tên phần)" cho biết phần nào không 
 
 1. Bấm **icon ConceptFlow AI Bridge** trên thanh công cụ Chrome, sang tab **Cài đặt**, bấm **Mở cài đặt**. Nếu chưa ghim icon thì vào `chrome://extensions` → **Chi tiết** → **Tuỳ chọn tiện ích**.
 2. Ở ô **Selector của**, chọn nhà cung cấp cần sửa.
-3. Mở một tab của nhà cung cấp đó (đã đăng nhập, nên đang có một câu trả lời đã xong), rồi bấm **Kiểm tra trên tab của nhà cung cấp**. Mỗi ô hiện "Tìm thấy" hoặc "Không tìm thấy"; phần tìm thấy được viền đỏ vài giây trên tab (nút Copy viền xanh). Với DeepSeek, trang cũng cho biết nút DeepThink và Search đang bật hay tắt và class của nút.
+3. Mở một tab của nhà cung cấp đó (đã đăng nhập, nên đang có một câu trả lời đã xong), rồi bấm **Kiểm tra trên tab của nhà cung cấp**. Mỗi ô hiện "Tìm thấy" hoặc "Không tìm thấy"; phần tìm thấy được viền đỏ vài giây trên tab (nút Copy viền xanh).
 4. Ô nào "Không tìm thấy", hoặc tìm thấy sai phần tử:
    - Sang tab nhà cung cấp, nhấn **F12**.
    - Bấm biểu tượng mũi tên chọn phần tử (Cmd + Shift + C), rồi bấm vào phần cần tìm.
@@ -133,16 +133,14 @@ Lỗi "Giao diện … đã đổi (tên phần)" cho biết phần nào không 
 Mẹo:
 
 - Selector do "Copy selector" sinh ra thường chứa class mã băm, nên sẽ hỏng khi trang cập nhật. Nếu được, rút gọn lại còn id, `data-testid`, tên thẻ hoặc `role`.
-- Gemini và Grok: ô **Lượt trả lời** khớp mọi lượt của AI trên trang; extension lấy lượt cuối. Ô **Dấu hiệu đã xong** và **Nút Copy** được tìm *bên trong* lượt cuối.
-- Grok: nút Copy tìm theo nhãn tiếng Anh `aria-label="Copy response"`, selector duy nhất phụ thuộc chữ. Đổi ngôn ngữ giao diện Grok thì sửa ô **Nút Copy**.
-- DeepSeek, ô **Class khi nút đang bật**: bật nút Search bằng tay, bấm Kiểm tra, xem class của nút. Phần chỉ xuất hiện khi nút bật (ví dụ `ds-toggle-button--selected`) là thứ cần điền; ô này là biểu thức chính quy, nhiều giá trị ngăn cách bằng `|`.
-- DeepSeek, **Nút gửi** để trống thì extension bấm nút cuối cùng trong khung chat; nếu không gửi được thì thử Enter.
+- Cả bốn ô đều tìm trên cả trang. Ô **Câu trả lời** khớp mọi câu trả lời của AI; extension lấy câu cuối. Ô **Nút Copy** có thể khớp nút Copy của mọi câu trả lời; extension lấy nút đầu tiên nằm trong hoặc sau câu trả lời mới. Vì vậy selector không cần nằm trong câu trả lời, ví dụ `[data-testid="response-footer-actions"] > div:first-of-type > button:first-of-type` hay `button[aria-label="Copy response"]`.
+- **Nút gửi** để trống thì gửi bằng Enter. **Nút Copy** để trống thì chờ chữ đứng yên 20 giây rồi đọc câu trả lời từ trang (mặc định của DeepSeek).
 
 Selector mặc định nằm trong `src/providers/<id>/selectors.js`. Nếu một selector bạn dán chạy ổn, hãy báo để cập nhật mặc định cho mọi người.
 
 ### Xem log một lượt chạy
 
-Mở tab nhà cung cấp mà extension đã tạo, nhấn F12, chọn tab **Console** và lọc theo `ai-bridge`. Mỗi bước đều có một dòng log: ô chat tìm thấy, trạng thái DeepThink/Search (DeepSeek), nút gửi đã bấm, số lượt trả lời trước và sau khi gửi, cách lấy câu trả lời, và lỗi nếu có. Gửi các dòng này khi cần hỗ trợ.
+Mở tab nhà cung cấp mà extension đã tạo, nhấn F12, chọn tab **Console** và lọc theo `ai-bridge`. Mỗi bước đều có một dòng log: ô chat tìm thấy, nút gửi đã bấm, số câu trả lời trước và sau khi gửi, nút Copy đã có chưa, cách lấy câu trả lời, và lỗi nếu có. Gửi các dòng này khi cần hỗ trợ.
 
 ## Phát triển và test
 

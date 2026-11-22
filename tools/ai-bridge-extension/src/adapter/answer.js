@@ -1,38 +1,14 @@
 /**
- * Pure rules for reading a provider answer: when it counts as finished, and
- * how the page's rendered blocks are turned back into text that keeps the
- * code fences (ConceptFlow looks for the ```json block). No DOM access here,
+ * Pure rules for reading a provider answer: how long it must stay unchanged
+ * to count as finished, and how the page's rendered blocks are turned back
+ * into text that keeps the code fences (ConceptFlow looks for the ```json block). No DOM access here,
  * so node tests can check every rule.
  */
 (function (root) {
-  /** The answer must not change for this long, with its icon row shown, to count as finished. */
+  /** The answer must not change for this long, with its Copy button shown, to count as finished. */
   const STABLE_MS = 5 * 1000;
-  /** Without an icon row (DeepSeek changed it) the answer must not change for this long instead. */
+  /** Without a Copy button to wait for, the answer must not change for this long instead. */
   const STABLE_WITHOUT_ACTIONS_MS = 20 * 1000;
-
-  /**
-   * Whether the answer is finished. `text` is the answer read so far,
-   * `changedAt` when it last changed, `hasActions` whether the icon row under
-   * it (Copy, Regenerate…) is there, which the page only shows once done.
-   */
-  function isFinished(text, changedAt, now, hasActions) {
-    if (!text || text.trim() === "") return false;
-    const quiet = now - changedAt;
-    return hasActions ? quiet >= STABLE_MS : quiet >= STABLE_WITHOUT_ACTIONS_MS;
-  }
-
-  /**
-   * True when a control's visible text is one of the labels, ignoring case and
-   * spacing; a model name in brackets may follow ("DeepThink (R1)"). A wrapper
-   * holding several controls ("DeepThink Search") does not match.
-   */
-  function hasLabel(text, labels) {
-    const t = String(text || "").replace(/\s+/g, " ").trim().toLowerCase();
-    return labels.some(function (label) {
-      const l = label.toLowerCase();
-      return t === l || /^\s?\([^)]*\)$/.test(t.slice(l.length)) && t.startsWith(l);
-    });
-  }
 
   /** A code block written back as a markdown fence. */
   function fence(lang, code) {
@@ -55,7 +31,7 @@
       .join("\n\n");
   }
 
-  const api = { STABLE_MS, STABLE_WITHOUT_ACTIONS_MS, isFinished, hasLabel, fence, joinBlocks };
+  const api = { STABLE_MS, STABLE_WITHOUT_ACTIONS_MS, fence, joinBlocks };
   root.AiBridgeAnswer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : self);

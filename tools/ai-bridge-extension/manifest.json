@@ -52,6 +52,7 @@
         "src/protocol.js",
         "src/adapter/answer.js",
         "src/adapter/core.js",
+        "src/adapter/selector-kit.js",
         "src/providers/deepseek/selectors.js",
         "src/providers/deepseek/adapter.js"
       ],

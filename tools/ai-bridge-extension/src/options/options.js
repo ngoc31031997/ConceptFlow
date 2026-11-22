@@ -47,7 +47,7 @@
       const input = document.createElement("input");
       input.id = "f-" + f.key;
       input.name = f.key;
-      input.placeholder = f.value || "(để trống: tự tìm)";
+      input.placeholder = f.value || "(để trống)";
       input.value = values[f.key] || "";
       const found = document.createElement("div");
       found.className = "found";
@@ -83,8 +83,6 @@
         return;
       }
       let text = r.count ? "Tìm thấy " + r.count : "Không tìm thấy";
-      if (r.total !== undefined) text += " (trên trang có " + r.total + " khối markdown, kể cả phần suy nghĩ)";
-      if (r.on !== undefined) text += " · đang " + (r.on ? "bật" : "tắt") + " · class=\"" + r.className + "\"";
       el.textContent = text;
       el.className = r.count ? "found ok" : "found bad";
     });

@@ -1,7 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const P = require("../src/protocol.js");
-const A = require("../src/adapter/answer.js");
 const core = require("../src/adapter/core.js");
 const gemini = require("../src/providers/gemini/adapter.js");
 const grok = require("../src/providers/grok/adapter.js");
@@ -174,101 +173,79 @@ test("a run that passes its deadline ends with timeout", async () => {
   page.close();
 });
 
-test("Gemini is done only with the footer complete and its content no longer busy", () => {
-  const page = makePage(GEMINI_HTML, "https://gemini.google.com/app");
-  const S = gemini.selectors.resolve({}, page.doc);
-  const ctx = { queryAll: (selector, field, scope) => Array.from((scope || page.doc).querySelectorAll(selector)) };
-  const progress = { text: "có chữ", changedAt: 0, now: 0 };
-  const turn = (html) => {
-    const el = page.doc.createElement("model-response");
-    el.innerHTML = html;
-    return el;
-  };
-  const footer = '<div class="response-footer complete"></div>';
-  assert.equal(gemini.isDone(S, turn('<message-content><div aria-busy="false">x</div></message-content>' + footer), progress, ctx), true);
-  assert.equal(gemini.isDone(S, turn('<message-content><div aria-busy="true">x</div></message-content>' + footer), progress, ctx), false, "still busy");
-  assert.equal(gemini.isDone(S, turn('<message-content><div aria-busy="false">x</div></message-content><div class="response-footer"></div>'), progress, ctx), false, "footer not complete");
-  assert.equal(gemini.isDone(S, turn('<message-content><div aria-busy="false">x</div></message-content>' + footer), { text: " ", changedAt: 0, now: 0 }, ctx), false, "no text");
-  page.close();
-});
-
-test("Grok is done only when the turn has its footer actions", () => {
+test("a Grok Copy button that sits next to the answer, not inside it, is still found on the page", async () => {
   const page = makePage(GROK_HTML, "https://grok.com/");
-  const S = grok.selectors.resolve({}, page.doc);
-  const ctx = { queryAll: (selector, field, scope) => Array.from((scope || page.doc).querySelectorAll(selector)) };
-  const progress = { text: "có chữ", changedAt: 0, now: 0 };
-  const turn = (html) => {
-    const el = page.doc.createElement("div");
-    el.innerHTML = html;
-    return el;
-  };
-  assert.equal(grok.isDone(S, turn('<p>x</p><div data-testid="response-footer-actions"></div>'), progress, ctx), true);
-  assert.equal(grok.isDone(S, turn("<p>x</p>"), progress, ctx), false);
+  page.doc.getElementById("send").addEventListener("click", () => {
+    page.doc.querySelector(".ProseMirror").textContent = "";
+    const turn = page.doc.createElement("div");
+    turn.setAttribute("data-testid", "assistant-message");
+    turn.innerHTML = "<p>xong</p>";
+    page.doc.getElementById("chat").append(turn);
+    turn.insertAdjacentHTML("afterend", '<div data-testid="response-footer-actions"><div role="toolbar"><button id="new-copy">copy</button><button>good</button></div></div>');
+    copyOnClick(page, page.doc.getElementById("new-copy"), ANSWER, P.SOURCE);
+  });
+  const oldCopy = copyOnClick(page, page.doc.querySelector('[data-testid="response-footer-actions"] button'), "CŨ", P.SOURCE);
+  const { runner } = runnerFor(grok, page);
+  assert.equal(await runner.run(work("p")), ANSWER);
+  assert.equal(oldCopy.count, 0, "the earlier answer's Copy button was never pressed");
   page.close();
 });
 
-test("the settings check outlines what a provider's selectors find on the page", () => {
+test("an answer that stays unchanged without its own Copy button ends with ui_changed naming the Copy selector", async () => {
+  const page = makePage(GROK_HTML, "https://grok.com/");
+  page.doc.getElementById("send").addEventListener("click", () => {
+    page.doc.querySelector(".ProseMirror").textContent = "";
+    const turn = page.doc.createElement("div");
+    turn.setAttribute("data-testid", "assistant-message");
+    turn.textContent = "xong";
+    page.doc.getElementById("chat").append(turn);
+  });
+  const runner = core.create(grok, {
+    document: page.doc,
+    window: page.win,
+    report: () => {},
+    readOverrides: async () => ({}),
+    timing: Object.assign({}, FAST, { STALLED_MS: 200 }),
+  });
+  await assert.rejects(runner.run(work("p")), (err) => {
+    assert.equal(err.code, "ui_changed");
+    assert.match(err.detail, /không thấy "Nút Copy" \(\[data-testid="response-footer-actions"\]/);
+    assert.match(err.detail, /trên trang có 1 nút khớp nhưng đều nằm trước câu trả lời mới/);
+    return true;
+  });
+  page.close();
+});
+
+test("the settings check outlines what each of the four selectors finds on the page", () => {
   const page = makePage(GROK_HTML, "https://grok.com/");
   const { runner } = runnerFor(grok, page);
   const probe = runner.probe({});
   assert.equal(probe.input.count, 1);
   assert.equal(probe.sendButton.count, 1);
   assert.equal(probe.answer.count, 1);
-  assert.equal(probe.doneMarker.count, 1);
   assert.equal(probe.copyButton.count, 1);
-  assert.equal(probe.settledMarker, undefined, "an unused selector is not checked");
   assert.deepEqual(probe.invalid, []);
-  assert.equal(runner.probe({ sendButton: "div[" }).sendButton.error === undefined, true, "a broken override falls back to the default");
   assert.deepEqual(runner.probe({ sendButton: "div[" }).invalid, ["sendButton"]);
   page.close();
 });
 
 const DEEPSEEK_HTML = `<body>
-<div class="chat">
-  <div class="msg"><div class="think-panel"><div class="ds-markdown" id="reason">suy nghĩ</div></div>
-    <div class="ds-markdown" id="answer">trả lời</div>
-    <div class="ds-icon-button" id="copy"></div></div>
-</div>
-<div class="box"><textarea id="chat-input"></textarea>
-  <div role="button" id="dt"><span>DeepThink</span></div><div role="button" id="se"><span>Search</span></div></div>
+<div class="chat" id="chat"><div class="ds-markdown"><p>câu trả lời cũ</p></div></div>
+<textarea id="chat-input"></textarea>
 </body>`;
 
-test("DeepSeek's answer turns leave out the DeepThink reasoning and the Copy button is the icon after the answer", () => {
+test("with no send or Copy selector (DeepSeek's defaults) the prompt goes with Enter and the answer is read from the page", async () => {
   const page = makePage(DEEPSEEK_HTML, "https://chat.deepseek.com/");
-  const S = deepseek.selectors.resolve({});
-  const ctx = { queryAll: (selector, field, scope) => Array.from((scope || page.doc).querySelectorAll(selector)), textOf: core.textOf };
-  const turns = deepseek.turns(S, ctx);
-  assert.deepEqual(turns.map((t) => t.id), ["answer"]);
-  assert.equal(deepseek.findCopy(S, turns[0], ctx).id, "copy");
-  assert.equal(deepseek.isDone(S, turns[0], { text: "trả lời", changedAt: 0, now: A.STABLE_MS }, ctx), true);
-  assert.equal(deepseek.isDone(S, turns[0], { text: "trả lời", changedAt: 0, now: A.STABLE_MS - 1 }, ctx), false);
-  page.close();
-});
-
-test("DeepSeek's modes are set from the item and only clicked when they differ", async () => {
-  const page = makePage(DEEPSEEK_HTML, "https://chat.deepseek.com/");
-  const clicks = [];
-  ["dt", "se"].forEach((id) => {
-    const el = page.doc.getElementById(id);
-    el.addEventListener("click", () => {
-      clicks.push(id);
-      el.classList.toggle("selected");
-    });
+  const input = page.doc.getElementById("chat-input");
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    input.value = "";
+    const answer = page.doc.createElement("div");
+    answer.className = "ds-markdown";
+    answer.innerHTML = '<p>Kết quả:</p><div class="code"><div class="banner"><span>json</span></div><pre>{"ok": true}</pre></div>';
+    page.doc.getElementById("chat").append(answer);
   });
-  page.doc.getElementById("se").classList.add("selected");
-  const S = deepseek.selectors.resolve({});
-  const ctx = {
-    queryAll: (selector, field, scope) => Array.from((scope || page.doc).querySelectorAll(selector)),
-    textOf: core.textOf,
-    waitFor: async (find) => find(),
-    wait: async () => {},
-    log: () => {},
-    timing: FAST,
-    RunError: core.RunError,
-  };
-  await deepseek.prepare(S, { modes: { deepThink: true, search: false } }, ctx);
-  assert.deepEqual(clicks, ["dt", "se"], "DeepThink was off and Search was on, so both were clicked");
-  await deepseek.prepare(S, { modes: { deepThink: true, search: false } }, ctx);
-  assert.deepEqual(clicks, ["dt", "se"], "already in the wanted state, so nothing was clicked again");
+  const { runner } = runnerFor(deepseek, page);
+  assert.equal(await runner.run(work("p")), ANSWER);
   page.close();
 });
