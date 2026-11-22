@@ -7,6 +7,7 @@
 - **Every Change Request gets its own feature branch** `feature/cr-<NNN>-<short-slug>` (e.g. `feature/cr-025-authoring-pipeline`); a bug fix gets `fix/<short-slug>`; other work not tied to a numbered CR gets `chore/<short-slug>` or `feature/<short-slug>`.
 - **Every such branch lives in its own git worktree**, created from `origin/main` with `scripts/worktree.sh add <branch>` under `.claude/worktrees/` (git-ignored). A Claude Code session switches into it with `EnterWorktree` (`path`) and does all its reading, editing, testing and committing there.
 - **The primary checkout** (the first entry of `git worktree list`) stays on a clean `main`. Nobody works in it: do not check out a branch, stash, commit or edit files there. It owns the running Docker stack (`.env`, `secrets/`, `data/`, volumes) and is where `/deliver` merges into `main`.
+- **Exception, Chrome extension:** a change that touches only `tools/ai-bridge-extension/` is made on its own branch checked out in the primary checkout, with no worktree, so Chrome (which loads the extension from that folder) runs the change at once. Start only from a clean `main` that no other session is using; `/deliver` switches the primary checkout back to `main` when it merges.
 - Never implement a CR directly on `main`/`master`, and never on a branch that belongs to a different, still-open CR or fix.
 - Never branch a CR from another open CR's branch unless the Creator explicitly chose to.
 - Do not merge, delete or remove the worktree of another agent's branch without being asked.

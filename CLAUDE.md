@@ -31,6 +31,7 @@ When implementing:
 ## Git branching policy
 - Every Change Request (CR) gets its own feature branch (`feature/cr-<NNN>-<slug>`) — never implement a new CR directly on `main`/`master` or on another CR's still-open branch. See `.ai-dlc/aws-aidlc-rule-details/construction/git-branching.md` for the full rule. This matters because multiple agents may work in this repo concurrently.
 - Every CR and fix branch lives in its own git worktree (`scripts/worktree.sh add <branch>` under `.claude/worktrees/`, entered with `EnterWorktree`), so CRs can run in parallel. The primary checkout stays on a clean `main`: never work, check out or commit there.
+- Exception: a change that touches only `tools/ai-bridge-extension/` gets no worktree. Create its `fix/...` or `feature/cr-<NNN>-<slug>` branch in the primary checkout and edit the files in `tools/ai-bridge-extension/` there, so Chrome loads the change at once (Reload on `chrome://extensions`). Check first that the primary checkout is on a clean `main` and that no other session is using it; `/deliver` then switches it back to `main` when merging.
 - Before designing a CR, check the other open CRs/fixes for a dependency (it needs another CR delivered first) or an overlap (both change the same feature, files, contract or table), and tell the Creator before going on.
 
 ## Git commit policy
