@@ -2915,11 +2915,11 @@ export async function generateScript(projectId: string, beat: string, note: stri
  * Nothing is stored: the Creator applies the text with an edit of the line.
  */
 export async function suggestScriptLine(projectId: string, kind: "line" | "join", lineId: string, operation?: AiCall): Promise<string> {
-  const reply = await apiFetch<{ text: string }>(`/v1/projects/${projectId}/script/suggest`, {
+  const reply = await apiFetch<{ text: string }>(`/v1/projects/${projectId}/script/suggest/${kind}/${lineId}`, {
     method: "POST",
     headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
     signal: operationInit(operation).signal,
-    body: operationBody({ kind, line_id: lineId }, operation),
+    body: operationBody({}, operation),
   });
   return reply.text;
 }

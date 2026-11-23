@@ -16,7 +16,7 @@ Dựng từ `beat:{key}` (`input_ref`): beat đổi thì lời thoại của bea
 |---|---|---|
 | GET | `/v1/projects/{id}/script` | Toàn màn: `status`, `beats_approved`, `beats[]` (`key`, `number`, `fn`, `title`, `goal`, `target_seconds`, `written`, `status`, `mine[]`, `stale`, `seconds`, `join`, `lines[]`), `checks[]` (`{ok,text}`: câu mở, câu kết, câu dài hoặc khó nghe, chỗ nối), `stats`, `target_label`, `in_range`, `voice_id` |
 | POST | `/v1/projects/{id}/script/generate` | AI viết lời thoại cho các beat chưa có, lần lượt từng beat, mỗi beat đọc lời thoại của beat liền trước và sau; body `{"beat":"","note":""}` tuỳ chọn, `beat` chỉ định một beat (phải chưa có lời thoại); trả state |
-| POST | `/v1/projects/{id}/script/suggest` | AI gợi ý một câu thay: body `{"kind":"line"\|"join","line_id":"b2.1"}`; trả `{"text":"…"}`, không lưu gì (áp dụng bằng sửa câu) |
+| POST | `/v1/projects/{id}/script/suggest/{kind}/{line_id}` | AI gợi ý một câu thay (`kind` là `line` hoặc `join`, `line_id` như `b2.1`; không có body); trả `{"text":"…"}`, không lưu gì (áp dụng bằng sửa câu) |
 | POST | `/v1/projects/{id}/script/speak` | Đưa câu vào hàng chờ đọc: `{"line_ids":["b1.1"]}`; câu đã có file đúng chữ và giọng thì bỏ qua; trả state |
 | POST | `/v1/projects/{id}/script/replace` | Tìm và thay một từ trong lời thoại: `{"find","replace","field":"spoken"\|"text","match_case","apply"}`. Khớp nguyên từ (ký tự liền kề không phải chữ hoặc số). `field = spoken` ghi vào lời đọc (câu chưa có lời đọc riêng thì lời đọc lấy chữ hiển thị đã thay); `text` ghi vào chữ hiển thị. `apply = false` chỉ trả danh sách; `true` ghi mọi beat chưa duyệt, mỗi beat về chờ duyệt như một lần sửa tay. Beat đã duyệt không bị đổi, chỉ đếm. Trả `{"matches":[{"beat","line","before","after"}],"skipped_approved":[{"beat","lines"}],"applied"}`; `400` khi từ rỗng, `field` sai, hoặc có câu trống / không hợp lệ sau khi thay (khi đó không ghi gì) |
 | GET | `/v1/projects/{id}/audio/{file}` | Phát file giọng (`audio/wav`, có Range) từ `/shared/{id}/audio/`; chỉ tên dạng `b1-2_<12 hex>.wav` |
@@ -24,6 +24,10 @@ Dựng từ `beat:{key}` (`input_ref`): beat đổi thì lời thoại của bea
 Mỗi câu trong `lines[]`: `id`, `text`, `facts[]`, `seconds`, `estimated` (true khi chưa có file giọng cho đúng chữ hiện tại, thời lượng tính theo tốc độ đọc), `flag` (`null` hoặc `{kind:"Câu dài"|"Khó nghe", msg}`) và `audio` (`{state:"none"|"pending"|"running"|"ready"|"failed", file?, error?}`). Câu sửa chữ hoặc đổi giọng về `none`. Cờ và kiểm chỉ cảnh báo, không chặn duyệt; **do máy tính** bằng bảng luật cố định (câu quá 28 từ; có ngoặc; chữ trộn số; số dài; chữ viết tắt in hoa; ký hiệu như `%`), AI chỉ viết gợi ý khi được hỏi.
 
 Lượt AI nhận header `X-Operation-Id` và ghi nhận dưới kind `script_beat`. Model AI của bước là model Creator chọn cho bước ở khoá `story` của `PUT /v1/projects/{id}/authoring/models` (bước Kịch bản dùng lại khoá này); mặc định theo bước đặt ở Cài đặt · Model AI, khoá `story`.
+
+## Lượt chạy AI (ADR-0052)
+
+Lượt AI một-prompt của bước chạy qua lượt chạy có xem trước của authoring-service, `/v1/projects/{id}/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md). Điểm dừng xem trước của từng lượt: `POST /units/script_beat/{key}/redo` (viết lời thoại beat chưa có, hoặc viết lại) → `{lines:[{id,text,spoken?,facts[]}], next_seq}` đúng như sẽ lưu; `POST /script/suggest/{kind}/{line_id}` → `{text}` (áp dụng không lưu gì, chỉ trả `{text}`). `POST /script/generate` (mọi beat chưa có lời thoại, mỗi beat đọc lời thoại đã lưu của beat trước) không đi qua lượt chạy: lưu ngay từng beat.
 
 ## Mã lỗi
 
