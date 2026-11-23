@@ -86,9 +86,6 @@ func (rt *Router) mountStoryboard(r chi.Router) {
 		r.Post("/lock", rt.sbLock)
 		r.Get("/versions/{version}", rt.sbVersion)
 		r.Get("/frames/{shot}", rt.sbFrame)
-		if rt.aiRuns != nil {
-			rt.mountAIRuns(r)
-		}
 	})
 }
 

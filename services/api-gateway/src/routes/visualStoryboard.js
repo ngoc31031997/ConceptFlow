@@ -17,6 +17,7 @@ const { proxyHandler } = require('../handlers/proxyHandler');
 function visualStoryboardRouter(visualClient, visualAiClient) {
   const router = express.Router();
   const base = '/v1/projects/:id/storyboard';
+  const runs = '/v1/projects/:id/visual/ai-runs';
   const plain = proxyHandler(visualClient, 'visual-service');
   const ai = proxyHandler(visualAiClient, 'visual-service');
   router.get(base, plain);
@@ -59,12 +60,12 @@ function visualStoryboardRouter(visualClient, visualAiClient) {
   // AI runs with a preview: start builds the prompt (and, on the API channel,
   // asks the model in the background inside visual-service); reply reads a
   // pasted or extension reply; apply stores it and redraws frames.
-  router.post(`${base}/ai-runs`, ai);
-  router.get(`${base}/ai-runs`, plain);
-  router.get(`${base}/ai-runs/:run`, plain);
-  router.post(`${base}/ai-runs/:run/reply`, ai);
-  router.post(`${base}/ai-runs/:run/apply`, ai);
-  router.post(`${base}/ai-runs/:run/cancel`, plain);
+  router.post(`${runs}`, ai);
+  router.get(`${runs}`, plain);
+  router.get(`${runs}/:run`, plain);
+  router.post(`${runs}/:run/reply`, ai);
+  router.post(`${runs}/:run/apply`, ai);
+  router.post(`${runs}/:run/cancel`, plain);
   return router;
 }
 

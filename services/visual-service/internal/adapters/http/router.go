@@ -24,7 +24,8 @@ type Router struct {
 	plan             planDesk
 	sequence         sequenceDesk
 	storyboard       storyboardDesk
-	aiRuns           storyboardAIRuns
+	aiRuns           aiRunsDesk
+	handler          http.Handler
 	referenceLibrary referenceLibraryUseCase
 }
 
@@ -51,6 +52,10 @@ func (rt *Router) Handler() http.Handler {
 		rt.mountStoryboard(r)
 	}
 	rt.mountReferenceLibrary(r)
+	if rt.aiRuns != nil {
+		rt.mountAIRuns(r)
+	}
+	rt.handler = r
 	return r
 }
 

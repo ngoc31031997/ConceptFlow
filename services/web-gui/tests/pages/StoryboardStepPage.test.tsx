@@ -221,9 +221,10 @@ function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
   return {
     id: "r1",
     project_id: "p1",
-    task: "unit",
-    target: "VP-004",
-    note: "",
+    label: "Viết shot cho VP-004",
+    method: "POST",
+    path: "/v1/projects/p1/storyboard/units/VP-004/generate",
+    body: '{"note":""}',
     channel: "api",
     status: "running",
     prompt: "PROMPT UNIT",
@@ -538,13 +539,17 @@ describe("StoryboardStepPage", () => {
     });
 
     it("lists the assets with the AI on the step's channel, and shows the run while it goes", async () => {
-      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ task: "assets", target: "" }));
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path: "/v1/projects/p1/storyboard/assets/generate" }));
       renderPage();
       fireEvent.click(await screen.findByTestId("sb-assets-generate"));
       expect(await screen.findByTestId("sb-assets-dialog")).toHaveTextContent("Danh sách về “Chờ duyệt”");
       fireEvent.click(screen.getByTestId("sb-assets-dialog-run"));
       await waitFor(() =>
-        expect(start).toHaveBeenCalledWith("p1", { task: "assets", target: "", note: "", channel: "api" }),
+        expect(start).toHaveBeenCalledWith("visual", "p1", {
+          label: expect.any(String),
+          request: expect.objectContaining({ method: "POST", path: "/v1/projects/p1/storyboard/assets/generate", body: JSON.stringify({ note: "" }) }),
+          channel: "api",
+        }),
       );
       expect(await screen.findByTestId("sb-assets-dialog-status")).toHaveTextContent("Đang gọi API");
       fireEvent.click(screen.getByTestId("sb-assets-dialog-done"));
@@ -576,14 +581,18 @@ describe("StoryboardStepPage", () => {
     it("writes one asset's detail with the note, from its card", async () => {
       const start = vi
         .spyOn(apiClient, "startAiRun")
-        .mockResolvedValue(aiRun({ task: "asset_detail", target: "AST-DISK-001", note: "dịu hơn" }));
+        .mockResolvedValue(aiRun({ path: "/v1/projects/p1/storyboard/assets/AST-DISK-001/detail" }));
       renderPage();
       fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-detail"));
       expect(await screen.findByTestId("sb-asset-AST-DISK-001-detail-dialog")).toHaveTextContent("chỉ đọc mục khái niệm");
       fireEvent.change(screen.getByTestId("sb-asset-AST-DISK-001-detail-dialog-note"), { target: { value: " dịu hơn " } });
       fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-detail-dialog-run"));
       await waitFor(() =>
-        expect(start).toHaveBeenCalledWith("p1", { task: "asset_detail", target: "AST-DISK-001", note: "dịu hơn", channel: "api" }),
+        expect(start).toHaveBeenCalledWith("visual", "p1", {
+          label: expect.any(String),
+          request: expect.objectContaining({ method: "POST", path: "/v1/projects/p1/storyboard/assets/AST-DISK-001/detail", body: JSON.stringify({ note: "dịu hơn" }) }),
+          channel: "api",
+        }),
       );
     });
 
@@ -933,18 +942,22 @@ describe("StoryboardStepPage", () => {
       fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai-dialog-run-more"));
       fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-run-manual"));
       await waitFor(() =>
-        expect(start).toHaveBeenCalledWith("p1", { task: "unit", target: "VP-004", note: "", channel: "manual" }),
+        expect(start).toHaveBeenCalledWith("visual", "p1", {
+          label: expect.any(String),
+          request: expect.objectContaining({ method: "POST", path: "/v1/projects/p1/storyboard/units/VP-004/generate", body: JSON.stringify({ note: "" }) }),
+          channel: "manual",
+        }),
       );
       expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog-prompt")).toHaveTextContent("PROMPT UNIT");
       expect(screen.getByTestId("sb-unit-VP-004-ai-dialog-status")).toHaveTextContent("Chờ bạn dán câu trả lời");
       fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-tab-reply"));
       fireEvent.change(screen.getByTestId("sb-unit-VP-004-ai-dialog-reply"), { target: { value: "{...}" } });
       fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-read"));
-      await waitFor(() => expect(reply).toHaveBeenCalledWith("p1", "r1", "{...}"));
+      await waitFor(() => expect(reply).toHaveBeenCalledWith("visual", "p1", "r1", "{...}"));
       expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("SH-009");
       expect(apply).not.toHaveBeenCalled();
       fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-apply"));
-      await waitFor(() => expect(apply).toHaveBeenCalledWith("p1", "r1"));
+      await waitFor(() => expect(apply).toHaveBeenCalledWith("visual", "p1", "r1"));
       await waitFor(() => expect(screen.queryByTestId("sb-unit-VP-004-ai-dialog")).toBeNull());
     });
 
@@ -961,7 +974,7 @@ describe("StoryboardStepPage", () => {
       const item = queueAdd.mock.calls[0][0];
       expect(item.kind).toBe("prompt");
       expect(item.prompt).toBe("PROMPT UNIT");
-      expect(item.request.path).toBe("/v1/projects/p1/storyboard/ai-runs/r1/reply");
+      expect(item.request.path).toBe("/v1/projects/p1/visual/ai-runs/r1/reply");
       expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog-status")).toHaveTextContent("Đang chờ extension");
     });
 
@@ -1074,13 +1087,17 @@ describe("StoryboardStepPage", () => {
     });
 
     it("runs the AI review on the step's channel", async () => {
-      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ task: "review", target: "" }));
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path: "/v1/projects/p1/storyboard/review" }));
       renderPage();
       await openReview();
       fireEvent.click(await screen.findByTestId("sb-review-run"));
       fireEvent.click(await screen.findByTestId("sb-review-dialog-run"));
       await waitFor(() =>
-        expect(start).toHaveBeenCalledWith("p1", { task: "review", target: "", note: "", channel: "api" }),
+        expect(start).toHaveBeenCalledWith("visual", "p1", {
+          label: expect.any(String),
+          request: expect.objectContaining({ method: "POST", path: "/v1/projects/p1/storyboard/review", body: JSON.stringify({ note: "" }) }),
+          channel: "api",
+        }),
       );
     });
 

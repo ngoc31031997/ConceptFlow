@@ -344,7 +344,7 @@ export function StoryboardStepPage() {
                 )}
               </div>
             </Card>
-            <AiRunsProvider projectId={projectId} step="visual_storyboard">
+            <AiRunsProvider projectId={projectId} step="visual_storyboard" service="visual">
               <StoryboardSections
                 projectId={projectId}
                 projectName={projectName}

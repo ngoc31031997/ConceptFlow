@@ -9,7 +9,7 @@ import (
 
 // projectTables are the tables that hold one video's data. reference_styles is
 // shared by every video and is not one of them.
-var projectTables = []string{"review_units", "visual_concept_versions", "visual_plan_versions", "visual_plan_seq", "visual_sequence_versions", "project_reference_picks", "project_visual", "storyboard_ai_runs"}
+var projectTables = []string{"review_units", "visual_concept_versions", "visual_plan_versions", "visual_plan_seq", "visual_sequence_versions", "project_reference_picks", "project_visual", "ai_runs"}
 
 // ProjectDataRepository implements application.ProjectDataPort.
 type ProjectDataRepository struct {

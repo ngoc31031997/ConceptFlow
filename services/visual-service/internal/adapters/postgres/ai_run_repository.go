@@ -11,7 +11,7 @@ import (
 	"visual/internal/application"
 )
 
-// AIRunRepository implements application.AIRunStorePort over storyboard_ai_runs.
+// AIRunRepository implements application.AIRunStorePort over ai_runs.
 type AIRunRepository struct {
 	pool *pgxpool.Pool
 }
@@ -23,12 +23,12 @@ func NewAIRunRepository(pool *pgxpool.Pool) *AIRunRepository {
 	return &AIRunRepository{pool: pool}
 }
 
-const aiRunColumns = `id, project_id, task, target, note, channel, status, prompt, reply, preview, error, created_at, updated_at`
+const aiRunColumns = `id, project_id, label, channel, status, method, path, body, prompt, reply, preview, error, created_at, updated_at`
 
 func scanAIRun(row pgx.Row) (application.AIRun, error) {
 	var r application.AIRun
 	var preview []byte
-	err := row.Scan(&r.ID, &r.ProjectID, &r.Task, &r.Target, &r.Note, &r.Channel, &r.Status, &r.Prompt, &r.Reply,
+	err := row.Scan(&r.ID, &r.ProjectID, &r.Label, &r.Channel, &r.Status, &r.Method, &r.Path, &r.Body, &r.Prompt, &r.Reply,
 		&preview, &r.Error, &r.CreatedAt, &r.UpdatedAt)
 	if len(preview) > 0 {
 		r.Preview = preview
@@ -47,10 +47,11 @@ func nullJSON(b []byte) any {
 // CreateAIRun stores a new run and returns it with its id and times.
 func (r *AIRunRepository) CreateAIRun(ctx context.Context, run application.AIRun) (application.AIRun, error) {
 	got, err := scanAIRun(r.pool.QueryRow(ctx, `
-		INSERT INTO storyboard_ai_runs (project_id, task, target, note, channel, status, prompt, reply, preview, error)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+		INSERT INTO ai_runs (project_id, label, channel, status, method, path, body, prompt, reply, preview, error)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
 		RETURNING `+aiRunColumns,
-		run.ProjectID, run.Task, run.Target, run.Note, run.Channel, run.Status, run.Prompt, run.Reply, nullJSON(run.Preview), run.Error))
+		run.ProjectID, run.Label, run.Channel, run.Status, run.Method, run.Path, run.Body, run.Prompt, run.Reply,
+		nullJSON(run.Preview), run.Error))
 	if err != nil {
 		return application.AIRun{}, fmt.Errorf("create AI run: %w", err)
 	}
@@ -60,7 +61,7 @@ func (r *AIRunRepository) CreateAIRun(ctx context.Context, run application.AIRun
 // AIRun returns one run of the video, or application.ErrUnknownAIRun.
 func (r *AIRunRepository) AIRun(ctx context.Context, projectID, id string) (application.AIRun, error) {
 	got, err := scanAIRun(r.pool.QueryRow(ctx,
-		`SELECT `+aiRunColumns+` FROM storyboard_ai_runs WHERE project_id = $1 AND id = $2`, projectID, id))
+		`SELECT `+aiRunColumns+` FROM ai_runs WHERE project_id = $1 AND id = $2`, projectID, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return application.AIRun{}, application.ErrUnknownAIRun
 	}
@@ -73,7 +74,7 @@ func (r *AIRunRepository) AIRun(ctx context.Context, projectID, id string) (appl
 // SaveAIRun writes the run's status, reply, preview and error.
 func (r *AIRunRepository) SaveAIRun(ctx context.Context, run application.AIRun) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE storyboard_ai_runs SET status = $3, reply = $4, preview = $5::jsonb, error = $6, updated_at = now()
+		UPDATE ai_runs SET status = $3, reply = $4, preview = $5::jsonb, error = $6, updated_at = now()
 		WHERE project_id = $1 AND id = $2`,
 		run.ProjectID, run.ID, run.Status, run.Reply, nullJSON(run.Preview), run.Error)
 	if err != nil {
@@ -85,12 +86,12 @@ func (r *AIRunRepository) SaveAIRun(ctx context.Context, run application.AIRun) 
 	return nil
 }
 
-// LatestAIRuns returns the newest run of every task and target of the video.
+// LatestAIRuns returns the newest run of every request path of the video.
 func (r *AIRunRepository) LatestAIRuns(ctx context.Context, projectID string) ([]application.AIRun, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT DISTINCT ON (task, target) `+aiRunColumns+`
-		FROM storyboard_ai_runs WHERE project_id = $1
-		ORDER BY task, target, created_at DESC`, projectID)
+		SELECT DISTINCT ON (path) `+aiRunColumns+`
+		FROM ai_runs WHERE project_id = $1
+		ORDER BY path, created_at DESC`, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("list AI runs: %w", err)
 	}
@@ -111,7 +112,7 @@ func (r *AIRunRepository) LatestAIRuns(ctx context.Context, projectID string) ([
 // still finish.
 func (r *AIRunRepository) FailRunningAIRuns(ctx context.Context, reason string) (int64, error) {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE storyboard_ai_runs SET status = $1, error = $2, updated_at = now() WHERE status = $3`,
+		UPDATE ai_runs SET status = $1, error = $2, updated_at = now() WHERE status = $3`,
 		application.AIRunFailed, reason, application.AIRunRunning)
 	if err != nil {
 		return 0, fmt.Errorf("fail running AI runs: %w", err)

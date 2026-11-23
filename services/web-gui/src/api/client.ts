@@ -4506,64 +4506,87 @@ export function getStoryboardVersion(projectId: string, version: number): Promis
 /** Where an AI turn's reply comes from: the system's model, the AI Bridge extension, or a paste. */
 export type AiChannel = "api" | "extension" | "manual";
 
-/** The AI turns of step 11 that run with a preview. */
-export type AiRunTask = "assets" | "asset_detail" | "unit" | "review";
-
-/** Where an AI run stands (docs/contracts/storyboard-v1.md, "Lượt chạy AI"). */
+/** Where an AI run stands (docs/contracts/ai-runs-v1.md). */
 export type AiRunStatus = "waiting" | "running" | "ready" | "unreadable" | "failed" | "applied" | "cancelled";
 
-/** One AI turn of step 11 run with a preview: the reply is read and shown before it is stored. */
+/** The service that owns a step's AI routes: steps 1–7 are authoring-service's, steps 8–11 visual-service's. */
+export type AiRunService = "authoring" | "visual";
+
+/** One AI turn of a step run with a preview: the step's own request, replayed; the reply is shown before it is stored. */
 export interface AiRun {
   id: string;
   project_id: string;
-  task: AiRunTask;
-  /** The asset or plan unit the turn writes; empty for the asset list and the review. */
-  target: string;
-  note: string;
+  /** Names the action ("Viết shot cho VP-001"); also the extension queue item's name. */
+  label: string;
   channel: AiChannel;
   status: AiRunStatus;
+  /** The step's own AI request the run replays; `path` is also the run's key: one AI action, one open run. */
+  method: string;
+  path: string;
+  body: string;
   prompt: string;
   reply: string;
-  /** What applying stores, once the reply was read: shots, asset drafts, a detail or review findings. */
+  /** What applying stores, once the reply was read; its shape is the step's. */
   preview: unknown;
   error: string;
   created_at: string;
   updated_at: string;
 }
 
-function aiRunsPath(projectId: string): string {
-  return `${storyboardPath(projectId)}/ai-runs`;
+function aiRunsPath(service: AiRunService, projectId: string): string {
+  return `/v1/projects/${projectId}/${service === "visual" ? "visual/" : ""}ai-runs`;
 }
 
-/** Starts a run: builds its prompt now; on "api" the system's model is asked in the background. */
+/**
+ * The request a step's AI call would send, built by calling it in "describe" mode, which sends nothing.
+ * `call` is the step's own client function with its external-AI argument.
+ */
+export async function describeAiRequest(call: (external: ExternalAi) => Promise<unknown>): Promise<ExternalRequest> {
+  try {
+    await call({ mode: "describe" });
+  } catch (err) {
+    if (err instanceof ExternalRequestDescribed) return err.request;
+    throw err;
+  }
+  throw new Error("Lời gọi AI này không dựng được yêu cầu để chạy.");
+}
+
+/** Starts a run of the step's request: builds its prompt now; on "api" the system's model is asked in the background. */
 export function startAiRun(
+  service: AiRunService,
   projectId: string,
-  run: { task: AiRunTask; target?: string; note: string; channel: AiChannel },
+  run: { label: string; request: ExternalRequest; channel: AiChannel },
 ): Promise<AiRun> {
-  return apiFetch<AiRun>(aiRunsPath(projectId), {
+  return apiFetch<AiRun>(aiRunsPath(service, projectId), {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ task: run.task, target: run.target ?? "", note: run.note, channel: run.channel }),
+    body: JSON.stringify({
+      label: run.label,
+      method: run.request.method,
+      path: run.request.path,
+      body: run.request.body ?? "",
+      channel: run.channel,
+    }),
   });
 }
 
-/** The newest run of every task and target of the video. */
-export async function listAiRuns(projectId: string): Promise<AiRun[]> {
-  return (await apiFetch<{ runs: AiRun[] }>(aiRunsPath(projectId))).runs ?? [];
+/** The newest run of every AI action (request path) of the video. */
+export async function listAiRuns(service: AiRunService, projectId: string): Promise<AiRun[]> {
+  return (await apiFetch<{ runs: AiRun[] }>(aiRunsPath(service, projectId))).runs ?? [];
 }
 
 /** Hands a reply to a run; the answer says whether it could be read (`ready`) or not (`unreadable`). */
-export function replyAiRun(projectId: string, runId: string, raw: string): Promise<AiRun> {
-  return apiFetch<AiRun>(`${aiRunsPath(projectId)}/${runId}/reply`, {
+export function replyAiRun(service: AiRunService, projectId: string, runId: string, raw: string): Promise<AiRun> {
+  return apiFetch<AiRun>(`${aiRunsPath(service, projectId)}/${runId}/reply`, {
     method: "POST",
     headers: JSON_HEADERS,
     body: JSON.stringify({ raw }),
   });
 }
 
-/** Stores a ready run's reply into the storyboard. */
-export function applyAiRun(projectId: string, runId: string): Promise<{ run: AiRun; state: StoryboardState }> {
-  return apiFetch<{ run: AiRun; state: StoryboardState }>(`${aiRunsPath(projectId)}/${runId}/apply`, {
+/** Stores a ready run's reply through the step's own request; `state` is what that request answered. */
+export function applyAiRun(service: AiRunService, projectId: string, runId: string): Promise<{ run: AiRun; state: unknown }> {
+  return apiFetch<{ run: AiRun; state: unknown }>(`${aiRunsPath(service, projectId)}/${runId}/apply`, {
     method: "POST",
     headers: JSON_HEADERS,
     body: "{}",
@@ -4571,8 +4594,8 @@ export function applyAiRun(projectId: string, runId: string): Promise<{ run: AiR
 }
 
 /** Drops a run that was not applied. */
-export function cancelAiRun(projectId: string, runId: string): Promise<AiRun> {
-  return apiFetch<AiRun>(`${aiRunsPath(projectId)}/${runId}/cancel`, {
+export function cancelAiRun(service: AiRunService, projectId: string, runId: string): Promise<AiRun> {
+  return apiFetch<AiRun>(`${aiRunsPath(service, projectId)}/${runId}/cancel`, {
     method: "POST",
     headers: JSON_HEADERS,
     body: "{}",
@@ -4580,8 +4603,8 @@ export function cancelAiRun(projectId: string, runId: string): Promise<AiRun> {
 }
 
 /** The request the AI Bridge extension posts a fixed-prompt item's answer to, as `{raw}`. */
-export function aiRunReplyRequest(projectId: string, runId: string): ExternalRequest {
-  return { gateway: GATEWAY_URL, method: "POST", path: `${aiRunsPath(projectId)}/${runId}/reply` };
+export function aiRunReplyRequest(service: AiRunService, projectId: string, runId: string): ExternalRequest {
+  return { gateway: GATEWAY_URL, method: "POST", path: `${aiRunsPath(service, projectId)}/${runId}/reply` };
 }
 
 /** The default AI channel for all steps and each step's own choice. */

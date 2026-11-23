@@ -1,5 +1,7 @@
 import { useState } from "react";
 import {
+  describeAiRequest,
+  reviewStoryboard,
   getStoryboardVersion,
   type StoryboardState,
 } from "../../api/client";
@@ -9,6 +11,7 @@ import lockStyles from "../lock/lock.module.css";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, CopyBox, Dialog, FormField, TextInput } from "../ui";
 import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { StoryboardRunPreview } from "./StoryboardRunPreview";
 import visualStyles from "../visual/visual.module.css";
 import { ACCEPTABLE_CHECKS, allShots, blockersTooltip, keyTarget, storyboardCriteria } from "./storyboardModel";
 import styles from "./storyboard.module.css";
@@ -83,7 +86,7 @@ export function StoryboardReviewTab({
             >
               {state.review.reviewed ? "Rà soát lại" : "Rà soát bằng AI"}
             </Button>
-            <AiRunPill task="review" onOpen={() => setReviewOpen(true)} testId="sb-review-ai-run" />
+            <AiRunPill runPath={`/v1/projects/${projectId}/storyboard/review`} onOpen={() => setReviewOpen(true)} testId="sb-review-ai-run" />
           </div>
           {!state.review.reviewed && failing.length === 0 && (
             <p className={researchStyles.hint} data-testid="sb-review-none">
@@ -282,9 +285,10 @@ export function StoryboardReviewTab({
       <AiRunDialog
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
-        projectId={projectId}
         title={state.review.reviewed ? "Rà soát lại storyboard" : "Rà soát storyboard"}
-        task="review"
+        runPath={`/v1/projects/${projectId}/storyboard/review`}
+        describe={(note) => describeAiRequest((external) => reviewStoryboard(projectId, note, { external }))}
+        renderPreview={(p) => <StoryboardRunPreview kind="review" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI so storyboard hiện tại với các vấn đề cũ: vấn đề đã hết thì đánh dấu đã sửa, vấn đề

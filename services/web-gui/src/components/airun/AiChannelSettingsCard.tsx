@@ -16,8 +16,20 @@ const CHANNEL_OPTIONS: { value: AiChannel; label: string }[] = [
   { value: "manual", label: "Thủ công · chép prompt, dán câu trả lời" },
 ];
 
-/** The steps whose AI buttons follow the channel setting today, with their names. */
-const CHANNEL_STEPS: { step: string; label: string }[] = [{ step: "visual_storyboard", label: "Bước 11 · Storyboard" }];
+/** The steps whose AI buttons follow the channel setting, with their names (llm-service CHANNEL_STEPS). */
+const CHANNEL_STEPS: { step: string; label: string }[] = [
+  { step: "idea", label: "Bước 1 · Ý tưởng" },
+  { step: "brief", label: "Bước 2 · Creative brief" },
+  { step: "research", label: "Bước 3 · Nghiên cứu" },
+  { step: "story", label: "Bước 4 · Câu chuyện" },
+  { step: "beats", label: "Bước 5 · Beat sheet" },
+  { step: "script", label: "Bước 6 · Viết kịch bản" },
+  { step: "lock", label: "Bước 7 · Rà soát và chốt" },
+  { step: "visual_concept", label: "Bước 8 · Ngôn ngữ hình ảnh" },
+  { step: "visual_plan", label: "Bước 9 · Kế hoạch hình" },
+  { step: "visual_sequence", label: "Bước 10 · Chuỗi hình" },
+  { step: "visual_storyboard", label: "Bước 11 · Storyboard" },
+];
 
 function errorText(err: unknown): string {
   return err instanceof ApiError && err.message ? err.message : "Không lưu được. Thử lại.";
@@ -59,8 +71,7 @@ export function AiChannelSettingsCard() {
         <div>
           <h3>Kênh chạy AI</h3>
           <p className={styles.hint}>
-            Nút “▶ Chạy AI” chạy bằng kênh này; menu ▾ cạnh nút đổi kênh cho một lần chạy. Hiện chỉ bước 11
-            dùng cài đặt này.
+            Nút “▶ Chạy AI” của mỗi bước chạy bằng kênh này; menu ▾ cạnh nút đổi kênh cho một lần chạy.
           </p>
         </div>
         {setting && (

@@ -83,17 +83,19 @@ CREATE TABLE IF NOT EXISTS project_visual (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- One AI turn of step 11 run through the AI run dialog: the prompt, the reply
--- once it is in (from the system's model, the AI Bridge extension or a paste),
--- what reading it would store (preview), and whether it was applied.
-CREATE TABLE IF NOT EXISTS storyboard_ai_runs (
+-- One AI turn of steps 8 to 11 run through the AI run dialog (ADR-0052): the
+-- step request it replays, the prompt, the reply once it is in (from the
+-- system's model, the AI Bridge extension or a paste), what reading it would
+-- store (preview), and whether it was applied.
+CREATE TABLE IF NOT EXISTS ai_runs (
     id         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     project_id TEXT NOT NULL,
-    task       TEXT NOT NULL,
-    target     TEXT NOT NULL DEFAULT '',
-    note       TEXT NOT NULL DEFAULT '',
+    label      TEXT NOT NULL DEFAULT '',
     channel    TEXT NOT NULL,
     status     TEXT NOT NULL,
+    method     TEXT NOT NULL,
+    path       TEXT NOT NULL,
+    body       TEXT NOT NULL DEFAULT '',
     prompt     TEXT NOT NULL DEFAULT '',
     reply      TEXT NOT NULL DEFAULT '',
     preview    JSONB,
@@ -101,7 +103,14 @@ CREATE TABLE IF NOT EXISTS storyboard_ai_runs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS storyboard_ai_runs_by_project ON storyboard_ai_runs (project_id, task, target, created_at DESC);
+CREATE INDEX IF NOT EXISTS ai_runs_by_path ON ai_runs (project_id, path, created_at DESC);
+-- The step 11 runs table that ai_runs replaces goes only while it is empty.
+DO $$
+BEGIN
+    IF to_regclass('storyboard_ai_runs') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM storyboard_ai_runs) THEN
+        DROP TABLE storyboard_ai_runs;
+    END IF;
+END $$;
 -- The reference library: text descriptions of a style, shared by every video.
 -- Ids are R01, R02... from seq and are never reused.
 CREATE SEQUENCE IF NOT EXISTS reference_styles_seq;

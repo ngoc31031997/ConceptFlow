@@ -75,7 +75,7 @@ func main() {
 	} else if n > 0 {
 		logger.Info("marked interrupted AI runs as failed", "count", n)
 	}
-	router.WithStoryboardAIRuns(application.NewStoryboardAIRuns(storyboardDesk, aiRunRepo))
+	router.WithAIRuns(application.NewAIRuns(router, aiRunRepo))
 	go pushSystemPrompts(ctx, logger, llmClient)
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler(), ReadHeaderTimeout: 10 * time.Second}

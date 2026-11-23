@@ -303,7 +303,7 @@ async def test_ai_channels_default_to_api_and_a_step_can_follow_its_own(lib):
     await lib.set_step_channel("visual_storyboard", "")
     assert (await lib.ai_channels())["effective"]["visual_storyboard"] == "extension"
     for bad in (lambda: lib.set_default_channel("fax"), lambda: lib.set_step_channel("nope", "api"),
-                lambda: lib.set_step_channel("brief", "fax")):
+                lambda: lib.set_step_channel("brief", "fax"), lambda: lib.set_step_channel("code", "api")):
         with pytest.raises(PromptInvalid):
             await bad()
 

@@ -21,6 +21,7 @@ function buildApp(plain, ai = ok()) {
 
 describe('storyboard routing', () => {
   const base = '/v1/projects/test-sb-gw/storyboard';
+  const runs = '/v1/projects/test-sb-gw/visual/ai-runs';
 
   test.each([
     ['get', base],
@@ -40,9 +41,9 @@ describe('storyboard routing', () => {
     ['post', `${base}/findings/m-asset-unused/accept`],
     ['post', `${base}/lock`],
     ['get', `${base}/versions/1`],
-    ['get', `${base}/ai-runs`],
-    ['get', `${base}/ai-runs/r1`],
-    ['post', `${base}/ai-runs/r1/cancel`],
+    ['get', `${runs}`],
+    ['get', `${runs}/r1`],
+    ['post', `${runs}/r1/cancel`],
   ])('%s %s goes to visual-service', async (method, path) => {
     const plain = ok();
     const res = await request(buildApp(plain))[method](path).send({});
@@ -64,9 +65,9 @@ describe('storyboard routing', () => {
     ['put', `${base}/units/VP-002/shots/SH-003`],
     ['post', `${base}/units/VP-002/shots/SH-003/frame`],
     ['post', `${base}/review`],
-    ['post', `${base}/ai-runs`],
-    ['post', `${base}/ai-runs/r1/reply`],
-    ['post', `${base}/ai-runs/r1/apply`],
+    ['post', `${runs}`],
+    ['post', `${runs}/r1/reply`],
+    ['post', `${runs}/r1/apply`],
   ])('%s %s goes to visual-service through the client with no timeout', async (method, path) => {
     const plain = ok();
     const ai = ok();

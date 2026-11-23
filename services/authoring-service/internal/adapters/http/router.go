@@ -33,6 +33,8 @@ type InternalAuthoring interface {
 
 // Router holds authoring-service's REST handlers' use case dependencies.
 type Router struct {
+	aiRuns                  aiRunsDesk
+	handler                 http.Handler
 	suggestPublishMetadata  suggestPublishMetadataUseCase
 	archetypes              archetypesUseCase
 	renderPrompt            renderPromptUseCase
@@ -114,6 +116,11 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/internal/v1/authoring/{project_id}", rt.handleGetAuthoringState)
 	r.Put("/internal/v1/authoring/{project_id}", rt.handleInternalPut)
 	r.Delete("/internal/v1/authoring/{project_id}", rt.handleInternalDelete)
+	// AI runs with a preview before apply (ADR-0052).
+	if rt.aiRuns != nil {
+		rt.aiRunRoutes(r)
+	}
+	rt.handler = r
 	return r
 }
 

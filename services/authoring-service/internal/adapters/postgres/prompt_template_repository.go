@@ -353,6 +353,10 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 	if _, err := r.pool.Exec(ctx, `DELETE FROM authoring_segments WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
+	// And its AI runs.
+	if _, err := r.pool.Exec(ctx, `DELETE FROM ai_runs WHERE project_id = $1`, projectID); err != nil {
+		return err
+	}
 	// And its review units (the brief and every unit of later steps).
 	if _, err := r.pool.Exec(ctx, `DELETE FROM review_units WHERE project_id = $1`, projectID); err != nil {
 		return err

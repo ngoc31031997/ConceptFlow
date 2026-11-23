@@ -136,3 +136,14 @@ When options are long sentences (a fact, a claim, a title), the Creator must be 
 - The trigger shows the chosen option on one line with an ellipsis, so `<Dropdown>` puts the full label and hint in the trigger's `title` tooltip. Where the chosen text is the thing the Creator must re-read later, show it in full next to the trigger instead (as the fact tags beside "+ Gắn dữ kiện…" do).
 - Give a dropdown with long options room: a trigger of at least 480px (or the full column) so lines stay short.
 - A new dropdown is checked with its longest real option before it is done.
+
+## 10. Every AI action runs through the AI run dialog
+
+Every place that asks the AI, in every step, uses the same pattern (ADR-0052, `docs/contracts/ai-runs-v1.md`):
+
+- One "▶ Chạy AI (<kênh>)" button with ▾ beside it (`ChannelButton`). The main part runs on the step's channel from Cài đặt · Kênh chạy AI; the menu runs this once on API, Extension or Thủ công without changing the setting.
+- One modal (`AiRunDialog`): the note and the impact before the run; then where the run stands, the Prompt tab (with quick copy, rule 8), the Kết quả tab with the reply, a preview of what will be stored, and "Áp dụng kết quả" (yellow, rule 6). Nothing is stored before "Áp dụng kết quả".
+- An unreadable reply stays in the box with the reason, so the Creator fixes it and presses "Đọc kết quả" again. A failed channel offers "Chuyển sang …" the others.
+- Closing the modal never cancels the run. A pill next to the action's button (`AiRunPill`) shows where it stands and opens the modal again.
+- A batch run whose items read the previous item's stored result stores each item at once, says so on its card, and has no manual channel.
+- Do not build new AI dialogs with separate "Gửi cho AI", "Dùng AI ngoài" and "Thêm vào hàng đợi AI" buttons.

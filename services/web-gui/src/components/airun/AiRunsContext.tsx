@@ -6,18 +6,14 @@ import {
   startAiRun,
   type AiChannel,
   type AiRun,
-  type AiRunTask,
+  type AiRunService,
+  type ExternalRequest,
 } from "../../api/client";
 import { useAiQueue, type AiQueue } from "../../hooks/useAiQueue";
 import { DEFAULT_AI_MODES } from "../../hooks/useQueuedExternalRun";
 
 /** How often open runs are read back while one waits on the model or the extension. */
 const POLL_MS = 2500;
-
-/** The key of one task and target: one run of it is open at a time. */
-export function runKey(task: AiRunTask, target = ""): string {
-  return `${task}/${target}`;
-}
 
 /** A run that still waits for a reply or for the Creator to apply or drop it. */
 export function isOpen(run: AiRun | undefined): run is AiRun {
@@ -26,16 +22,18 @@ export function isOpen(run: AiRun | undefined): run is AiRun {
 
 /** What the AI run dialogs and pills of one step share. */
 export interface AiRuns {
+  service: AiRunService;
+  projectId: string;
   /** The step's channel from Settings, until the Creator picks another for one run. */
   defaultChannel: AiChannel;
-  /** The newest run of each task and target, by `runKey`. */
+  /** The newest run of each AI action, by the path of the step request it replays. */
   runs: Record<string, AiRun>;
   /** The AI Bridge extension's queue, for runs on the extension channel. */
   queue: AiQueue;
   /** The extension queue item that carries each run, by run id. */
   queueItems: Record<string, string>;
-  /** Starts a run; on the extension channel it also queues the prompt. Rejects with the reason. */
-  start: (task: AiRunTask, target: string, note: string, channel: AiChannel, label: string) => Promise<AiRun>;
+  /** Starts a run of the request; on the extension channel it also queues the prompt. Rejects with the reason. */
+  start: (request: ExternalRequest, channel: AiChannel, label: string) => Promise<AiRun>;
   /** Puts a run read back from the server in place. */
   put: (run: AiRun) => void;
   refresh: () => Promise<void>;
@@ -52,18 +50,20 @@ export function useAiRuns(): AiRuns {
 
 interface AiRunsProviderProps {
   projectId: string;
-  /** The step's id in Settings (`visual_storyboard`). */
+  /** The step's id in Settings (`idea`, `visual_storyboard`…), whose channel the run buttons use. */
   step: string;
+  /** The service that owns the step's AI routes. */
+  service: AiRunService;
   children: ReactNode;
 }
 
 /**
- * Keeps the AI runs of one step (docs/contracts/storyboard-v1.md, "Lượt chạy AI"): reads them on
- * open and, while one waits on the system's model or the extension, every few seconds, so a closed
- * dialog's run keeps going and its pill shows where it stands. A run on the extension channel is
- * queued as a fixed-prompt item whose answer the extension posts to the run's reply route.
+ * Keeps the AI runs of one step (docs/contracts/ai-runs-v1.md): reads them on open and, while one
+ * waits on the system's model or the extension, every few seconds, so a closed dialog's run keeps
+ * going and its pill shows where it stands. A run on the extension channel is queued as a
+ * fixed-prompt item whose answer the extension posts to the run's reply route.
  */
-export function AiRunsProvider({ projectId, step, children }: AiRunsProviderProps) {
+export function AiRunsProvider({ projectId, step, service, children }: AiRunsProviderProps) {
   const [runs, setRuns] = useState<Record<string, AiRun>>({});
   const [defaultChannel, setDefaultChannel] = useState<AiChannel>("api");
   const [queueItems, setQueueItems] = useState<Record<string, string>>({});
@@ -71,16 +71,16 @@ export function AiRunsProvider({ projectId, step, children }: AiRunsProviderProp
   const alive = useRef(true);
 
   const put = useCallback((run: AiRun) => {
-    setRuns((before) => ({ ...before, [runKey(run.task, run.target)]: run }));
+    setRuns((before) => ({ ...before, [run.path]: run }));
   }, []);
 
   const refresh = useCallback(async () => {
-    const list = await listAiRuns(projectId);
+    const list = await listAiRuns(service, projectId);
     if (!alive.current) return;
     const next: Record<string, AiRun> = {};
-    for (const r of list) next[runKey(r.task, r.target)] = r;
+    for (const r of list) next[r.path] = r;
     setRuns(next);
-  }, [projectId]);
+  }, [service, projectId]);
 
   useEffect(() => {
     alive.current = true;
@@ -104,7 +104,7 @@ export function AiRunsProvider({ projectId, step, children }: AiRunsProviderProp
   }, [waiting, refresh]);
 
   const start = useCallback(
-    async (task: AiRunTask, target: string, note: string, channel: AiChannel, label: string) => {
+    async (request: ExternalRequest, channel: AiChannel, label: string) => {
       if (channel === "extension" && !queue.available) {
         throw new Error(
           queue.outdated
@@ -112,7 +112,7 @@ export function AiRunsProvider({ projectId, step, children }: AiRunsProviderProp
             : "Chưa thấy extension ConceptFlow AI Bridge trên trình duyệt này. Cài và bật nó, hoặc chọn kênh khác.",
         );
       }
-      const run = await startAiRun(projectId, { task, target, note, channel });
+      const run = await startAiRun(service, projectId, { label, request, channel });
       put(run);
       if (channel === "extension") {
         const outcome = await queue.add(
@@ -121,7 +121,7 @@ export function AiRunsProvider({ projectId, step, children }: AiRunsProviderProp
             project: projectId,
             kind: "prompt",
             prompt: run.prompt,
-            request: aiRunReplyRequest(projectId, run.id),
+            request: aiRunReplyRequest(service, projectId, run.id),
             modes: DEFAULT_AI_MODES,
           },
           { watch: true },
@@ -131,12 +131,12 @@ export function AiRunsProvider({ projectId, step, children }: AiRunsProviderProp
       }
       return run;
     },
-    [projectId, put, queue],
+    [service, projectId, put, queue],
   );
 
   const value = useMemo(
-    () => ({ defaultChannel, runs, queue, queueItems, start, put, refresh }),
-    [defaultChannel, runs, queue, queueItems, start, put, refresh],
+    () => ({ service, projectId, defaultChannel, runs, queue, queueItems, start, put, refresh }),
+    [service, projectId, defaultChannel, runs, queue, queueItems, start, put, refresh],
   );
   return <AiRunsContext.Provider value={value}>{children}</AiRunsContext.Provider>;
 }

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync/atomic"
@@ -16,6 +17,13 @@ const (
 	ExternalAIPrompt ExternalAIMode = "prompt"
 	// ExternalAIPaste answers the call with the reply the Creator pasted.
 	ExternalAIPaste ExternalAIMode = "paste"
+	// ExternalAIPreview answers the call with a pasted reply like
+	// ExternalAIPaste, and stops the flow once the reply is read and checked,
+	// before anything is stored (stopForPreview).
+	ExternalAIPreview ExternalAIMode = "preview"
+	// ExternalAICapture asks the system's model, keeps its reply, and stops the
+	// flow like ExternalAIPreview.
+	ExternalAICapture ExternalAIMode = "capture"
 )
 
 var (
@@ -25,15 +33,58 @@ var (
 	// ErrExternalAISingleTurn is returned when a flow asks for a second model
 	// turn in a request that carries one pasted reply.
 	ErrExternalAISingleTurn = errors.New("AI ngoài chỉ chạy được một prompt mỗi lượt; chạy từng mục một")
+	// ErrExternalAIPreviewReady stops a flow in preview or capture mode once the
+	// reply is read; what it would store is read back through ExternalAIRun.Preview.
+	ErrExternalAIPreviewReady = errors.New("kết quả đã đọc xong, chưa lưu")
 )
 
 // ExternalAIRun is the external-AI state of one request. It lets exactly one
 // model call through and remembers the prompt of the first.
 type ExternalAIRun struct {
-	mode   ExternalAIMode
-	reply  string
-	taken  atomic.Bool
-	prompt atomic.Pointer[string]
+	mode     ExternalAIMode
+	reply    string
+	taken    atomic.Bool
+	prompt   atomic.Pointer[string]
+	captured atomic.Pointer[string]
+	preview  atomic.Pointer[json.RawMessage]
+}
+
+// Captured is the system model's reply kept in ExternalAICapture mode, and
+// whether the model answered.
+func (r *ExternalAIRun) Captured() (string, bool) {
+	c := r.captured.Load()
+	if c == nil {
+		return "", false
+	}
+	return *c, true
+}
+
+// Preview is what the flow would have stored, as JSON, once it stopped in
+// ExternalAIPreview or ExternalAICapture mode.
+func (r *ExternalAIRun) Preview() (json.RawMessage, bool) {
+	p := r.preview.Load()
+	if p == nil {
+		return nil, false
+	}
+	return *p, true
+}
+
+// stopForPreview is called by a flow right after the reply is read and checked
+// and before anything is stored. In preview or capture mode it keeps v as the
+// preview and stops the flow with ErrExternalAIPreviewReady; otherwise it does
+// nothing. See ADR-0052.
+func stopForPreview(ctx context.Context, v any) error {
+	run := externalAIFrom(ctx)
+	if run == nil || (run.mode != ExternalAIPreview && run.mode != ExternalAICapture) {
+		return nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	raw := json.RawMessage(b)
+	run.preview.Store(&raw)
+	return ErrExternalAIPreviewReady
 }
 
 // NewExternalAIRun starts the external-AI state of a request. reply is the
@@ -120,10 +171,18 @@ func (p *ExternalAIProvider) Chat(ctx context.Context, req ChatRequest) (ChatRes
 	if !run.taken.CompareAndSwap(false, true) {
 		return ChatResult{}, ErrExternalAISingleTurn
 	}
-	if run.mode == ExternalAIPrompt {
-		prompt := ExternalPrompt(req)
-		run.prompt.Store(&prompt)
+	prompt := ExternalPrompt(req)
+	run.prompt.Store(&prompt)
+	switch run.mode {
+	case ExternalAIPrompt:
 		return ChatResult{}, ErrExternalAIPromptBuilt
+	case ExternalAICapture:
+		res, err := p.model.Chat(ctx, req)
+		if strings.TrimSpace(res.Content) != "" {
+			content := res.Content
+			run.captured.Store(&content)
+		}
+		return res, err
 	}
 	return p.replier.ChatExternal(ctx, req, run.reply)
 }
@@ -135,7 +194,8 @@ func requireProvider(ctx context.Context, provider LLMProviderPort) error {
 	if provider == nil {
 		return ErrLLMNotConfigured
 	}
-	if UsingExternalAI(ctx) {
+	// Capture mode asks the system's model, so it needs it ready like a plain call.
+	if run := externalAIFrom(ctx); run != nil && run.mode != ExternalAICapture {
 		return nil
 	}
 	if r, ok := provider.(interface{ Ready() bool }); ok && !r.Ready() {

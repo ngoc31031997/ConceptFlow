@@ -456,6 +456,27 @@ SELECT project_id, unit_key, COALESCE(content->>'text', ''), COALESCE(content->>
 FROM review_units WHERE kind = 'research_question'
 ON CONFLICT DO NOTHING;
 DELETE FROM review_units WHERE kind IN ('research', 'script_review', 'handoff_beat', 'glossary', 'research_question', 'idea', 'brief', 'brief_platform');
+-- One AI turn of steps 1 to 7 run through the AI run dialog (ADR-0052): the
+-- step request it replays, the prompt, the reply once it is in (from the
+-- system's model, the AI Bridge extension or a paste), what reading it would
+-- store (preview), and whether it was applied.
+CREATE TABLE IF NOT EXISTS ai_runs (
+    id         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    project_id TEXT NOT NULL,
+    label      TEXT NOT NULL DEFAULT '',
+    channel    TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    method     TEXT NOT NULL,
+    path       TEXT NOT NULL,
+    body       TEXT NOT NULL DEFAULT '',
+    prompt     TEXT NOT NULL DEFAULT '',
+    reply      TEXT NOT NULL DEFAULT '',
+    preview    JSONB,
+    error      TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ai_runs_by_path ON ai_runs (project_id, path, created_at DESC);
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import {
+  describeAiRequest,
+  generateStoryboardUnit,
   storyboardFrameUrl,
   type StoryboardBeat,
   type StoryboardShot,
@@ -11,6 +13,7 @@ import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
 import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { StoryboardRunPreview } from "./StoryboardRunPreview";
 import { FormDialog } from "../visualplan/PlanDialogs";
 import { Foldable } from "./Foldable";
 import { ShotDialog } from "./ShotDialog";
@@ -396,7 +399,7 @@ function UnitBlock({ projectId, state, unit, storyboard, readOnly, expanded, onT
             >
               {unit.written ? "AI viết lại unit" : "Viết shot unit này"}
             </Button>
-            <AiRunPill task="unit" target={unit.unit_id} onOpen={() => setAiOpen(true)} testId={`${testId}-ai-run`} />
+            <AiRunPill runPath={`/v1/projects/${projectId}/storyboard/units/${unit.unit_id}/generate`} onOpen={() => setAiOpen(true)} testId={`${testId}-ai-run`} />
             <Button
               variant="ghost"
               onClick={() => setAdding(true)}
@@ -439,14 +442,14 @@ function UnitBlock({ projectId, state, unit, storyboard, readOnly, expanded, onT
         <AiRunDialog
           open={aiOpen}
           onClose={() => setAiOpen(false)}
-          projectId={projectId}
           title={
             unit.written
               ? `Viết lại shot của ${unit.unit_id} kèm ghi chú`
               : `Viết shot cho ${unit.unit_id}`
           }
-          task="unit"
-          target={unit.unit_id}
+          runPath={`/v1/projects/${projectId}/storyboard/units/${unit.unit_id}/generate`}
+          describe={(note) => describeAiRequest((external) => generateStoryboardUnit(projectId, unit.unit_id, note, { external }))}
+          renderPreview={(p) => <StoryboardRunPreview kind="unit" preview={p} />}
           impact={
             <p className={researchStyles.hint} data-testid={`${testId}-ai-impact`}>
               AI viết riêng {unit.unit_id} trong một lượt, đọc shot của unit liền trước, rồi dựng

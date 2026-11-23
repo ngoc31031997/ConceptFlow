@@ -102,6 +102,15 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(authoringAi, 'authoring-service'),
   );
+  // AI runs of steps 1–7 with a preview before apply (ADR-0052). Start, reply
+  // and apply replay the step's own AI route inside authoring-service, so they
+  // take the long-timeout client.
+  router.post('/v1/projects/:id/ai-runs', proxyHandler(authoringAi, 'authoring-service'));
+  router.get('/v1/projects/:id/ai-runs', proxyHandler(authoring, 'authoring-service'));
+  router.get('/v1/projects/:id/ai-runs/:run', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/ai-runs/:run/reply', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/ai-runs/:run/apply', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/ai-runs/:run/cancel', proxyHandler(authoring, 'authoring-service'));
   // Idea and creative brief steps: each one's state and the AI writing it
   // (a model call, so the long-timeout client), plus the brief's target length and platform.
   router.get('/v1/projects/:id/idea', proxyHandler(authoring, 'authoring-service'));

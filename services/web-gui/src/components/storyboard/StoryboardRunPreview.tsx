@@ -1,5 +1,7 @@
-import type { AiRunTask } from "../../api/client";
-import styles from "./AiRun.module.css";
+import styles from "../airun/AiRun.module.css";
+
+/** The AI actions of step 11 whose result is previewed before it is stored. */
+export type StoryboardRunKind = "assets" | "asset_detail" | "unit" | "review";
 
 type Row = Record<string, unknown>;
 
@@ -17,8 +19,8 @@ function text(v: unknown): string {
  * list, one asset's detail, or the review's findings. Only what the Creator needs to judge the
  * reply is shown; the whole reply stays one tab away.
  */
-export function AiRunPreview({ task, preview }: { task: AiRunTask; preview: unknown }) {
-  if (task === "unit") {
+export function StoryboardRunPreview({ kind, preview }: { kind: StoryboardRunKind; preview: unknown }) {
+  if (kind === "unit") {
     const shots = list(preview);
     return (
       <div className={styles.preview} data-testid="ai-run-preview">
@@ -35,7 +37,7 @@ export function AiRunPreview({ task, preview }: { task: AiRunTask; preview: unkn
       </div>
     );
   }
-  if (task === "assets") {
+  if (kind === "assets") {
     const assets = list(preview);
     return (
       <div className={styles.preview} data-testid="ai-run-preview">
@@ -54,7 +56,7 @@ export function AiRunPreview({ task, preview }: { task: AiRunTask; preview: unkn
       </div>
     );
   }
-  if (task === "asset_detail") {
+  if (kind === "asset_detail") {
     const d = (preview ?? {}) as Row;
     return (
       <dl className={styles.preview} data-testid="ai-run-preview">

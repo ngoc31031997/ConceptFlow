@@ -155,20 +155,9 @@ Mọi route (trừ `GET /versions/{n}`, `GET /frames/{shot}` và `GET /assets/{a
 Bốn lượt AI chữ (`/assets/generate`, `/assets/{aid}/detail`, `/units/{vp}/generate`, `/review`) nhận `X-External-AI: prompt` (trả `{"external_prompt":"…"}`, không gọi model, không ghi gì) hoặc `X-External-AI: paste` (thân thêm `external_reply`, đọc chặt như reply của AI trong): cùng cơ chế bước 8–10, ADR-0047. `/generate` (mọi unit) và `/assets/detail` (mọi tài sản chưa có chi tiết) không có chế độ ngoài; web-gui xếp hàng DeepSeek từng unit và từng tài sản (mỗi mục dựng yêu cầu bằng chế độ mô tả của web-gui, không gửi, extension chạy rồi dán kết quả về như `paste`).
 
 
-## Lượt chạy AI (`/ai-runs`, ADR-0052)
+## Lượt chạy AI (ADR-0052)
 
-Bốn lượt AI chữ trên cũng chạy được qua **lượt chạy**: câu trả lời được đọc và kiểm tra như khi lưu, nhưng chỉ được lưu khi Creator bấm áp dụng. Bảng `storyboard_ai_runs` (xoá theo dự án).
-
-| Method | Path | Body | Ý nghĩa |
-|---|---|---|---|
-| POST | `/ai-runs` | `{task, target, note, channel}` | `task`: `assets`, `asset_detail` (`target` = `AST-…`), `unit` (`target` = `VP-…`), `review`; `channel`: `api`, `extension`, `manual`. Dựng prompt từ bước lúc đó (lỗi như route của lượt đó: `409` khi chưa sẵn sàng hoặc đang chạy). Lượt cũ còn mở của cùng `task`+`target` chuyển sang `cancelled`. `api`: trả `201` ngay với `status: running`, model được gọi nền; còn lại `status: waiting`. |
-| GET | `/ai-runs` | | `{runs:[…]}`: lượt mới nhất của mỗi `task`+`target` |
-| GET | `/ai-runs/{rid}` | | một lượt; `404` khi không có |
-| POST | `/ai-runs/{rid}/reply` | `{raw}` | câu trả lời từ extension (mục `kind: "prompt"`) hoặc ô dán, hay bản sửa lại; chỉ khi lượt đang `waiting`, `ready`, `unreadable`, `failed` (khác → `409`, `code: ai_run_state`). Trả `200` với lượt: `ready` kèm `preview`, hoặc `unreadable` kèm `error`. |
-| POST | `/ai-runs/{rid}/apply` | | chỉ khi `ready`; lưu qua đúng luồng `paste` (giữ trường Creator, dựng khung). Trả `{run, state}`. Câu trả lời không còn khớp với bước → lỗi như route của lượt đó, lượt về `unreadable` |
-| POST | `/ai-runs/{rid}/cancel` | | bỏ lượt chưa áp dụng |
-
-Một lượt: `{id, project_id, task, target, note, channel, status, prompt, reply, preview, error, created_at, updated_at}`. `status`: `waiting` (chờ câu trả lời), `running` (đang gọi model), `ready`, `unreadable`, `failed` (không có câu trả lời), `applied`, `cancelled`. `preview` là thứ áp dụng sẽ lưu: `unit` → mảng shot đã ghép (mã shot cuối cùng), `assets` → mảng tài sản AI lập (`same_as, concept_id, name, kind, tier, base_illustration_id, units`), `asset_detail` → `{portrayal, must_not_imply, palette_tokens, expressions}`, `review` → `{findings, notes}`. Lượt còn `running` khi visual-service khởi động lại được chuyển sang `failed`.
+Bốn lượt AI chữ trên chạy qua lượt chạy có xem trước của visual-service, `/v1/projects/{id}/visual/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md). Điểm dừng xem trước của từng lượt: `/units/{vp}/generate` → mảng shot đã ghép; `/assets/generate` → mảng tài sản AI lập; `/assets/{aid}/detail` → `{portrayal, must_not_imply, palette_tokens, expressions}`; `/review` → `{findings, notes}`.
 
 ## Toàn màn (`GET /`)
 

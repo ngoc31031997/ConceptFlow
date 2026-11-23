@@ -5,12 +5,11 @@ import {
   replyAiRun,
   type AiChannel,
   type AiRun,
-  type AiRunTask,
+  type ExternalRequest,
 } from "../../api/client";
 import { messageOf } from "../../hooks/useQueuedExternalRun";
 import { Button, CopyBox, Dialog, FormField, TextArea } from "../ui";
-import { AiRunPreview } from "./AiRunPreview";
-import { isOpen, runKey, useAiRuns } from "./AiRunsContext";
+import { isOpen, useAiRuns } from "./AiRunsContext";
 import styles from "./AiRun.module.css";
 
 /** How each channel is named on buttons, chips and the menu. */
@@ -146,28 +145,57 @@ export function ChannelButton({ channel, label, onRun, disabled, unavailable = {
 interface AiRunDialogProps {
   open: boolean;
   onClose: () => void;
-  projectId: string;
-  /** Names the item and the task ("Viết shot cho VP-001"). */
+  /** Names the item and the task ("Viết shot cho VP-001"); also names the extension queue item. */
   title: string;
-  task: AiRunTask;
-  target?: string;
+  /**
+   * The path of the step request this action sends (`/v1/projects/p1/storyboard/units/VP-001/generate`):
+   * the key of its run, known before the note is written. It must be the path `describe` returns.
+   */
+  runPath: string;
+  /** Builds the step's own AI request with the note, without sending it (`describeAiRequest`). */
+  describe: (note: string) => Promise<ExternalRequest>;
+  /** The action takes no note: the form shows only the impact. */
+  noNote?: boolean;
   /** What applying changes for the rest of the step, shown under the note. */
   impact?: ReactNode;
-  /** The screen loads what an applied run stored. */
-  onApplied: () => void | Promise<void>;
+  /** Shows what applying would store; without it the preview is shown as JSON. */
+  renderPreview?: (preview: unknown) => ReactNode;
+  /** The screen loads what an applied run stored; `state` is what the step's request answered. */
+  onApplied: (state: unknown) => void | Promise<void>;
   testId: string;
 }
 
+/** The preview as indented JSON, for an action with no preview of its own. */
+function JsonPreview({ preview }: { preview: unknown }) {
+  return (
+    <pre className={`${styles.prompt} ${styles.preview}`} data-testid="ai-run-preview">
+      {JSON.stringify(preview, null, 2)}
+    </pre>
+  );
+}
+
 /**
- * One AI task of step 11 in one modal (docs/ux-ui-design-rules.md, rule 4). Before a run: the note
- * and the impact, and "▶ Chạy AI" on the step's channel with ▾ for another. During and after it:
- * where it stands, the prompt (to copy), the reply (pasted here on the manual channel, or filled
- * in by the system's model or the extension), what applying would store, and "Áp dụng kết quả".
- * Closing the dialog does not stop the run; the pill next to the task's button opens it again.
+ * One AI action of a step in one modal (docs/ux-ui-design-rules.md, rule 4; ADR-0052). Before a
+ * run: the note and the impact, and "▶ Chạy AI" on the step's channel with ▾ for another. During
+ * and after it: where it stands, the prompt (to copy), the reply (pasted here on the manual channel,
+ * or filled in by the system's model or the extension), what applying would store, and "Áp dụng
+ * kết quả". Closing the dialog does not stop the run; the pill next to the action's button opens it
+ * again. Needs an `AiRunsProvider` above it.
  */
-export function AiRunDialog({ open, onClose, projectId, title, task, target = "", impact, onApplied, testId }: AiRunDialogProps) {
+export function AiRunDialog({
+  open,
+  onClose,
+  title,
+  runPath,
+  describe,
+  noNote = false,
+  impact,
+  renderPreview,
+  onApplied,
+  testId,
+}: AiRunDialogProps) {
   const ai = useAiRuns();
-  const current = ai.runs[runKey(task, target)];
+  const current = ai.runs[runPath];
   const [composing, setComposing] = useState(true);
   const [note, setNote] = useState("");
   const [reply, setReply] = useState("");
@@ -181,7 +209,7 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
     if (!open) return;
     const showRun = isOpen(current);
     setComposing(!showRun);
-    setNote(showRun ? current.note : "");
+    setNote("");
     setError(null);
     setReply(current?.reply ?? "");
     setTab(showRun && current.channel === "manual" && current.status === "waiting" ? "prompt" : "reply");
@@ -199,7 +227,7 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
     setError(null);
     setLastChannel(channel);
     try {
-      const r = await ai.start(task, target, note.trim(), channel, title);
+      const r = await ai.start(await describe(note.trim()), channel, title);
       setComposing(false);
       setReply("");
       setTab(r.channel === "manual" ? "prompt" : "reply");
@@ -216,7 +244,7 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
     setBusy(true);
     setError(null);
     try {
-      ai.put(await replyAiRun(projectId, current.id, reply));
+      ai.put(await replyAiRun(ai.service, ai.projectId, current.id, reply));
     } catch (err) {
       setError(reasonOf(err));
     } finally {
@@ -229,9 +257,9 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
     setBusy(true);
     setError(null);
     try {
-      const out = await applyAiRun(projectId, current.id);
+      const out = await applyAiRun(ai.service, ai.projectId, current.id);
       ai.put(out.run);
-      await onApplied();
+      await onApplied(out.state);
       onClose();
     } catch (err) {
       setError(reasonOf(err));
@@ -245,7 +273,7 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
     if (!current) return;
     setBusy(true);
     try {
-      ai.put(await cancelAiRun(projectId, current.id));
+      ai.put(await cancelAiRun(ai.service, ai.projectId, current.id));
       setComposing(true);
     } catch (err) {
       setError(reasonOf(err));
@@ -317,15 +345,17 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
     <Dialog open={open} onClose={onClose} title={title} size="lg" hasInput testId={testId} footer={footer}>
       {!showRun && (
         <>
-          <FormField label="Ghi chú cho AI (không bắt buộc)">
-            <TextArea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={4}
-              placeholder="Viết điều chưa ổn và muốn đổi thế nào"
-              data-testid={`${testId}-note`}
-            />
-          </FormField>
+          {!noNote && (
+            <FormField label="Ghi chú cho AI (không bắt buộc)">
+              <TextArea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={4}
+                placeholder="Viết điều chưa ổn và muốn đổi thế nào"
+                data-testid={`${testId}-note`}
+              />
+            </FormField>
+          )}
           {impact}
           <p className={styles.previewSub}>
             Kết quả chỉ được lưu khi bạn bấm “Áp dụng kết quả” sau khi xem. Đóng hộp thoại không huỷ lượt chạy.
@@ -386,7 +416,9 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
             </div>
           ) : (
             <div className={styles.section}>
-              {current.status === "ready" && !replyChanged && <AiRunPreview task={current.task} preview={current.preview} />}
+              {current.status === "ready" &&
+                !replyChanged &&
+                (renderPreview ? renderPreview(current.preview) : <JsonPreview preview={current.preview} />)}
               <FormField label={current.status === "ready" ? "Câu trả lời của AI (sửa được, rồi bấm Đọc kết quả)" : "Câu trả lời của AI"}>
                 <TextArea
                   className={styles.reply}
@@ -411,16 +443,16 @@ export function AiRunDialog({ open, onClose, projectId, title, task, target = ""
 }
 
 interface AiRunPillProps {
-  task: AiRunTask;
-  target?: string;
+  /** The same `runPath` as the action's `AiRunDialog`. */
+  runPath: string;
   onOpen: () => void;
   testId: string;
 }
 
-/** Where the open run of a task stands, next to its button; a click opens its dialog again. */
-export function AiRunPill({ task, target = "", onOpen, testId }: AiRunPillProps) {
+/** Where the open run of an action stands, next to its button; a click opens its dialog again. */
+export function AiRunPill({ runPath, onOpen, testId }: AiRunPillProps) {
   const { runs } = useAiRuns();
-  const run = runs[runKey(task, target)];
+  const run = runs[runPath];
   if (!isOpen(run)) return null;
   const st = statusOf(run);
   return (

@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS ai_channel_defaults (
 AI_CHANNELS: tuple[str, ...] = ("api", "extension", "manual")
 #: The row of `ai_channel_defaults` that holds the default of every step without its own.
 ALL_STEPS_SCOPE = "*"
+#: The flow steps whose AI buttons run on a channel, by their screen (steps 1 to 11).
+CHANNEL_STEPS: tuple[str, ...] = (
+    "idea", "brief", "research", "story", "beats", "script", "lock",
+    "visual_concept", "visual_plan", "visual_sequence", "visual_storyboard",
+)
 
 _COLUMNS = "id, role, name, template_text, is_system, is_active, created_at, updated_at"
 
@@ -236,13 +241,13 @@ class PromptLibrary:
         """The default channel of every step (its own, else the one for all steps, else "api")."""
         saved = await self._store.saved_channels()
         default = saved.get(ALL_STEPS_SCOPE) or AI_CHANNELS[0]
-        own = {k: v for k, v in saved.items() if k != ALL_STEPS_SCOPE and modelcatalog.valid_step(k)}
+        own = {k: v for k, v in saved.items() if k != ALL_STEPS_SCOPE and k in CHANNEL_STEPS}
         return {
             "default": default,
             "step_channels": own,
-            "effective": {step: own.get(step, default) for step in modelcatalog.STEPS},
+            "effective": {step: own.get(step, default) for step in CHANNEL_STEPS},
             "channels": list(AI_CHANNELS),
-            "steps": list(modelcatalog.STEPS),
+            "steps": list(CHANNEL_STEPS),
         }
 
     async def set_default_channel(self, channel: str) -> None:
@@ -252,7 +257,7 @@ class PromptLibrary:
 
     async def set_step_channel(self, step: str, channel: str) -> None:
         """An empty channel removes the step's own choice, so it follows the default again."""
-        if not modelcatalog.valid_step(step):
+        if step not in CHANNEL_STEPS:
             raise PromptInvalid(f"bước {step!r} không cấu hình được kênh AI")
         if channel != "" and channel not in AI_CHANNELS:
             raise PromptInvalid(f"kênh {channel!r} không có; chọn {', '.join(AI_CHANNELS)}")

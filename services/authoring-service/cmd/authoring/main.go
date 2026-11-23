@@ -152,6 +152,13 @@ func main() {
 		WithBeats(beats).
 		WithScript(script, voiceLines).
 		WithScriptLock(scriptLock)
+	aiRunRepo := postgres.NewAIRunRepository(pool)
+	if n, err := aiRunRepo.FailRunningAIRuns(ctx, application.AIRunInterrupted); err != nil {
+		logger.Error("mark interrupted AI runs", "error", err)
+	} else if n > 0 {
+		logger.Info("marked interrupted AI runs as failed", "count", n)
+	}
+	router.WithAIRuns(application.NewAIRuns(router, aiRunRepo))
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler()}
 	go func() {
