@@ -83,7 +83,9 @@ type AIRun struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 }
 
-func (r AIRun) request() AIRunRequest { return AIRunRequest{Method: r.Method, Path: r.Path, Body: r.Body} }
+func (r AIRun) request() AIRunRequest {
+	return AIRunRequest{Method: r.Method, Path: r.Path, Body: r.Body}
+}
 
 // open reports whether the run still waits for something: a reply or an apply.
 func (r AIRun) open() bool {

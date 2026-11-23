@@ -535,7 +535,7 @@ func TestReviewAsksAgainWhenTheReplyIsUnusableAndGivesUpAfterThreeTries(t *testi
 	}
 }
 
-func previewCtx() (context.Context, *ExternalAIRun) {
+func lockPreviewCtx() (context.Context, *ExternalAIRun) {
 	run := NewExternalAIRun(ExternalAIPreview, "")
 	return WithExternalAI(context.Background(), run), run
 }
@@ -543,7 +543,7 @@ func previewCtx() (context.Context, *ExternalAIRun) {
 func TestReviewInPreviewModeStopsBeforeStoring(t *testing.T) {
 	f := newLockFixture(t)
 	f.llm.replies[reviewMarker] = f.reviewReply(`{"group":"logic","title":"Chuyển đột ngột","detail":"d","line":"b2.1","fix":"Câu thay thế."}`)
-	ctx, run := previewCtx()
+	ctx, run := lockPreviewCtx()
 	if err := f.uc2.Review(ctx, "p1"); !errors.Is(err, ErrExternalAIPreviewReady) {
 		t.Fatalf("err = %v, want ErrExternalAIPreviewReady", err)
 	}
@@ -568,7 +568,7 @@ func TestReviewInPreviewModeStopsBeforeStoring(t *testing.T) {
 func TestHandoffForOneBeatInPreviewModeStopsBeforeStoring(t *testing.T) {
 	f := newLockFixture(t)
 	f.llm.replies[handoffMarker] = handoffReply
-	ctx, run := previewCtx()
+	ctx, run := lockPreviewCtx()
 	if err := f.uc2.GenerateHandoff(ctx, "p1", "b1"); !errors.Is(err, ErrExternalAIPreviewReady) {
 		t.Fatalf("err = %v, want ErrExternalAIPreviewReady", err)
 	}
@@ -601,7 +601,7 @@ func TestHandoffRedoInPreviewModeStopsBeforeStoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, _ := f.uc2.handoffs(context.Background(), "p1")
-	ctx, run := previewCtx()
+	ctx, run := lockPreviewCtx()
 	_, err := f.uc2.HandoffUnitKind().Redo(ctx, "p1", "b1", "ngắn hơn")
 	if !errors.Is(err, ErrExternalAIPreviewReady) {
 		t.Fatalf("err = %v, want ErrExternalAIPreviewReady", err)
