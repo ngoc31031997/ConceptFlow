@@ -83,6 +83,12 @@ Của cả chuỗi (tính mỗi lần đọc, chấp nhận được kèm lý do
 
 Lỗi `{"error":"…","code":"…"}` như bước 8 và 9.
 
+## Lượt chạy AI (ADR-0052)
+
+Ba lượt AI một prompt chạy qua lượt chạy có xem trước của visual-service, `/v1/projects/{id}/visual/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md). Điểm dừng xem trước của từng lượt, sau khi đọc và kiểm tra câu trả lời, trước mọi lần ghi: `/motifs/generate` → `{motifs, next_seq}` (bộ motif sau khi giữ id và trường Creator đã sửa); `/units/{unit}/generate` → item của unit sau khi giữ trường Creator đã sửa; `/review` → `{findings, next_seq, notes, rounds, checks}` (rà soát đã gộp với vấn đề cũ).
+
+`/generate` (mọi unit còn trống) và `/beats/{beat}/generate` chạy từng unit, mỗi unit đọc item **đã lưu** của unit trước, nên vẫn lưu ngay từng unit và không đi qua lượt chạy. Trên kênh extension, web-gui đưa mỗi unit vào hàng đợi AI theo thứ tự kế hoạch; kênh thủ công không dùng được cho chạy hàng loạt.
+
 ## API nội bộ
 
 | Phương thức | Đường dẫn | Việc |

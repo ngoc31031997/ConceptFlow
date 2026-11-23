@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  describeAiRequest,
   generateSequenceMotifs,
   type SequenceMotif,
   type VisualSequenceState,
@@ -8,7 +9,8 @@ import type { VisualSequenceControls } from "../../hooks/useVisualSequence";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dropdown, FormField, TextArea, TextInput } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { SequenceRunPreview } from "./SequenceRunPreview";
 import visualStyles from "../visual/visual.module.css";
 import { FormDialog } from "../visualplan/PlanDialogs";
 import styles from "./sequence.module.css";
@@ -139,6 +141,7 @@ export function SequenceMotifsCard({
   const disabled = readOnly || sequence.busy || sequence.running !== null;
   const m = state.motifs;
   const approved = m.status === "approved" && !m.stale && m.motifs.length > 0;
+  const motifsRunPath = `/v1/projects/${projectId}/visual-sequence/motifs/generate`;
   const hasProblems = m.motifs.some((x) => x.problems.length > 0);
 
   return (
@@ -160,6 +163,11 @@ export function SequenceMotifsCard({
           >
             {m.motifs.length > 0 ? "AI đặt lại motif" : "AI đặt motif"}
           </Button>
+          <AiRunPill
+            runPath={motifsRunPath}
+            onOpen={() => setAiOpen(true)}
+            testId="seq-motifs-ai-run"
+          />
         </div>
         <p className={researchStyles.hint}>
           Motif là hình lặp lại có chủ ý để nối mạch. Mỗi motif neo vào một mục cách vẽ đã chốt ở
@@ -278,10 +286,15 @@ export function SequenceMotifsCard({
         </div>
       </div>
 
-      <ConceptAiDialog
+      <AiRunDialog
         open={aiOpen}
         onClose={() => setAiOpen(false)}
         title={m.motifs.length > 0 ? "AI đặt lại motif" : "AI đặt motif"}
+        runPath={motifsRunPath}
+        describe={(note) =>
+          describeAiRequest((external) => generateSequenceMotifs(projectId, note, { external }))
+        }
+        renderPreview={(p) => <SequenceRunPreview kind="motifs" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI đọc kế hoạch hình, nhịp chung, ngôn ngữ chuyển động và các mục cách vẽ của bước 8.
@@ -290,11 +303,7 @@ export function SequenceMotifsCard({
             motif đổi.
           </p>
         }
-        onSystem={(note) => void sequence.generateMotifs(note)}
-        external={{
-          run: (note, external) => generateSequenceMotifs(projectId, note, { external }),
-          onDone: sequence.reload,
-        }}
+        onApplied={sequence.reload}
         testId="seq-motifs-dialog"
       />
       <MotifDialog

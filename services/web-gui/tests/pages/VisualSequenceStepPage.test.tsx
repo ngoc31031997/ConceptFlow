@@ -9,6 +9,19 @@ import * as apiClient from "../../src/api/client";
 import type { SequenceItem, SequenceUnit, VisualSequenceState } from "../../src/api/client";
 import type { Project } from "../../src/types";
 
+const queueAdd = vi.fn();
+let queueAvailable = true;
+
+vi.mock("../../src/hooks/useAiQueue", () => ({
+  useAiQueue: () => ({
+    available: queueAvailable,
+    outdated: false,
+    counts: { waiting: 0, running: 0, done: 0, failed: 0, paused: false },
+    add: queueAdd,
+    items: {},
+  }),
+}));
+
 function Where() {
   const l = useLocation();
   return <span data-testid="where">{l.pathname}</span>;
@@ -197,8 +210,76 @@ function baseState(over: Partial<VisualSequenceState> = {}): VisualSequenceState
 
 let state: VisualSequenceState;
 
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Chuỗi hình",
+    method: "POST",
+    path: "/v1/projects/p1/visual-sequence/units/VP-003/generate",
+    body: '{"note":""}',
+    channel: "manual",
+    status: "waiting",
+    prompt: "PROMPT",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
+
+/** Runs one action by hand: opens its dialog, starts the manual channel, pastes a reply, then applies. */
+async function runByHand(opts: {
+  open: string;
+  dialog: string;
+  path: string;
+  preview: unknown;
+  shows: string;
+}) {
+  const start = vi
+    .spyOn(apiClient, "startAiRun")
+    .mockResolvedValue(aiRun({ path: opts.path, channel: "manual", status: "waiting" }));
+  const reply = vi
+    .spyOn(apiClient, "replyAiRun")
+    .mockResolvedValue(
+      aiRun({
+        path: opts.path,
+        channel: "manual",
+        status: "ready",
+        reply: "{...}",
+        preview: opts.preview,
+      }),
+    );
+  const apply = vi
+    .spyOn(apiClient, "applyAiRun")
+    .mockResolvedValue({ run: aiRun({ path: opts.path, status: "applied" }), state });
+  fireEvent.click(await screen.findByTestId(opts.open));
+  fireEvent.click(await screen.findByTestId(`${opts.dialog}-run-more`));
+  fireEvent.click(screen.getByTestId(`${opts.dialog}-run-manual`));
+  await waitFor(() =>
+    expect(start).toHaveBeenCalledWith("visual", "p1", {
+      label: expect.any(String),
+      request: expect.objectContaining({ method: "POST", path: opts.path }),
+      channel: "manual",
+    }),
+  );
+  fireEvent.click(await screen.findByTestId(`${opts.dialog}-tab-reply`));
+  fireEvent.change(screen.getByTestId(`${opts.dialog}-reply`), { target: { value: "{...}" } });
+  fireEvent.click(screen.getByTestId(`${opts.dialog}-read`));
+  await waitFor(() => expect(reply).toHaveBeenCalledWith("visual", "p1", "r1", "{...}"));
+  expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent(opts.shows);
+  expect(apply).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId(`${opts.dialog}-apply`));
+  await waitFor(() => expect(apply).toHaveBeenCalledWith("visual", "p1", "r1"));
+  await waitFor(() => expect(screen.queryByTestId(opts.dialog)).toBeNull());
+}
+
 beforeEach(() => {
   state = baseState();
+  queueAvailable = true;
+  queueAdd.mockReset();
   const project = {
     project_id: "p1",
     status: "draft",
@@ -219,6 +300,12 @@ beforeEach(() => {
   vi.spyOn(apiClient, "listProjects").mockResolvedValue([]);
   vi.spyOn(apiClient, "getResearch").mockRejectedValue(new Error("no"));
   vi.spyOn(apiClient, "getVisualSequence").mockImplementation(async () => state);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { visual_sequence: "api" },
+  });
   Element.prototype.scrollIntoView = vi.fn();
 });
 
@@ -493,26 +580,69 @@ describe("VisualSequenceStepPage", () => {
     expect(screen.getByTestId("seq-unit-VP-002")).toBeInTheDocument();
   });
 
-  it("writes one unit in one turn, on the system's AI or one outside", async () => {
-    const gen = vi.spyOn(apiClient, "generateSequenceUnit").mockResolvedValue(baseState());
+  it("writes one unit by hand: paste the reply, see the item, then apply", async () => {
     renderPage();
-    fireEvent.click(await screen.findByTestId("seq-unit-VP-003-redo"));
-    expect(await screen.findByTestId("seq-unit-VP-003-redo-dialog")).toHaveTextContent(
-      "AI viết riêng VP-003",
-    );
-    fireEvent.click(screen.getByTestId("seq-unit-VP-003-redo-dialog-send"));
-    await waitFor(() =>
-      expect(gen).toHaveBeenCalledWith(
-        "p1",
-        "VP-003",
-        "",
-        expect.objectContaining({ id: expect.any(String) }),
-      ),
+    await runByHand({
+      open: "seq-unit-VP-003-redo",
+      dialog: "seq-unit-VP-003-redo-dialog",
+      path: "/v1/projects/p1/visual-sequence/units/VP-003/generate",
+      preview: item("VP-003", { purpose_in_flow: "Vai trò mới của VP-003" }),
+      shows: "Vai trò mới của VP-003",
+    });
+  });
+
+  it("sets the motifs by hand and previews them before storing", async () => {
+    renderPage();
+    await runByHand({
+      open: "seq-motifs-generate",
+      dialog: "seq-motifs-dialog",
+      path: "/v1/projects/p1/visual-sequence/motifs/generate",
+      preview: {
+        motifs: [
+          {
+            motif_id: "MOTIF-07",
+            name: "Đồng hồ cát",
+            role: "nhịp",
+            description: "",
+            planned_units: ["VP-001"],
+          },
+        ],
+        next_seq: 8,
+      },
+      shows: "Đồng hồ cát",
+    });
+  });
+
+  it("reviews the sequence by hand and previews the findings before storing", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("seq-tab-review"));
+    await runByHand({
+      open: "seq-review-run",
+      dialog: "seq-review-dialog",
+      path: "/v1/projects/p1/visual-sequence/review",
+      preview: {
+        findings: [
+          { id: "f9", unit_key: "VP-002", text: "Chuyển cảnh gượng", fix: "", state: "open" },
+        ],
+      },
+      shows: "Chuyển cảnh gượng",
+    });
+  });
+
+  it("shows the pill of an open run next to the unit's button", async () => {
+    vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([
+      aiRun({ status: "unreadable", error: "Không đọc được" }),
+    ]);
+    renderPage();
+    fireEvent.click(await screen.findByTestId("seq-unit-VP-003-ai-run"));
+    expect(await screen.findByTestId("seq-unit-VP-003-redo-dialog-error")).toHaveTextContent(
+      "Không đọc được",
     );
   });
 
-  it("rewrites a beat on the system's AI, one turn per unit", async () => {
+  it("rewrites a beat on the system's AI, one turn per unit, with no preview", async () => {
     const gen = vi.spyOn(apiClient, "generateSequenceBeat").mockResolvedValue(baseState());
+    const start = vi.spyOn(apiClient, "startAiRun");
     renderPage();
     fireEvent.click(await screen.findByTestId("seq-beat-b1-generate"));
     expect(await screen.findByTestId("seq-beat-b1-dialog")).toHaveTextContent("mỗi unit một lượt");
@@ -525,5 +655,37 @@ describe("VisualSequenceStepPage", () => {
         expect.objectContaining({ id: expect.any(String) }),
       ),
     );
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it("queues a beat's units on the extension in plan order when that is the channel", async () => {
+    vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+      defaultChannel: "extension",
+      stepChannels: {},
+      effective: { visual_sequence: "extension" },
+    });
+    vi.spyOn(apiClient, "generateSequenceUnit").mockRejectedValue(
+      new apiClient.ExternalRequestDescribed({
+        method: "POST",
+        path: "/x",
+        body: "{}",
+      } as apiClient.ExternalRequest),
+    );
+    queueAdd.mockResolvedValue({ ok: true, added: true, itemId: "q1" });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("seq-beat-b1-generate"));
+    await waitFor(() => expect(queueAdd).toHaveBeenCalledTimes(2));
+    expect(queueAdd.mock.calls.map((c) => c[0].label)).toEqual([
+      "Chuỗi hình · VP-001",
+      "Chuỗi hình · VP-002",
+    ]);
+    expect(await screen.findByTestId("seq-beat-b1-queue-note")).toHaveTextContent("Đã thêm 2 unit");
+  });
+
+  it("does not offer the manual channel for the batch run", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("seq-generate-more"));
+    expect(screen.getByTestId("seq-generate-manual")).toBeDisabled();
+    expect(screen.getByTestId("seq-generate-manual")).toHaveTextContent("không làm thủ công được");
   });
 });
