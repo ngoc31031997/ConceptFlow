@@ -83,7 +83,34 @@ beforeEach(() => {
   vi.spyOn(apiClient, "getResearch").mockRejectedValue(new Error("no"));
   vi.spyOn(apiClient, "getScript").mockImplementation(async () => state);
   vi.spyOn(apiClient, "getUnitImpact").mockResolvedValue([]);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  channel("api");
 });
+
+/** The channel the step runs on, as Cài đặt · Kênh chạy AI sets it. */
+function channel(c: apiClient.AiChannel) {
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({ defaultChannel: c, stepChannels: {}, effective: { script: c } });
+}
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Viết lời thoại",
+    method: "POST",
+    path: "/v1/projects/p1/units/script_beat/b1/redo",
+    body: '{"note":""}',
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT BEAT",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -152,6 +179,7 @@ describe("ScriptWriteStepPage", () => {
     expect(await screen.findByTestId("script-not-open")).toHaveTextContent("Duyệt beat sheet");
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chưa mở bước");
     expect(screen.queryByTestId("script-generate")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("script-write-card")).not.toBeInTheDocument();
   });
 
   it("has the AI write the beats that have no dialogue, saying that what exists is kept", async () => {
@@ -161,16 +189,17 @@ describe("ScriptWriteStepPage", () => {
     fireEvent.click(await screen.findByTestId("script-generate"));
     expect(screen.getByTestId("script-write-card")).toHaveTextContent("Lời thoại đã có giữ nguyên");
     await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", "", "", expect.anything()));
+    expect(generate.mock.calls[0][3]).not.toHaveProperty("external");
   });
 
-  it("shows the loading card only on the beat being written, not on the other empty beats", async () => {
+  it("shows the loading card only on the beats without dialogue while the batch runs", async () => {
     state = baseState({
-      beats: [beat("b1", 1, { written: false, lines: [], seconds: 0 }), beat("b2", 2, { written: false, lines: [], seconds: 0 })],
-      stats: { ...baseState().stats, written: 0, lines: 0 },
+      beats: [beat("b1", 1, { written: false, lines: [], seconds: 0 }), beat("b2", 2)],
+      stats: { ...baseState().stats, written: 1, lines: 2 },
     });
     vi.spyOn(apiClient, "generateScript").mockReturnValue(new Promise(() => {}));
     renderPage();
-    fireEvent.click(await screen.findByTestId("script-write-b1"));
+    fireEvent.click(await screen.findByTestId("script-generate"));
     expect(await screen.findByTestId("script-progress-b1")).toBeInTheDocument();
     expect(screen.queryByTestId("script-progress-b2")).not.toBeInTheDocument();
   });
@@ -180,7 +209,7 @@ describe("ScriptWriteStepPage", () => {
     state = baseState({ beats: [beat("b1", 1, { written: false, lines: [], seconds: 0 })], stats: { ...baseState().stats, written: 0, lines: 0 } });
     renderPage();
     expect(await screen.findByTestId("script-empty-b1")).toHaveTextContent("Chưa cấu hình AI");
-    expect(screen.queryByTestId("script-write-b1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("script-write-b1")).toBeInTheDocument();
     const edit = vi.spyOn(apiClient, "editUnit").mockResolvedValue({} as never);
     fireEvent.click(screen.getByTestId("script-write-by-hand-b1"));
     const field = await screen.findByTestId("script-edit-b1-field-add:start");
@@ -189,17 +218,40 @@ describe("ScriptWriteStepPage", () => {
     await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "script_beat", key: "b1" }), { "add:start": "Câu tôi tự viết." }));
   });
 
-  it("flags a line, shows the AI's suggestion and applies it as an edit of that line", async () => {
+  it("flags a line, previews the AI's suggestion, shows it under the line and applies it as an edit of that line", async () => {
+    channel("manual");
     state = baseState({
       beats: [beat("b1", 1, { lines: [line("b1.1", "Chất CO2 rất nhiều.", { flag: { kind: "Khó nghe", msg: "“CO2” trộn chữ và số." } })] })],
     });
-    const suggest = vi.spyOn(apiClient, "suggestScriptLine").mockResolvedValue("Chất các-bon đi-ô-xít rất nhiều.");
+    const path = "/v1/projects/p1/script/suggest/line/b1.1";
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path, channel: "manual", status: "waiting", body: "{}" }));
+    const reply = vi
+      .spyOn(apiClient, "replyAiRun")
+      .mockResolvedValue(aiRun({ path, channel: "manual", status: "ready", reply: "{}", preview: { text: "Chất các-bon đi-ô-xít rất nhiều." } }));
+    const apply = vi
+      .spyOn(apiClient, "applyAiRun")
+      .mockResolvedValue({ run: aiRun({ path, channel: "manual", status: "applied" }), state: { text: "Chất các-bon đi-ô-xít rất nhiều." } });
     const edit = vi.spyOn(apiClient, "editUnit").mockResolvedValue({} as never);
     renderPage();
     expect(await screen.findByTestId("script-flag-b1.1")).toHaveTextContent("Khó nghe");
     fireEvent.click(screen.getByTestId("script-ask-line-b1.1"));
+    fireEvent.click(await screen.findByTestId("script-ask-line-b1.1-dialog-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path, body: JSON.stringify({}) }),
+        channel: "manual",
+      }),
+    );
+    fireEvent.click(await screen.findByTestId("script-ask-line-b1.1-dialog-tab-reply"));
+    fireEvent.change(screen.getByTestId("script-ask-line-b1.1-dialog-reply"), { target: { value: "{}" } });
+    fireEvent.click(screen.getByTestId("script-ask-line-b1.1-dialog-read"));
+    await waitFor(() => expect(reply).toHaveBeenCalledWith("authoring", "p1", "r1", "{}"));
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("các-bon đi-ô-xít");
+    expect(screen.queryByTestId("script-suggestion-b1.1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("script-ask-line-b1.1-dialog-apply"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("authoring", "p1", "r1"));
     expect(await screen.findByTestId("script-suggestion-b1.1")).toHaveTextContent("các-bon đi-ô-xít");
-    expect(suggest).toHaveBeenCalledWith("p1", "line", "b1.1", expect.anything());
     expect(edit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("script-suggestion-apply-b1.1"));
     await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "script_beat", key: "b1" }), { "line:b1.1": "Chất các-bon đi-ô-xít rất nhiều.", "spoken:b1.1": "" }));
@@ -222,15 +274,19 @@ describe("ScriptWriteStepPage", () => {
     );
   });
 
-  it("offers a suggestion for a join that does not read well", async () => {
+  it("offers a suggestion for a join that does not read well, as its own run", async () => {
     state = baseState({
       beats: [beat("b1", 1), beat("b2", 2, { join: { ok: false, msg: "hai câu liền nhau cùng mở bằng “Ong”, nghe lặp." } })],
     });
-    vi.spyOn(apiClient, "suggestScriptLine").mockResolvedValue("Rồi con ong mất cánh.");
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path: "/v1/projects/p1/script/suggest/join/b2.1", body: "{}" }));
     renderPage();
     expect(await screen.findByTestId("script-join-b2")).toHaveAttribute("data-ok", "false");
     fireEvent.click(screen.getByTestId("script-ask-join-b2.1"));
-    expect(await screen.findByTestId("script-suggestion-b2.1")).toHaveTextContent("Rồi con ong mất cánh.");
+    fireEvent.click(await screen.findByTestId("script-ask-join-b2.1-dialog-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", expect.objectContaining({ request: expect.objectContaining({ path: "/v1/projects/p1/script/suggest/join/b2.1" }), channel: "api" })),
+    );
+    expect(await screen.findByTestId("script-ask-join-b2.1-dialog-status")).toHaveTextContent("Đang gọi API");
   });
 
   it("sends a line to be read, waits for its file and plays it from the gateway", async () => {
@@ -292,13 +348,51 @@ describe("ScriptWriteStepPage", () => {
     expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/lock");
   });
 
-  it("redoes one beat's dialogue with a note", async () => {
-    const redo = vi.spyOn(apiClient, "redoUnit").mockResolvedValue({} as never);
+  it("redoes one beat's dialogue with a note as a run of that beat", async () => {
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path: "/v1/projects/p1/units/script_beat/b2/redo", body: '{"note":"ngắn hơn"}' }));
     await ready();
     fireEvent.click(screen.getByTestId("script-review-b2-redo"));
+    expect(await screen.findByTestId("script-redo-b2-text")).toHaveTextContent("Beat về “Chưa duyệt”");
     fireEvent.change(await screen.findByTestId("script-redo-b2-note"), { target: { value: "ngắn hơn" } });
-    fireEvent.click(screen.getByTestId("script-redo-b2-send"));
-    await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "script_beat", key: "b2" }), "ngắn hơn", expect.anything()));
+    fireEvent.click(screen.getByTestId("script-redo-b2-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: "/v1/projects/p1/units/script_beat/b2/redo", body: JSON.stringify({ note: "ngắn hơn" }) }),
+        channel: "api",
+      }),
+    );
+  });
+
+  it("writes a beat without dialogue through the AI by hand: paste the reply, see the lines, then apply and reload", async () => {
+    channel("manual");
+    state = baseState({ beats: [beat("b1", 1, { written: false, lines: [], seconds: 0 })], stats: { ...baseState().stats, written: 0, lines: 0 } });
+    const path = "/v1/projects/p1/units/script_beat/b1/redo";
+    vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path, channel: "manual", status: "waiting" }));
+    const preview = { lines: [{ id: "b1.1", text: "Câu AI viết.", facts: ["F01"] }], next_seq: 2 };
+    vi.spyOn(apiClient, "replyAiRun").mockResolvedValue(aiRun({ path, channel: "manual", status: "ready", reply: "{...}", preview }));
+    const apply = vi.spyOn(apiClient, "applyAiRun").mockResolvedValue({ run: aiRun({ path, channel: "manual", status: "applied" }), state: {} });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("script-write-b1"));
+    fireEvent.click(await screen.findByTestId("script-redo-b1-run"));
+    fireEvent.click(await screen.findByTestId("script-redo-b1-tab-reply"));
+    fireEvent.change(screen.getByTestId("script-redo-b1-reply"), { target: { value: "{...}" } });
+    fireEvent.click(screen.getByTestId("script-redo-b1-read"));
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Câu AI viết.");
+    expect(apply).not.toHaveBeenCalled();
+    const loads = vi.mocked(apiClient.getScript).mock.calls.length;
+    fireEvent.click(screen.getByTestId("script-redo-b1-apply"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("authoring", "p1", "r1"));
+    await waitFor(() => expect(vi.mocked(apiClient.getScript).mock.calls.length).toBeGreaterThan(loads));
+  });
+
+  it("reopens an open run from its pill next to the beat's button", async () => {
+    vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([aiRun({ path: "/v1/projects/p1/units/script_beat/b2/redo", status: "unreadable", reply: "lỗi", error: "Không đọc được JSON" })]);
+    await ready();
+    const pill = await screen.findByTestId("script-redo-run-b2");
+    expect(pill).toHaveTextContent("Câu trả lời chưa dùng được");
+    fireEvent.click(pill);
+    expect(await screen.findByTestId("script-redo-b2-error")).toHaveTextContent("Không đọc được JSON");
   });
 
   it("shows why an action failed in the server's words", async () => {
@@ -324,20 +418,23 @@ describe("ScriptWriteStepPage", () => {
 
     const twoUnwritten = () => baseState({ beats: [beat("b1", 1), beat("b2", 2, { written: false, lines: [] }), beat("b3", 3, { written: false, lines: [] })] });
 
-    it("offers no run-all button when the extension has no queue", async () => {
+    it("cannot run the whole batch on the extension or by hand when the extension has no queue", async () => {
       bridge = installFakeAiBridge();
       state = twoUnwritten();
       await ready();
-      expect(screen.queryByTestId("script-queue-all")).not.toBeInTheDocument();
+      fireEvent.click(await screen.findByTestId("script-generate-more"));
+      expect(screen.getByTestId("script-generate-extension")).toBeDisabled();
+      expect(screen.getByTestId("script-generate-manual")).toBeDisabled();
     });
 
     it("queues one item per beat without dialogue, in the order of the sheet, without calling the AI", async () => {
       bridge = installFakeAiBridge({ queue: true });
+      channel("extension");
       state = twoUnwritten();
       const generate = vi.spyOn(apiClient, "generateScript");
       await ready();
-      const button = await screen.findByTestId("script-queue-all");
-      expect(button).toHaveTextContent("Thêm tất cả vào hàng đợi AI (2)");
+      const button = await screen.findByTestId("script-generate");
+      await waitFor(() => expect(button).toHaveTextContent("Extension"));
       fireEvent.click(button);
       await waitFor(() => expect(bridge.queued).toHaveLength(2));
       expect(bridge.queued.map((q) => q.item.label)).toEqual(["B2 · Beat b2", "B3 · Beat b3"]);

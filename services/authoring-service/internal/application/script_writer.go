@@ -164,6 +164,9 @@ func (uc *ScriptDeskUseCase) writeBeat(ctx context.Context, projectID string, sc
 	if err := script.Validate(factKnownTo(sc.facts)); err != nil {
 		return domain.ReviewUnit{}, fmt.Errorf("%w: %v", domain.ErrScriptReplyUnusable, err)
 	}
+	if err := stopForPreview(ctx, script); err != nil {
+		return domain.ReviewUnit{}, err
+	}
 	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindBeat, key)
 	if err != nil {
 		return domain.ReviewUnit{}, err
@@ -269,7 +272,14 @@ func (uc *ScriptDeskUseCase) Suggest(ctx context.Context, projectID, kind, lineI
 	if err != nil {
 		return "", err
 	}
-	return domain.ParseLineSuggestion(reply)
+	text, err := domain.ParseLineSuggestion(reply)
+	if err != nil {
+		return "", err
+	}
+	if err := stopForPreview(ctx, map[string]string{"text": text}); err != nil {
+		return "", err
+	}
+	return text, nil
 }
 
 // Speak sends the lines to be read in the project's voice. A line that

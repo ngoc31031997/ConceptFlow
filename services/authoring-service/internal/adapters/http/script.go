@@ -41,7 +41,7 @@ func (rt *Router) scriptRoutes(r chi.Router) {
 	const base = "/v1/projects/{project_id}/script"
 	r.Get(base, rt.handleGetScript)
 	r.Post(base+"/generate", rt.handleGenerateScript)
-	r.Post(base+"/suggest", rt.handleSuggestScript)
+	r.Post(base+"/suggest/{kind}/{line_id}", rt.handleSuggestScript)
 	r.Post(base+"/speak", rt.handleSpeakScript)
 	r.Post(base+"/replace", rt.handleReplaceScript)
 }
@@ -97,16 +97,8 @@ func (rt *Router) handleSuggestScript(w http.ResponseWriter, r *http.Request) {
 	if !rt.scriptEnabled(w) {
 		return
 	}
-	var body struct {
-		Kind   string `json:"kind"`
-		LineID string `json:"line_id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
 	ctx, finish := rt.trackOperation(r, operationScript)
-	text, err := rt.script.Suggest(ctx, chi.URLParam(r, "project_id"), body.Kind, body.LineID)
+	text, err := rt.script.Suggest(ctx, chi.URLParam(r, "project_id"), chi.URLParam(r, "kind"), chi.URLParam(r, "line_id"))
 	finish(err)
 	if err != nil {
 		writeUnitRunError(w, err)

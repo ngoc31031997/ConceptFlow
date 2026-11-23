@@ -80,7 +80,7 @@ func TestScriptStateAndRunsPassTheirArgumentsOn(t *testing.T) {
 	if rec.Code != http.StatusOK || f.beat != "b2" || f.note != "ngắn" || f.runs != 1 {
 		t.Errorf("generate: status %d beat %q note %q", rec.Code, f.beat, f.note)
 	}
-	rec = serveScript(f, nil, http.MethodPost, "/v1/projects/p1/script/suggest", `{"kind":"join","line_id":"b2.1"}`)
+	rec = serveScript(f, nil, http.MethodPost, "/v1/projects/p1/script/suggest/join/b2.1", "")
 	if rec.Code != http.StatusOK || f.kind != "join" || f.lineID != "b2.1" || !strings.Contains(rec.Body.String(), `"text":"Câu thay."`) {
 		t.Errorf("suggest: status %d body %s", rec.Code, rec.Body)
 	}
@@ -100,7 +100,7 @@ func TestScriptErrorsKeepTheirMeaning(t *testing.T) {
 		"beat has lines":     {application.ErrScriptBeatHasLines, "/script/generate", http.StatusBadRequest},
 		"reply unusable":     {domain.ErrScriptReplyUnusable, "/script/generate", http.StatusBadGateway},
 		"no model":           {application.ErrLLMNotConfigured, "/script/generate", http.StatusServiceUnavailable},
-		"not flagged":        {application.ErrScriptLineNotFlagged, "/script/suggest", http.StatusBadRequest},
+		"not flagged":        {application.ErrScriptLineNotFlagged, "/script/suggest/line/b1.1", http.StatusBadRequest},
 		"no voice":           {application.ErrVoiceNotConfigured, "/script/speak", http.StatusServiceUnavailable},
 	} {
 		rec := serveScript(&fakeScript{err: c.err}, nil, http.MethodPost, "/v1/projects/p1"+c.path, `{"kind":"line","line_id":"b1.1","line_ids":["b1.1"]}`)

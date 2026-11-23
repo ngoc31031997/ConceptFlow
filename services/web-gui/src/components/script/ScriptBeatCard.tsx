@@ -1,20 +1,27 @@
 import { useState } from "react";
 import beatStyles from "../beats/beats.module.css";
-import { generateScript, redoUnit, scriptBeatUnit, suggestScriptLine, type ScriptBeat, type ScriptLine } from "../../api/client";
+import {
+  describeAiRequest,
+  redoUnit,
+  scriptBeatUnit,
+  suggestScriptLine,
+  type ScriptBeat,
+  type ScriptLine,
+} from "../../api/client";
 import type { ScriptControls } from "../../hooks/useScript";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
-import { AiModelSelect } from "../AiModelSelect";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiButton } from "../ExternalAiButton";
 import researchStyles from "../research/research.module.css";
 import { FactTags } from "../story/FactTags";
 import { Button, Card } from "../ui";
 import { UnitEditModal } from "../units/UnitEditModal";
-import { UnitRedoModal } from "../units/UnitRedoModal";
+import { ImpactList } from "../units/ImpactList";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import unitStyles from "../units/units.module.css";
 import { UnitStatusChip } from "../units/UnitStatusChip";
 import { formatSeconds } from "./ScriptOverviewCard";
+import { ScriptRunPreview } from "./ScriptRunPreview";
 import styles from "./script.module.css";
 
 interface ScriptBeatCardProps {
@@ -36,9 +43,74 @@ interface Suggestion {
   text: string;
 }
 
+interface SuggestAskProps {
+  projectId: string;
+  kind: "line" | "join";
+  lineId: string;
+  /** The suggestion shown under this line is open: the button hides it instead. */
+  shown: boolean;
+  disabled: boolean;
+  onHide: () => void;
+  onSuggested: (text: string) => void;
+}
+
+/** "Xem gợi ý" for one flagged line or join: one AI run whose text is shown under the line for the Creator to apply or drop. */
+function SuggestAsk({
+  projectId,
+  kind,
+  lineId,
+  shown,
+  disabled,
+  onHide,
+  onSuggested,
+}: SuggestAskProps) {
+  const [open, setOpen] = useState(false);
+  const runPath = `/v1/projects/${projectId}/script/suggest/${kind}/${lineId}`;
+  const testId = `script-ask-${kind}-${lineId}`;
+  return (
+    <>
+      <Button
+        variant="view"
+        className={researchStyles.sm}
+        onClick={() => (shown ? onHide() : setOpen(true))}
+        disabled={disabled}
+        data-testid={testId}
+      >
+        {shown ? "Ẩn gợi ý" : "Xem gợi ý"}
+      </Button>
+      <AiRunPill runPath={runPath} onOpen={() => setOpen(true)} testId={`${testId}-run`} />
+      <AiRunDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={
+          kind === "join" ? `Gợi ý chỗ nối vào câu ${lineId}` : `Gợi ý câu thay cho câu ${lineId}`
+        }
+        runPath={runPath}
+        describe={() =>
+          describeAiRequest((external) => suggestScriptLine(projectId, kind, lineId, { external }))
+        }
+        noNote
+        renderPreview={(p) => <ScriptRunPreview kind="suggestion" preview={p} />}
+        impact={
+          <p className={researchStyles.hint} data-testid={`${testId}-impact`}>
+            AI gợi ý một câu thay cho câu {lineId}. Chưa lưu gì: câu chỉ đổi khi bạn bấm “Áp dụng” ở
+            gợi ý hiện dưới câu.
+          </p>
+        }
+        onApplied={(state) => {
+          const text = (state as { text?: unknown } | null)?.text;
+          if (typeof text === "string" && text !== "") onSuggested(text);
+        }}
+        testId={`${testId}-dialog`}
+      />
+    </>
+  );
+}
+
 function readingLabel(line: ScriptLine, playing: boolean, waiting: boolean): string {
   if (playing) return "● Đang phát";
-  if (waiting || line.audio.state === "pending" || line.audio.state === "running") return "… Đang đọc";
+  if (waiting || line.audio.state === "pending" || line.audio.state === "running")
+    return "… Đang đọc";
   return "▶ Nghe";
 }
 
@@ -63,7 +135,14 @@ function lengthDeviation(seconds: number, targetSeconds: number): string {
  * for the Creator to apply (an edit of that line) or drop. Hand edits go
  * through the "Sửa tay" dialog (docs/ux-ui-design-rules.md, rule 4).
  */
-export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, highlight }: ScriptBeatCardProps) {
+export function ScriptBeatCard({
+  projectId,
+  beat,
+  script,
+  aiAvailable,
+  locked,
+  highlight,
+}: ScriptBeatCardProps) {
   const [editing, setEditing] = useState(false);
   const [redoing, setRedoing] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
@@ -76,22 +155,12 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
 
   const { player } = script;
   const busy = locked || script.busy || script.running !== null;
-  const writing = typeof script.running === "object" && script.running !== null && "beat" in script.running && script.running.beat === beat.key;
   const writingAll = script.running === "write";
-  const asking = typeof script.running === "object" && script.running !== null && "suggest" in script.running ? script.running.suggest : null;
+  const beatRunPath = `/v1/projects/${projectId}/units/script_beat/${beat.key}/redo`;
   const lastId = beat.lines.length > 0 ? beat.lines[beat.lines.length - 1].id : "start";
   const ids = beat.lines.map((l) => l.id);
   const playingBeat = ids.some((id) => id === player.playingId || id === player.waitingId);
   const listenDisabled = locked || ids.length === 0;
-
-  async function ask(kind: "line" | "join", lineId: string) {
-    if (suggestion?.lineId === lineId && suggestion.kind === kind) {
-      setSuggestion(null);
-      return;
-    }
-    const text = await script.suggest(kind, lineId);
-    if (text) setSuggestion({ kind, lineId, text });
-  }
 
   async function apply() {
     if (!suggestion) return;
@@ -105,10 +174,21 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         <b>AI gợi ý</b>
         <span>{suggestion.text}</span>
         <div className={styles.actions}>
-          <Button variant="ghost" className={researchStyles.sm} onClick={() => setSuggestion(null)} data-testid={`script-suggestion-drop-${lineId}`}>
+          <Button
+            variant="ghost"
+            className={researchStyles.sm}
+            onClick={() => setSuggestion(null)}
+            data-testid={`script-suggestion-drop-${lineId}`}
+          >
             Bỏ
           </Button>
-          <Button variant="primary" className={researchStyles.sm} onClick={() => void apply()} disabled={busy} data-testid={`script-suggestion-apply-${lineId}`}>
+          <Button
+            variant="primary"
+            className={researchStyles.sm}
+            onClick={() => void apply()}
+            disabled={busy}
+            data-testid={`script-suggestion-apply-${lineId}`}
+          >
             Áp dụng
           </Button>
         </div>
@@ -116,26 +196,19 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
     ) : null;
 
   const askButton = (kind: "line" | "join", lineId: string) => (
-    <>
-      <ExternalAiButton
-        title={`Gợi ý cho câu ${lineId} · AI ngoài`}
-        label="Gợi ý bằng AI ngoài"
-        run={(external) => suggestScriptLine(projectId, kind, lineId, { external })}
-        queued={false}
-        onDone={(text) => setSuggestion({ kind, lineId, text })}
-        disabled={busy}
-        testId={`script-ask-external-${kind}-${lineId}`}
-      />
-      {aiAvailable && (
-        <Button variant="view" className={researchStyles.sm} onClick={() => void ask(kind, lineId)} disabled={busy} data-testid={`script-ask-${kind}-${lineId}`}>
-          {asking === lineId ? "AI đang gợi ý…" : suggestion?.lineId === lineId && suggestion.kind === kind ? "Ẩn gợi ý" : "Xem gợi ý"}
-        </Button>
-      )}
-    </>
+    <SuggestAsk
+      projectId={projectId}
+      kind={kind}
+      lineId={lineId}
+      shown={suggestion?.lineId === lineId && suggestion.kind === kind}
+      disabled={busy}
+      onHide={() => setSuggestion(null)}
+      onSuggested={(text) => setSuggestion({ kind, lineId, text })}
+    />
   );
 
   const holdsHighlight = highlight != null && beat.lines.some((l) => l.id === highlight);
-  if (beat.written && beat.status === "approved" && !expanded && !writing && !holdsHighlight) {
+  if (beat.written && beat.status === "approved" && !expanded && !holdsHighlight) {
     return (
       <div className={beatStyles.beatRow} data-testid={`script-beat-${beat.key}`}>
         <span className={beatStyles.beatRowTitle}>
@@ -146,7 +219,12 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         </span>
         <UnitStatusChip state={beat.status} testId={`script-status-${beat.key}`} />
         <span className={researchStyles.grow} />
-        <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(true)} data-testid={`script-expand-${beat.key}`}>
+        <Button
+          variant="ghost"
+          className={researchStyles.sm}
+          onClick={() => setExpanded(true)}
+          data-testid={`script-expand-${beat.key}`}
+        >
           Mở
         </Button>
       </div>
@@ -161,13 +239,22 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
             B{beat.number} · {beat.fn} · {beat.title}
           </h3>
           <span className={styles.actions}>
-            {writing ? <UnitStatusChip state="running" testId={`script-status-${beat.key}`} /> : beat.written && <UnitStatusChip state={beat.status} testId={`script-status-${beat.key}`} />}
+            {beat.written && (
+              <UnitStatusChip state={beat.status} testId={`script-status-${beat.key}`} />
+            )}
             <span className={unitStyles.mine} data-testid={`script-length-${beat.key}`}>
-              {beat.written && `${formatSeconds(beat.seconds)} / `}mục tiêu {formatSeconds(beat.targetSeconds)}
-              {beat.written && deviation && <span className={`${styles.check} ${styles.checkWarn}`}> · {deviation}</span>}
+              {beat.written && `${formatSeconds(beat.seconds)} / `}mục tiêu{" "}
+              {formatSeconds(beat.targetSeconds)}
+              {beat.written && deviation && (
+                <span className={`${styles.check} ${styles.checkWarn}`}> · {deviation}</span>
+              )}
             </span>
             {beat.mine.length > 0 && (
-              <span className={unitStyles.mine} title="AI giữ nguyên phần này khi viết lại" data-testid={`script-mine-${beat.key}`}>
+              <span
+                className={unitStyles.mine}
+                title="AI giữ nguyên phần này khi viết lại"
+                data-testid={`script-mine-${beat.key}`}
+              >
                 ✎ Bạn viết
               </span>
             )}
@@ -179,18 +266,32 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
           </span>
           <span className={researchStyles.grow} />
           {beat.written && beat.status === "approved" && (
-            <Button variant="ghost" className={researchStyles.sm} onClick={() => setExpanded(false)} data-testid={`script-collapse-${beat.key}`}>
+            <Button
+              variant="ghost"
+              className={researchStyles.sm}
+              onClick={() => setExpanded(false)}
+              data-testid={`script-collapse-${beat.key}`}
+            >
               Thu gọn
             </Button>
           )}
         </div>
         <p className={researchStyles.hint}>Mục tiêu: {beat.goal || "(chưa có)"}</p>
 
-        <AiOperationCard run={script.run} active={writing || (writingAll && !beat.written)} showFailure={script.runBeat === null || script.runBeat === beat.key} testId={`script-progress-${beat.key}`} title="AI đang viết lời thoại beat này" />
+        <AiOperationCard
+          run={script.run}
+          active={writingAll && !beat.written}
+          testId={`script-progress-${beat.key}`}
+          title="AI đang viết lời thoại beat này"
+        />
 
         {beat.join && (
           <>
-            <div className={`${styles.note} ${beat.join.ok ? "" : styles.noteBad}`} data-testid={`script-join-${beat.key}`} data-ok={beat.join.ok}>
+            <div
+              className={`${styles.note} ${beat.join.ok ? "" : styles.noteBad}`}
+              data-testid={`script-join-${beat.key}`}
+              data-ok={beat.join.ok}
+            >
               <span className={`${unitStyles.mine}`}>{beat.join.ok ? "✓ nối" : "! nối"}</span>
               <span className={styles.noteText}>
                 B{beat.number - 1} → B{beat.number}: {beat.join.msg}
@@ -204,23 +305,33 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         {!beat.written ? (
           <>
             <p className={researchStyles.hint} data-testid={`script-empty-${beat.key}`}>
-              Chưa có lời thoại.{aiAvailable ? " AI viết từ mục tiêu và nội dung của beat, hoặc bạn tự viết." : " Chưa cấu hình AI nên bạn tự viết."}
+              Chưa có lời thoại.
+              {aiAvailable
+                ? " AI viết từ mục tiêu và nội dung của beat, hoặc bạn tự viết."
+                : " Chưa cấu hình AI của hệ thống: viết bằng AI ngoài (extension hoặc thủ công) hoặc tự viết."}
             </p>
             <div className={styles.actions}>
-              <ExternalAiButton
-                title={`Lời thoại B${beat.number} ${beat.title} · AI ngoài`}
-                label="Viết lời thoại bằng AI ngoài"
-                run={(external) => generateScript(projectId, beat.key, "", { external })}
-                onDone={script.reload}
+              <Button
+                variant="run"
+                className={researchStyles.sm}
+                onClick={() => setRedoing(true)}
                 disabled={busy}
-                testId={`script-write-external-${beat.key}`}
+                data-testid={`script-write-${beat.key}`}
+              >
+                Viết lời thoại beat này
+              </Button>
+              <AiRunPill
+                runPath={beatRunPath}
+                onOpen={() => setRedoing(true)}
+                testId={`script-write-run-${beat.key}`}
               />
-              {aiAvailable && (
-                <Button variant="run" className={researchStyles.sm} onClick={() => void script.generate(beat.key, "")} disabled={busy} data-testid={`script-write-${beat.key}`}>
-                  AI viết lời thoại beat này
-                </Button>
-              )}
-              <Button variant="ghost" className={researchStyles.sm} onClick={() => setEditing(true)} disabled={busy} data-testid={`script-write-by-hand-${beat.key}`}>
+              <Button
+                variant="ghost"
+                className={researchStyles.sm}
+                onClick={() => setEditing(true)}
+                disabled={busy}
+                data-testid={`script-write-by-hand-${beat.key}`}
+              >
                 Tự viết
               </Button>
             </div>
@@ -233,7 +344,12 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
                 const waiting = player.waitingId === line.id;
                 return (
                   <div key={line.id} style={{ display: "contents" }}>
-                    <div className={styles.line} id={`ln-${line.id}`} data-current={highlight === line.id || playing} data-testid={`script-line-${line.id}`}>
+                    <div
+                      className={styles.line}
+                      id={`ln-${line.id}`}
+                      data-current={highlight === line.id || playing}
+                      data-testid={`script-line-${line.id}`}
+                    >
                       <span className={styles.lineId}>
                         {line.id.slice(1)}
                         <span className={styles.lineSecs}>
@@ -244,20 +360,31 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
                       <span className={styles.lineBody}>
                         <span data-testid={`script-line-text-${line.id}`}>{line.text}</span>
                         {line.spoken && (
-                          <span className={styles.spoken} data-testid={`script-line-spoken-${line.id}`}>
+                          <span
+                            className={styles.spoken}
+                            data-testid={`script-line-spoken-${line.id}`}
+                          >
                             <b>Đọc:</b> {line.spoken}
                           </span>
                         )}
                         <span className={styles.tags}>
                           <FactTags ids={line.facts} />
                           {line.flag && (
-                            <span className={styles.flag} title={line.flag.msg} data-testid={`script-flag-${line.id}`}>
+                            <span
+                              className={styles.flag}
+                              title={line.flag.msg}
+                              data-testid={`script-flag-${line.id}`}
+                            >
                               {line.flag.kind}
                             </span>
                           )}
                         </span>
                         {line.audio.state === "failed" && (
-                          <span className={styles.audioFail} role="alert" data-testid={`script-audio-error-${line.id}`}>
+                          <span
+                            className={styles.audioFail}
+                            role="alert"
+                            data-testid={`script-audio-error-${line.id}`}
+                          >
                             Không đọc được: {line.audio.error}
                           </span>
                         )}
@@ -265,7 +392,9 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
                       <Button
                         variant="ghost"
                         className={researchStyles.sm}
-                        onClick={() => (playing || waiting ? player.stop() : void player.play([line.id]))}
+                        onClick={() =>
+                          playing || waiting ? player.stop() : void player.play([line.id])
+                        }
                         disabled={locked}
                         data-testid={`script-play-${line.id}`}
                       >
@@ -273,7 +402,10 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
                       </Button>
                     </div>
                     {line.flag && (
-                      <div className={`${styles.note} ${styles.noteBad}`} data-testid={`script-flagnote-${line.id}`}>
+                      <div
+                        className={`${styles.note} ${styles.noteBad}`}
+                        data-testid={`script-flagnote-${line.id}`}
+                      >
                         <span className={styles.noteText}>
                           <b>{line.flag.kind}:</b> {line.flag.msg}
                         </span>
@@ -307,6 +439,13 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
               onUnapprove={() => void script.unapprove(beat.key)}
               testId={`script-review-${beat.key}`}
             />
+            <div className={styles.actions}>
+              <AiRunPill
+                runPath={beatRunPath}
+                onOpen={() => setRedoing(true)}
+                testId={`script-redo-run-${beat.key}`}
+              />
+            </div>
           </>
         )}
       </div>
@@ -318,9 +457,19 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         fields={[
           ...beat.lines.flatMap((l) => [
             { name: `line:${l.id}`, label: `Câu ${l.id.slice(1)}`, value: l.text, rows: 2 },
-            { name: `spoken:${l.id}`, label: `Chữ để đọc câu ${l.id.slice(1)} (để trống thì đọc đúng như chữ trên)`, value: l.spoken ?? "", rows: 2 },
+            {
+              name: `spoken:${l.id}`,
+              label: `Chữ để đọc câu ${l.id.slice(1)} (để trống thì đọc đúng như chữ trên)`,
+              value: l.spoken ?? "",
+              rows: 2,
+            },
           ]),
-          { name: `add:${lastId}`, label: beat.lines.length === 0 ? "Câu đầu tiên" : "Thêm một câu mới ở cuối", value: "", rows: 2 },
+          {
+            name: `add:${lastId}`,
+            label: beat.lines.length === 0 ? "Câu đầu tiên" : "Thêm một câu mới ở cuối",
+            value: "",
+            rows: 2,
+          },
         ]}
         impact={editImpact}
         onSave={(changed) => script.edit(beat.key, changed)}
@@ -328,18 +477,35 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         size="lg"
         testId={`script-edit-${beat.key}`}
       />
-      <UnitRedoModal
+      <AiRunDialog
         open={redoing}
         onClose={() => setRedoing(false)}
-        title={`Làm lại kèm ghi chú · B${beat.number} ${beat.title}`}
-        impact={redoImpact}
-        initialNote={script.failedNote}
-        modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="story" label="Model AI cho bước Viết kịch bản" testId={`script-redo-model-${beat.key}`} /> : undefined}
-        onSend={aiAvailable ? (note) => void script.redo(beat.key, note) : undefined}
-        external={{
-          run: (note, external) => redoUnit(projectId, scriptBeatUnit(beat.key), note, { external }),
-          onDone: script.reload,
-        }}
+        title={
+          beat.written
+            ? `Làm lại kèm ghi chú · B${beat.number} ${beat.title}`
+            : `Viết lời thoại · B${beat.number} ${beat.title}`
+        }
+        runPath={beatRunPath}
+        describe={(note) =>
+          describeAiRequest((external) => redoUnit(projectId, unit, note, { external }))
+        }
+        renderPreview={(p) => <ScriptRunPreview kind="beat" preview={p} />}
+        impact={
+          <>
+            <p className={researchStyles.hint} data-testid={`script-redo-${beat.key}-text`}>
+              {beat.written
+                ? "AI viết lại cả lời thoại của beat này; số câu đánh tiếp, không dùng lại số cũ, và lời thoại thành của AI. Beat về “Chưa duyệt”."
+                : "AI viết lời thoại của beat này từ mục tiêu và nội dung beat, đọc lời thoại của beat liền trước và sau."}{" "}
+              Các beat khác giữ nguyên.
+            </p>
+            <ImpactList
+              head="AI làm lại mục này thì phần phụ thuộc sẽ làm lại:"
+              impact={redoImpact}
+              testId={`script-redo-${beat.key}-impact`}
+            />
+          </>
+        }
+        onApplied={script.reload}
         testId={`script-redo-${beat.key}`}
       />
     </Card>
