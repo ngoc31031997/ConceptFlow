@@ -54,6 +54,16 @@ Prompt nghiên cứu (vai `research_prompt`, sửa được ở Cài đặt prom
 
 `link.state` của một dữ kiện: `ok` (trang có đoạn trích), `bad` (tải được trang nhưng không thấy đoạn trích; kèm `nearest` là câu gần nhất nếu có), `na` (không tải được, kèm `why`), `none` (không có link), `run` (đang kiểm).
 
+## Lượt chạy AI (ADR-0052)
+
+Lượt AI một-prompt của bước chạy qua lượt chạy có xem trước của authoring-service, `/v1/projects/{id}/ai-runs`, khoá kênh `research`, theo [`ai-runs-v1.md`](ai-runs-v1.md). Điểm dừng xem trước:
+
+| Route | Preview |
+|---|---|
+| `POST /questions/generate` | `{questions: [chữ câu hỏi mới]}`; câu của Creator được giữ (hoặc thay khi `replace_edited`) lúc áp dụng |
+
+`POST /paste` không phải lượt chạy: hệ thống không gọi model, chỉ đọc câu trả lời của công cụ nghiên cứu bên ngoài (prompt lấy từ `GET /prompt`, `GET /follow-up-prompt`) rồi kiểm link; nó giữ đường dán trực tiếp và hàng đợi extension như cũ.
+
 ## Đường ra Internet của authoring-service
 
 authoring-service là service duy nhất tải trang web do người ngoài đưa link. Việc này chặn địa chỉ nội bộ (SSRF):

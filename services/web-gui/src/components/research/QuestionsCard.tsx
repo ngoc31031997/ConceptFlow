@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { generateResearchQuestions, type QuestionCoverage, type ResearchBrief, type ResearchIdea, type ResearchQuestion } from "../../api/client";
-import type { OperationRun } from "../../hooks/useOperationRun";
+import {
+  describeAiRequest,
+  generateResearchQuestions,
+  type QuestionCoverage,
+  type ResearchBrief,
+  type ResearchIdea,
+  type ResearchQuestion,
+} from "../../api/client";
 import { AiModelSelect } from "../AiModelSelect";
-import { AiOperationCard } from "../AiOperationCard";
-import { useQueuedExternalRun } from "../../hooks/useQueuedExternalRun";
-import { AiBridgeRunStatus } from "../AiBridgeRunStatus";
-import { ExternalAiDialog } from "../ExternalAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { isOpen, useAiRuns } from "../airun/AiRunsContext";
 import { Button, Card, TextInput } from "../ui";
 import unitStyles from "../units/units.module.css";
 import { CoverageChip } from "./CoverageChip";
 import { FollowUpPrompt } from "./FollowUpPrompt";
 import { ImpactConfirm } from "./ImpactConfirm";
+import { QuestionsRunPreview } from "./QuestionsRunPreview";
 import { ResearchInputModal } from "./ResearchInputModal";
 import styles from "./research.module.css";
 
@@ -87,14 +92,6 @@ function QuestionRow({ question, coverage, checking, disabled, onSave, onDelete 
   );
 }
 
-type Engine = "system" | "queue" | "outside";
-
-const ENGINES: { id: Engine; label: string }[] = [
-  { id: "system", label: "AI hệ thống" },
-  { id: "queue", label: "Hàng đợi AI" },
-  { id: "outside", label: "AI ngoài" },
-];
-
 interface QuestionsCardProps {
   projectId: string;
   questions: ResearchQuestion[];
@@ -103,10 +100,6 @@ interface QuestionsCardProps {
   checking: ReadonlySet<string>;
   /** The brief the questions come from changed since the AI wrote them. */
   stale: boolean;
-  /** A language model is configured, so the AI can write the questions. */
-  aiAvailable: boolean;
-  running: boolean;
-  run: OperationRun;
   /** The step cannot be changed now (the project is past editing). */
   locked: boolean;
   /** The approved idea and brief the questions are written from. */
@@ -114,7 +107,6 @@ interface QuestionsCardProps {
   brief: ResearchBrief | null;
   /** Reads the idea and brief again from the server. */
   onReloadInput: () => Promise<void>;
-  onGenerate: (replaceEdited: boolean) => Promise<boolean>;
   onAdd: (text: string) => Promise<boolean>;
   onSave: (id: string, text: string) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
@@ -124,8 +116,8 @@ interface QuestionsCardProps {
  * Section 1 of the research step: the questions to look up, each with how well
  * it is sourced. The AI writes them from the brief and nobody approves them;
  * every question is a field the Creator edits, deletes (after a confirmation)
- * or adds to. One button generates them on the engine picked beside it: the
- * system's AI, the AI queue or an AI outside. Regenerating keeps the questions the
+ * or adds to. One button runs the AI on the step's channel and shows the new
+ * questions before they are stored. Regenerating keeps the questions the
  * Creator wrote, unless they agree to replace those too.
  */
 export function QuestionsCard({
@@ -134,14 +126,10 @@ export function QuestionsCard({
   coverage,
   checking,
   stale,
-  aiAvailable,
-  running,
-  run,
   locked,
   idea,
   brief,
   onReloadInput,
-  onGenerate,
   onAdd,
   onSave,
   onDelete,
@@ -149,27 +137,13 @@ export function QuestionsCard({
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<ResearchQuestion | null>(null);
-  // Regenerating while the Creator has questions of their own asks first, for the system's AI or an AI outside.
-  const [regenerating, setRegenerating] = useState<"system" | "outside" | "queue" | null>(null);
-  // The dialog of the AI outside the system; the value is whether it replaces the Creator's own questions.
-  const [outside, setOutside] = useState<boolean | null>(null);
-  // An answer the step could not read, shown in that dialog for the Creator to fix.
-  const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
-  // Whether the queued run in progress replaces the Creator's own questions.
-  const queuedReplace = useRef(false);
-  const queued = useQueuedExternalRun({
-    label: "Sinh câu hỏi tra cứu",
-    run: (external) => generateResearchQuestions(projectId, { replaceEdited: queuedReplace.current }, { external }),
-    onDone: onReloadInput,
-    onUnreadable: (reply, message) => {
-      setUnreadable({ reply, message });
-      setOutside(queuedReplace.current);
-    },
-  });
-  const [pickedEngine, setPickedEngine] = useState<Engine | null>(null);
-  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, queue: queued.available, outside: true };
-  // The Creator's pick, or the first engine that can run when that one cannot.
-  const engine: Engine = pickedEngine && engineAvailable[pickedEngine] ? pickedEngine : (ENGINES.find((e) => engineAvailable[e.id])?.id ?? "outside");
+  // Regenerating while the Creator has questions of their own asks first whether to replace those too.
+  const [regenerating, setRegenerating] = useState(false);
+  // The AI run dialog; `replaceEdited` is what the run in it does with the Creator's own questions.
+  const [runOpen, setRunOpen] = useState(false);
+  const [replaceEdited, setReplaceEdited] = useState(false);
+  const { runs } = useAiRuns();
+  const runPath = `/v1/projects/${projectId}/research/questions/generate`;
   // The dialog that shows what the AI reads.
   const [inputOpen, setInputOpen] = useState(false);
   const [inputLoading, setInputLoading] = useState(false);
@@ -196,27 +170,18 @@ export function QuestionsCard({
     void onReloadInput().finally(() => setInputLoading(false));
   }
 
-  function startOutside(replaceEdited: boolean) {
-    setUnreadable(null);
-    setOutside(replaceEdited);
+  function startGenerate() {
+    if (isOpen(runs[runPath])) setRunOpen(true);
+    else if (mine.length > 0) setRegenerating(true);
+    else {
+      setReplaceEdited(false);
+      setRunOpen(true);
+    }
   }
 
-  function startQueued(replaceEdited: boolean) {
-    queuedReplace.current = replaceEdited;
-    void queued.start();
-  }
-
-  function startGenerate(via: "system" | "outside" | "queue") {
-    if (mine.length > 0) setRegenerating(via);
-    else if (via === "system") void onGenerate(false);
-    else if (via === "outside") startOutside(false);
-    else startQueued(false);
-  }
-
-  function chooseGenerate(replaceEdited: boolean) {
-    if (regenerating === "outside") startOutside(replaceEdited);
-    else if (regenerating === "queue") startQueued(replaceEdited);
-    else void onGenerate(replaceEdited);
+  function chooseGenerate(replace: boolean) {
+    setReplaceEdited(replace);
+    setRunOpen(true);
   }
 
   const generateLabel = questions.length === 0 ? "Sinh câu hỏi từ brief" : "Sinh lại từ brief";
@@ -246,7 +211,7 @@ export function QuestionsCard({
         <div className={styles.questions}>
           {questions.length === 0 && !adding && (
             <span className={styles.hint} data-testid="research-questions-empty">
-              Chưa có câu hỏi nào. {aiAvailable ? "AI sinh từ brief, hoặc bạn tự thêm." : "Chưa cấu hình AI nên bạn tự thêm câu hỏi."}
+              Chưa có câu hỏi nào. AI sinh từ brief, hoặc bạn tự thêm.
             </span>
           )}
           {questions.map((q) => (
@@ -286,50 +251,19 @@ export function QuestionsCard({
           <FollowUpPrompt projectId={projectId} questions={questions} coverage={coverage} checking={checking} />
         </div>
         <div className={styles.engineBar}>
-          <span className={styles.hint} id="question-engine-label">
-            Sinh bằng
-          </span>
-          <div className={styles.seg} role="radiogroup" aria-labelledby="question-engine-label">
-            {ENGINES.filter((e) => e.id !== "queue" || queued.available).map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                role="radio"
-                aria-checked={engine === e.id}
-                className={engine === e.id ? `${styles.segItem} ${styles.segOn}` : styles.segItem}
-                onClick={() => setPickedEngine(e.id)}
-                disabled={locked || running || queued.busy || !engineAvailable[e.id]}
-                title={engineAvailable[e.id] ? undefined : "Chưa cấu hình AI"}
-                data-testid={`question-engine-${e.id}`}
-              >
-                {e.label}
-              </button>
-            ))}
-          </div>
-          {engine === "system" && !locked && (
-            <AiModelSelect projectId={projectId} step="research" label="Model AI sinh câu hỏi" testId="research-model" />
-          )}
+          {!locked && <AiModelSelect projectId={projectId} step="research" label="Model AI sinh câu hỏi" testId="research-model" />}
           <span className={styles.grow} />
-          {queued.busy ? (
-            <AiBridgeRunStatus item={queued.item} ahead={queued.ahead} onCancel={queued.cancel} testId="question-generate-queue" />
-          ) : (
-            <Button
-              variant={mine.length > 0 && questions.length > 0 ? "impact" : "run"}
-              className={styles.sm}
-              onClick={() => startGenerate(engine)}
-              disabled={locked || running}
-              data-testid="question-generate"
-            >
-              {generateLabel}
-            </Button>
-          )}
+          <AiRunPill runPath={runPath} onOpen={() => setRunOpen(true)} testId="question-generate-run" />
+          <Button
+            variant={mine.length > 0 && questions.length > 0 ? "impact" : "run"}
+            className={styles.sm}
+            onClick={startGenerate}
+            disabled={locked}
+            data-testid="question-generate"
+          >
+            {generateLabel}
+          </Button>
         </div>
-        {queued.error && (
-          <p className={styles.error} role="alert" data-testid="question-generate-queue-error">
-            {queued.error}
-          </p>
-        )}
-        <AiOperationCard run={run} active={running} testId="research-progress" title="AI đang sinh câu hỏi" />
       </div>
 
       <ResearchInputModal
@@ -364,8 +298,8 @@ export function QuestionsCard({
         testId="question-delete-dialog"
       />
       <ImpactConfirm
-        open={regenerating !== null}
-        onClose={() => setRegenerating(null)}
+        open={regenerating}
+        onClose={() => setRegenerating(false)}
         title="Sinh lại câu hỏi từ brief?"
         lead={`Câu hỏi bạn đã viết hoặc sửa: ${mine.map((q) => q.id).join(", ")}.`}
         list={[
@@ -380,15 +314,22 @@ export function QuestionsCard({
         ]}
         testId="question-generate-dialog"
       />
-      <ExternalAiDialog
-        open={outside !== null}
-        onClose={() => setOutside(null)}
-        title="Câu hỏi nghiên cứu · AI ngoài"
-        run={(external) => generateResearchQuestions(projectId, { replaceEdited: outside === true }, { external })}
-        onDone={onReloadInput}
-        initialReply={unreadable?.reply}
-        initialError={unreadable?.message}
-        testId="question-generate-external-dialog"
+      <AiRunDialog
+        open={runOpen}
+        onClose={() => setRunOpen(false)}
+        title={questions.length === 0 ? "Sinh câu hỏi nghiên cứu" : "Sinh lại câu hỏi nghiên cứu"}
+        runPath={runPath}
+        describe={(note) => describeAiRequest((external) => generateResearchQuestions(projectId, { replaceEdited, note }, { external }))}
+        renderPreview={(p) => <QuestionsRunPreview preview={p} />}
+        impact={
+          <p className={styles.hint}>
+            {replaceEdited
+              ? "AI thay mọi câu hỏi, kể cả câu bạn đã viết hoặc sửa. Câu mới có mã mới; bảng dữ kiện giữ nguyên."
+              : "AI thay các câu hỏi do AI viết bằng câu mới (mã mới, không dùng lại mã cũ); câu bạn đã viết hoặc sửa được giữ. Bảng dữ kiện giữ nguyên."}
+          </p>
+        }
+        onApplied={onReloadInput}
+        testId="question-generate-run-dialog"
       />
     </Card>
   );

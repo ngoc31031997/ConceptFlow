@@ -89,6 +89,11 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 	if err != nil {
 		return nil, err
 	}
+	if err := stopForPreview(ctx, struct {
+		Questions []string `json:"questions"`
+	}{written}); err != nil {
+		return nil, err
+	}
 
 	// The new questions are stored before the old ones are removed, so a failure
 	// part way leaves too many questions rather than none.
