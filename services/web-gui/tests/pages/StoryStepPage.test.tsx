@@ -9,6 +9,38 @@ import * as apiClient from "../../src/api/client";
 import type { Story, StoryFact, StoryState } from "../../src/api/client";
 import type { Project } from "../../src/types";
 
+vi.mock("../../src/hooks/useAiQueue", () => ({
+  useAiQueue: () => ({
+    available: true,
+    outdated: false,
+    counts: { waiting: 0, running: 0, done: 0, failed: 0, paused: false },
+    add: vi.fn(),
+    items: {},
+  }),
+}));
+
+const GENERATE_PATH = "/v1/projects/p1/story/generate";
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Viết câu chuyện",
+    method: "POST",
+    path: GENERATE_PATH,
+    body: '{"note":""}',
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT STORY",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
+
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
 }
@@ -71,6 +103,12 @@ beforeEach(() => {
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
   vi.spyOn(apiClient, "getStory").mockImplementation(async () => state);
   vi.spyOn(apiClient, "getUnitImpact").mockResolvedValue([]);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { story: "api" },
+  });
 });
 
 afterEach(() => {
@@ -154,8 +192,7 @@ describe("StoryStepPage", () => {
 
   it("lets the Creator pick the model the story step runs on", async () => {
     await ready();
-    fireEvent.click(screen.getByTestId("story-redo-all"));
-    expect(await screen.findByTestId("story-redo-all-model-field")).toHaveTextContent("Model AI cho bước Câu chuyện");
+    expect(await screen.findByTestId("story-model-field")).toHaveTextContent("Model AI cho bước Câu chuyện");
   });
 
   it("says what the step waits for while the brief or the research is not done", async () => {
@@ -167,19 +204,45 @@ describe("StoryStepPage", () => {
     expect(screen.queryByTestId("story-write-by-hand")).not.toBeInTheDocument();
   });
 
-  it("lets the AI write the story when none exists yet", async () => {
+  it("lets the AI write the story when none exists yet, previews it and stores it only on apply", async () => {
     state = baseState({ story: null });
-    const gen = vi.spyOn(apiClient, "generateStory").mockImplementation(async () => {
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "waiting" }));
+    const preview = {
+      central_question: "Câu hỏi mới?",
+      core_answer: "Đáp án mới.",
+      narrative_arc: [{ beat: "Hook", text: "Mở đầu mới.", facts: ["F01"] }],
+    };
+    const reply = vi.spyOn(apiClient, "replyAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "ready", reply: "{...}", preview }));
+    const apply = vi.spyOn(apiClient, "applyAiRun").mockImplementation(async () => {
       state = baseState();
-      return state.story as Story;
+      return { run: aiRun({ channel: "manual", status: "applied" }), state: story() };
     });
     await ready();
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chưa có câu chuyện");
     expect(screen.getByTestId("story-approve")).toBeDisabled();
     fireEvent.click(screen.getByTestId("story-generate"));
-    await waitFor(() => expect(gen).toHaveBeenCalledWith("p1", "", expect.anything()));
+    expect(await screen.findByTestId("story-run-dialog")).toHaveTextContent("Ô bạn tự viết được giữ nguyên");
+    fireEvent.click(await screen.findByTestId("story-run-dialog-run-more"));
+    fireEvent.click(screen.getByTestId("story-run-dialog-run-manual"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: GENERATE_PATH, body: JSON.stringify({ note: "" }) }),
+        channel: "manual",
+      }),
+    );
+    expect(await screen.findByTestId("story-run-dialog-prompt")).toHaveTextContent("PROMPT STORY");
+    fireEvent.click(screen.getByTestId("story-run-dialog-tab-reply"));
+    fireEvent.change(screen.getByTestId("story-run-dialog-reply"), { target: { value: "{...}" } });
+    fireEvent.click(screen.getByTestId("story-run-dialog-read"));
+    await waitFor(() => expect(reply).toHaveBeenCalledWith("authoring", "p1", "r1", "{...}"));
+    const shown = await screen.findByTestId("ai-run-preview");
+    expect(shown).toHaveTextContent("Câu hỏi mới?");
+    expect(shown).toHaveTextContent("Mở đầu mới.");
+    expect(apply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("story-run-dialog-apply"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("authoring", "p1", "r1"));
     await waitFor(() => expect(screen.getByTestId("story-field-central_question")).toHaveTextContent("Vì sao ong chết trong quả sung?"));
-    expect(screen.queryByTestId("story-generate")).not.toBeInTheDocument();
   });
 
   it("edits the core answer by hand in a dialog and saves only its text", async () => {
@@ -259,13 +322,19 @@ describe("StoryStepPage", () => {
   });
 
   it("has the AI redo the whole story with the Creator's note", async () => {
-    const gen = vi.spyOn(apiClient, "generateStory").mockResolvedValue(story());
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ body: '{"note":"ngắn hơn"}' }));
     await ready();
     fireEvent.click(screen.getByTestId("story-redo-all"));
-    fireEvent.change(await screen.findByTestId("story-redo-all-dialog-note"), { target: { value: "ngắn hơn" } });
-    await waitFor(() => expect(screen.getByTestId("story-redo-all-dialog-send")).not.toBeDisabled());
-    fireEvent.click(screen.getByTestId("story-redo-all-dialog-send"));
-    await waitFor(() => expect(gen).toHaveBeenCalledWith("p1", "ngắn hơn", expect.anything()));
+    fireEvent.change(await screen.findByTestId("story-run-dialog-note"), { target: { value: " ngắn hơn " } });
+    fireEvent.click(screen.getByTestId("story-run-dialog-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: GENERATE_PATH, body: JSON.stringify({ note: "ngắn hơn" }) }),
+        channel: "api",
+      }),
+    );
+    expect(await screen.findByTestId("story-run-dialog-status")).toHaveTextContent("Đang gọi API");
   });
 
   it("approves the story, then lets the Creator take the approval back and move on", async () => {
@@ -294,12 +363,20 @@ describe("StoryStepPage", () => {
     expect(await screen.findByTestId("story-error")).toHaveTextContent("còn trống Mạch kể");
   });
 
-  it("shows why an AI run failed", async () => {
+  it("shows why an AI run failed to start", async () => {
     state = baseState({ story: null });
-    vi.spyOn(apiClient, "generateStory").mockRejectedValue(new apiClient.ApiError("câu trả lời của AI không dùng được làm câu chuyện"));
+    vi.spyOn(apiClient, "startAiRun").mockRejectedValue(new apiClient.ApiError("bước Câu chuyện chưa sẵn sàng"));
     await ready();
     fireEvent.click(screen.getByTestId("story-generate"));
-    expect(await screen.findByTestId("story-error")).toHaveTextContent("không dùng được làm câu chuyện");
+    fireEvent.click(await screen.findByTestId("story-run-dialog-run"));
+    expect(await screen.findByTestId("story-run-dialog-error")).toHaveTextContent("chưa sẵn sàng");
+  });
+
+  it("shows the open run as a pill next to the button", async () => {
+    vi.mocked(apiClient.listAiRuns).mockResolvedValue([aiRun({ status: "ready", preview: {} })]);
+    await ready();
+    fireEvent.click(await screen.findByTestId("story-ai-run"));
+    expect(await screen.findByTestId("story-run-dialog")).toBeInTheDocument();
   });
 
   it("keeps the approval at the foot of the story card", async () => {
@@ -308,16 +385,5 @@ describe("StoryStepPage", () => {
     expect(card).toContainElement(screen.getByTestId("story-approve"));
     expect(card).toContainElement(screen.getByTestId("story-input-open"));
     expect(screen.queryByTestId("story-approve-card")).not.toBeInTheDocument();
-  });
-
-  it("picks the engine that writes the story and opens the outside-AI dialog from it", async () => {
-    state = baseState({ story: null });
-    await ready();
-    expect(screen.getByTestId("story-engine-system")).toHaveAttribute("aria-checked", "true");
-    expect(screen.queryByTestId("story-engine-deepseek")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("story-engine-outside"));
-    expect(screen.getByTestId("story-engine-outside")).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(screen.getByTestId("story-generate"));
-    expect(await screen.findByTestId("story-generate-external-dialog")).toBeInTheDocument();
   });
 });

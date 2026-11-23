@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { generateStory, type StoryFieldKey, type StoryPatch, type StoryState } from "../../api/client";
-import { useQueuedExternalRun } from "../../hooks/useQueuedExternalRun";
+import { describeAiRequest, generateStory, type StoryFieldKey, type StoryPatch, type StoryState } from "../../api/client";
 import type { StoryControls } from "../../hooks/useStory";
-import { AiBridgeRunStatus } from "../AiBridgeRunStatus";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiDialog } from "../ExternalAiDialog";
 import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
 import unitStyles from "../units/units.module.css";
@@ -13,6 +11,7 @@ import { UnitStatusChip } from "../units/UnitStatusChip";
 import { FactTags } from "./FactTags";
 import { StoryArcEditModal } from "./StoryArcEditModal";
 import { StoryInputModal } from "./StoryInputModal";
+import { StoryRunPreview } from "./StoryRunPreview";
 import { StoryTextEditModal } from "./StoryTextEditModal";
 import styles from "./story.module.css";
 
@@ -24,17 +23,7 @@ interface StoryCardProps {
   aiAvailable: boolean;
   /** The step cannot be changed now (the project is past editing). */
   locked: boolean;
-  /** Opens "Làm lại kèm ghi chú" for the whole story. */
-  onRedo: () => void;
 }
-
-type Engine = "system" | "queue" | "outside";
-
-const ENGINES: { id: Engine; label: string }[] = [
-  { id: "system", label: "AI hệ thống" },
-  { id: "queue", label: "Hàng đợi AI" },
-  { id: "outside", label: "AI ngoài" },
-];
 
 const LABELS: Record<StoryFieldKey, string> = {
   central_question: "Câu hỏi trung tâm",
@@ -59,29 +48,15 @@ function Mine({ field, owned }: { field: StoryFieldKey; owned: boolean }) {
  * kept by the AI. With no story yet the bar writes it on the engine picked
  * beside it; with one, "Làm lại kèm ghi chú" opens the redo dialog.
  */
-export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo }: StoryCardProps) {
+export function StoryCard({ projectId, story, state, aiAvailable, locked }: StoryCardProps) {
   const [editing, setEditing] = useState<"central_question" | "core_answer" | "narrative_arc" | null>(null);
   const [inputOpen, setInputOpen] = useState(false);
   const [inputLoading, setInputLoading] = useState(false);
-  const [outside, setOutside] = useState(false);
-  // An answer the step could not read, shown in the outside-AI dialog for the Creator to fix.
-  const [unreadable, setUnreadable] = useState<{ reply: string; message: string } | null>(null);
-  const queued = useQueuedExternalRun({
-    label: "Viết câu chuyện",
-    run: (external) => generateStory(projectId, "", { external }),
-    onDone: story.reload,
-    onUnreadable: (reply, message) => {
-      setUnreadable({ reply, message });
-      setOutside(true);
-    },
-  });
-  const [pickedEngine, setPickedEngine] = useState<Engine | null>(null);
-  const engineAvailable: Record<Engine, boolean> = { system: aiAvailable, queue: queued.available, outside: true };
-  // The Creator's pick, or the first engine that can run when that one cannot.
-  const engine: Engine = pickedEngine && engineAvailable[pickedEngine] ? pickedEngine : (ENGINES.find((e) => engineAvailable[e.id])?.id ?? "outside");
+  const [runOpen, setRunOpen] = useState(false);
+  const runPath = `/v1/projects/${projectId}/story/generate`;
   const s = state.story;
   const open = state.briefApproved && state.researchResolved;
-  const busy = locked || story.busy || story.writing || queued.busy;
+  const busy = locked || story.busy || story.writing;
   const owns = (key: StoryFieldKey) => s?.creatorFields.includes(key) ?? false;
   const approved = s?.status === "approved";
 
@@ -100,15 +75,6 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
     setInputOpen(true);
     setInputLoading(true);
     void story.reload().finally(() => setInputLoading(false));
-  }
-
-  function generate() {
-    if (engine === "system") void story.generate("");
-    else if (engine === "queue") void queued.start();
-    else {
-      setUnreadable(null);
-      setOutside(true);
-    }
   }
 
   const factsText = state.researchSkipped ? "bước Nghiên cứu đã bỏ qua, không có dữ kiện" : `${state.facts.length} dữ kiện đang giữ`;
@@ -207,51 +173,13 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
         )}
         {open && !approved && (
           <div className={styles.engineBar}>
-            {s ? (
-              <Button variant="ghost" onClick={onRedo} disabled={busy} data-testid="story-redo-all">
-                Làm lại kèm ghi chú
-              </Button>
-            ) : (
-              <>
-                <span className={researchStyles.hint} id="story-engine-label">
-                  Sinh bằng
-                </span>
-                <div className={styles.seg} role="radiogroup" aria-labelledby="story-engine-label">
-                  {ENGINES.filter((e) => e.id !== "queue" || queued.available).map((e) => (
-                    <button
-                      key={e.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={engine === e.id}
-                      className={engine === e.id ? `${styles.segItem} ${styles.segOn}` : styles.segItem}
-                      onClick={() => setPickedEngine(e.id)}
-                      disabled={busy || !engineAvailable[e.id]}
-                      title={engineAvailable[e.id] ? undefined : "Chưa cấu hình AI"}
-                      data-testid={`story-engine-${e.id}`}
-                    >
-                      {e.label}
-                    </button>
-                  ))}
-                </div>
-                {engine === "system" && !locked && (
-                  <AiModelSelect projectId={projectId} step="story_frame" label="Model AI cho bước Câu chuyện" testId="story-model" />
-                )}
-                <span className={researchStyles.grow} />
-                {queued.busy ? (
-                  <AiBridgeRunStatus item={queued.item} ahead={queued.ahead} onCancel={queued.cancel} testId="story-generate-queue" />
-                ) : (
-                  <Button variant="run" onClick={generate} disabled={busy} data-testid="story-generate">
-                    Viết câu chuyện
-                  </Button>
-                )}
-              </>
-            )}
+            {!locked && <AiModelSelect projectId={projectId} step="story_frame" label="Model AI cho bước Câu chuyện" testId="story-model" />}
+            <span className={researchStyles.grow} />
+            <AiRunPill runPath={runPath} onOpen={() => setRunOpen(true)} testId="story-ai-run" />
+            <Button variant="run" onClick={() => setRunOpen(true)} disabled={busy || !aiAvailable} title={aiAvailable ? undefined : "Chưa cấu hình AI"} data-testid={s ? "story-redo-all" : "story-generate"}>
+              {s ? "Làm lại kèm ghi chú" : "Viết câu chuyện"}
+            </Button>
           </div>
-        )}
-        {queued.error && (
-          <p className={researchStyles.error} role="alert" data-testid="story-generate-queue-error">
-            {queued.error}
-          </p>
         )}
         {story.actionError && (
           <p className={researchStyles.error} role="alert" data-testid="story-error">
@@ -282,15 +210,21 @@ export function StoryCard({ projectId, story, state, aiAvailable, locked, onRedo
         facts={state.facts}
         researchSkipped={state.researchSkipped}
       />
-      <ExternalAiDialog
-        open={outside}
-        onClose={() => setOutside(false)}
-        title="Câu chuyện · AI ngoài"
-        run={(external) => generateStory(projectId, "", { external })}
-        onDone={story.reload}
-        initialReply={unreadable?.reply}
-        initialError={unreadable?.message}
-        testId="story-generate-external-dialog"
+      <AiRunDialog
+        open={runOpen}
+        onClose={() => setRunOpen(false)}
+        title={s ? "Làm lại kèm ghi chú · Câu chuyện" : "Viết câu chuyện"}
+        runPath={runPath}
+        describe={(note) => describeAiRequest((external) => generateStory(projectId, note, { external }))}
+        renderPreview={(p) => <StoryRunPreview preview={p} />}
+        impact={
+          <p className={researchStyles.hint}>
+            AI viết lại câu hỏi, câu trả lời và mạch kể từ brief và dữ kiện đã duyệt. Ô bạn tự viết được giữ nguyên. Áp dụng
+            sẽ đưa câu chuyện về “Chờ duyệt”.
+          </p>
+        }
+        onApplied={story.reload}
+        testId="story-run-dialog"
       />
 
       <StoryTextEditModal

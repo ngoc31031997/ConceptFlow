@@ -1,14 +1,13 @@
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { generateStory, type StoryState } from "../api/client";
-import { AiModelSelect } from "../components/AiModelSelect";
+import type { StoryState } from "../api/client";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import type { StepStripProps } from "../components/StepStrip";
 import { StoryCard } from "../components/story/StoryCard";
 import researchStyles from "../components/research/research.module.css";
 import { Button } from "../components/ui";
-import { UnitRedoModal } from "../components/units/UnitRedoModal";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useLlmStatus } from "../hooks/useLlmStatus";
@@ -63,7 +62,6 @@ export function StoryStepPage() {
   const llm = useLlmStatus();
   const projectId = params.id ?? draft.projectId;
   const story = useStory(projectId, !!projectId);
-  const [redoOpen, setRedoOpen] = useState(false);
 
   if (!projectId) return <Navigate to="/" replace />;
 
@@ -73,9 +71,9 @@ export function StoryStepPage() {
 
   function content(s: StoryState) {
     return (
-      <>
-        <StoryCard projectId={projectId} story={story} state={s} aiAvailable={aiAvailable} locked={locked} onRedo={() => setRedoOpen(true)} />
-      </>
+      <AiRunsProvider projectId={projectId} step="story" service="authoring">
+        <StoryCard projectId={projectId} story={story} state={s} aiAvailable={aiAvailable} locked={locked} />
+      </AiRunsProvider>
     );
   }
 
@@ -126,21 +124,6 @@ export function StoryStepPage() {
         nextDisabled={state?.status !== "approved"}
         nextLabel="Lưu và sang beat sheet"
         nextTestId="story-next"
-      />
-
-      <UnitRedoModal
-        open={redoOpen}
-        onClose={() => setRedoOpen(false)}
-        title="Làm lại kèm ghi chú · Câu chuyện"
-        impact={{ items: [], failed: false }}
-        initialNote={story.failedNote}
-        modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="story_frame" label="Model AI cho bước Câu chuyện" testId="story-redo-all-model" /> : undefined}
-        onSend={aiAvailable ? (note) => void story.generate(note) : undefined}
-        external={{
-          run: (note, external) => generateStory(projectId, note, { external }),
-          onDone: story.reload,
-        }}
-        testId="story-redo-all-dialog"
       />
     </div>
   );
