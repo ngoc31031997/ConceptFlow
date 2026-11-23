@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { generateProjectBrief, reviewProjectBrief, type IdeaAspect, type IdeaRating, type ProjectBriefField } from "../../api/client";
+import { describeAiRequest, generateProjectBrief, reviewProjectBrief, type IdeaAspect, type IdeaRating, type ProjectBriefField } from "../../api/client";
 import type { ProjectBriefControls } from "../../hooks/useProjectBrief";
 import { formatClock } from "../../utils/clockDuration";
 import { AiModelSelect } from "../AiModelSelect";
-import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiButton } from "../ExternalAiButton";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import { Button, Card } from "../ui";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import { UnitStatusChip } from "../units/UnitStatusChip";
@@ -13,7 +12,7 @@ import cardStyles from "../CreativeBriefCard.module.css";
 import styles from "../idea/ProjectIdeaCard.module.css";
 import { BriefEditModal } from "./BriefEditModal";
 import { BriefInputModal } from "./BriefInputModal";
-import { BriefRedoModal } from "./BriefRedoModal";
+import { BriefRunPreview } from "./BriefRunPreview";
 
 const FIELD_LABELS: Record<ProjectBriefField, string> = {
   audience: "Khán giả",
@@ -75,7 +74,8 @@ export function ProjectBriefCard({
   aiAvailable,
 }: ProjectBriefCardProps) {
   const [editOpen, setEditOpen] = useState(false);
-  const [redoOpen, setRedoOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [inputOpen, setInputOpen] = useState(false);
 
   const screen = brief.screen;
@@ -95,12 +95,12 @@ export function ProjectBriefCard({
     if (stored.learningObjectives.length === 0) missing.push("learning_objectives");
     if (stored.avoid.length === 0) missing.push("avoid");
   }
-  const working = brief.writing || brief.reviewing;
   const cannotApprove = missing.length > 0 || outOfRange;
 
-  const chip = brief.writing ? (
-    <UnitStatusChip state="running" testId="brief-status" />
-  ) : stored ? (
+  const generatePath = `/v1/projects/${projectId}/creative-brief/generate`;
+  const reviewPath = `/v1/projects/${projectId}/creative-brief/review`;
+
+  const chip = stored ? (
     <UnitStatusChip state={stored.status} testId="brief-status" />
   ) : null;
 
@@ -181,23 +181,15 @@ export function ProjectBriefCard({
         <div className={styles.reviewHead}>
           <h4>Đánh giá của AI</h4>
           <div className={cardStyles.actions}>
-            <ExternalAiButton
-              title="Đánh giá brief · AI ngoài"
-              run={(external) => reviewProjectBrief(projectId, { external })}
-              onDone={brief.reload}
-              disabled={working || brief.busy || cannotApprove}
-              testId="brief-review-external"
-            />
-            {aiAvailable && (
-              <Button
-                variant="run"
-                onClick={() => void brief.review()}
-                disabled={working || brief.busy || cannotApprove}
-                data-testid="brief-review-run"
-              >
-                {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
-              </Button>
-            )}
+            <Button
+              variant="run"
+              onClick={() => setReviewOpen(true)}
+              disabled={brief.busy || cannotApprove}
+              data-testid="brief-review-run"
+            >
+              {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
+            </Button>
+            <AiRunPill runPath={reviewPath} onOpen={() => setReviewOpen(true)} testId="brief-review-ai-run" />
           </div>
         </div>
         {!review && (
@@ -241,12 +233,6 @@ export function ProjectBriefCard({
             )}
           </>
         )}
-        <AiOperationCard
-          run={brief.reviewRun}
-          active={brief.reviewing}
-          testId="brief-review-progress"
-          title="AI đang đọc brief"
-        />
       </div>
     );
   }
@@ -277,7 +263,6 @@ export function ProjectBriefCard({
       );
     }
     if (!stored) {
-      if (brief.writing) return null;
       return (
         <>
           <p className={cardStyles.hint} data-testid="brief-none">
@@ -299,23 +284,15 @@ export function ProjectBriefCard({
             <Button variant="ghost" onClick={() => setEditOpen(true)} data-testid="brief-write-own">
               Tự viết brief
             </Button>
-            <ExternalAiButton
-              title="Creative brief · AI ngoài"
-              run={(external) => generateProjectBrief(projectId, "", { external })}
-              onDone={brief.reload}
+            <Button
+              variant="run"
+              onClick={() => setGenerateOpen(true)}
               disabled={!ideaApproved}
-              testId="brief-generate-external"
-            />
-            {aiAvailable && (
-              <Button
-                variant="run"
-                onClick={() => void brief.generate()}
-                disabled={!ideaApproved}
-                data-testid="brief-generate"
-              >
-                AI viết brief
-              </Button>
-            )}
+              data-testid="brief-generate"
+            >
+              AI viết brief
+            </Button>
+            <AiRunPill runPath={generatePath} onOpen={() => setGenerateOpen(true)} testId="brief-generate-ai-run" />
           </div>
         </>
       );
@@ -354,14 +331,15 @@ export function ProjectBriefCard({
           status={stored.status}
           approveLabel="Duyệt brief"
           approveDisabled={cannotApprove}
-          busy={brief.busy || working}
+          busy={brief.busy}
           canRedo={ideaApproved}
           onEdit={() => setEditOpen(true)}
-          onRedo={() => setRedoOpen(true)}
+          onRedo={() => setGenerateOpen(true)}
           onApprove={() => void brief.approve()}
           onUnapprove={() => void brief.unapprove()}
           testId="brief-actions"
         />
+        <AiRunPill runPath={generatePath} onOpen={() => setGenerateOpen(true)} testId="brief-redo-ai-run" />
       </>
     );
   }
@@ -385,12 +363,6 @@ export function ProjectBriefCard({
           {chip}
         </div>
         {body()}
-        <AiOperationCard
-          run={brief.writeRun}
-          active={brief.writing}
-          testId="brief-progress"
-          title="AI đang viết brief"
-        />
         {brief.actionError && (
           <p className={cardStyles.error} role="alert" data-testid="brief-error">
             {brief.actionError}
@@ -407,26 +379,39 @@ export function ProjectBriefCard({
         onSave={brief.edit}
       />
       <BriefInputModal open={inputOpen} onClose={() => setInputOpen(false)} idea={brief.screen?.idea ?? null} />
-      <BriefRedoModal
-        open={redoOpen}
-        onClose={() => setRedoOpen(false)}
-        approved={stored?.status === "approved"}
-        initialNote={brief.failedNote}
-        modelSelect={
-          aiAvailable ? (
-            <AiModelSelect
-              projectId={projectId}
-              step="brief"
-              label="Model AI viết brief"
-              testId="brief-redo-model"
-            />
-          ) : undefined
+      <AiRunDialog
+        open={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        title={stored ? "Làm lại kèm ghi chú · Creative brief" : "AI viết Creative brief"}
+        runPath={generatePath}
+        describe={(note) => describeAiRequest((external) => generateProjectBrief(projectId, note, { external }))}
+        noNote={!stored}
+        renderPreview={(p) => <BriefRunPreview kind="brief" preview={p} />}
+        impact={
+          <p className={unitStyles.note}>
+            AI viết lại các ô bạn chưa sửa; ô “Bạn viết” giữ nguyên.
+            {stored?.status === "approved" ? " Creative brief đang được duyệt sẽ về chờ duyệt." : ""}
+          </p>
         }
-        onSend={aiAvailable ? (note) => void brief.generate(note) : undefined}
-        external={{
-          run: (note, external) => generateProjectBrief(projectId, note, { external }),
-          onDone: brief.reload,
-        }}
+        onApplied={brief.reload}
+        testId="brief-generate-dialog"
+      />
+      <AiRunDialog
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        title="Đánh giá Creative brief"
+        runPath={reviewPath}
+        describe={() => describeAiRequest((external) => reviewProjectBrief(projectId, { external }))}
+        noNote
+        renderPreview={(p) => <BriefRunPreview kind="review" preview={p} />}
+        impact={
+          <p className={unitStyles.note}>
+            AI đọc brief về khán giả, thời lượng, mục tiêu học tập và điều cần tránh. Đánh giá chỉ để
+            bạn tham khảo, không đổi brief.
+          </p>
+        }
+        onApplied={brief.reload}
+        testId="brief-review-dialog"
       />
     </Card>
   );

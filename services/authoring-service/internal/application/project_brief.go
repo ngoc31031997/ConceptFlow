@@ -219,6 +219,9 @@ func (uc *ProjectBriefUseCase) Generate(ctx context.Context, projectID, note str
 	if err := written.Validate(mode); err != nil {
 		return domain.StoredBrief{}, fmt.Errorf("%w: %v", domain.ErrProjectBriefReplyUnusable, err)
 	}
+	if err := stopForPreview(ctx, written); err != nil {
+		return domain.StoredBrief{}, err
+	}
 
 	if exists {
 		current.RedoCount++
@@ -489,6 +492,9 @@ func (uc *ProjectBriefUseCase) Review(ctx context.Context, projectID string) (do
 	}
 	review.BriefHash = stored.Brief.Hash()
 	review.CreatedAt = uc.now()
+	if err := stopForPreview(ctx, review); err != nil {
+		return domain.BriefReview{}, err
+	}
 	if err := uc.store.SaveBriefReview(ctx, projectID, review); err != nil {
 		return domain.BriefReview{}, err
 	}

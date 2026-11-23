@@ -9,6 +9,36 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { BriefReview, BriefScreen, ProjectBrief } from "../../src/api/client";
 
+vi.mock("../../src/hooks/useAiQueue", () => ({
+  useAiQueue: () => ({
+    available: true,
+    outdated: false,
+    counts: { waiting: 0, running: 0, done: 0, failed: 0, paused: false },
+    add: vi.fn(),
+    items: {},
+  }),
+}));
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p",
+    label: "Creative brief",
+    method: "POST",
+    path: "/v1/projects/p/creative-brief/generate",
+    body: '{"note":""}',
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT BRIEF",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
+
 const BRIEF: ProjectBrief = {
   audience: "Khán giả phổ thông từ cấp 2 trở lên.",
   durationSeconds: 270,
@@ -49,8 +79,8 @@ function screenOf(overrides: Partial<BriefScreen> = {}): BriefScreen {
 
 let briefScreen: BriefScreen;
 let patchSettings: MockInstance<typeof apiClient.patchWizardSettings>;
-let generate: MockInstance<typeof apiClient.generateProjectBrief>;
-let review: MockInstance<typeof apiClient.reviewProjectBrief>;
+let startRun: MockInstance<typeof apiClient.startAiRun>;
+let applyRun: MockInstance<typeof apiClient.applyAiRun>;
 let approve: MockInstance<typeof apiClient.approveProjectBrief>;
 let edit: MockInstance<typeof apiClient.editProjectBrief>;
 
@@ -65,14 +95,14 @@ beforeEach(() => {
   vi.spyOn(apiClient, "fetchVideoFormats").mockResolvedValue([]);
   vi.spyOn(apiClient, "getBriefScreen").mockImplementation(async () => briefScreen);
   patchSettings = vi.spyOn(apiClient, "patchWizardSettings").mockResolvedValue(undefined);
-  generate = vi.spyOn(apiClient, "generateProjectBrief").mockImplementation(async () => {
-    briefScreen = { ...briefScreen, brief: BRIEF };
-    return BRIEF;
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { brief: "api" },
   });
-  review = vi.spyOn(apiClient, "reviewProjectBrief").mockImplementation(async () => {
-    briefScreen = { ...briefScreen, review: REVIEW };
-    return REVIEW;
-  });
+  startRun = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
+  applyRun = vi.spyOn(apiClient, "applyAiRun");
   approve = vi.spyOn(apiClient, "approveProjectBrief").mockImplementation(async () => {
     briefScreen = { ...briefScreen, brief: { ...(briefScreen.brief ?? BRIEF), status: "approved" } };
     return briefScreen.brief as ProjectBrief;
@@ -136,25 +166,71 @@ describe("CreativeBriefStepPage (Bước 2 — Creative brief)", () => {
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Duyệt ý tưởng ở bước 1 trước");
   });
 
-  it("AI viết brief; brief chờ duyệt, có đủ năm ô, đánh giá chỉ chạy khi Creator nhờ", async () => {
+  it("AI viết brief qua lượt chạy: xem trước rồi áp dụng; đánh giá chỉ chạy khi Creator nhờ", async () => {
+    startRun.mockResolvedValueOnce(aiRun({ status: "ready", preview: { audience: BRIEF.audience, duration_seconds: 270, tone: BRIEF.tone, learning_objectives: BRIEF.learningObjectives, avoid: BRIEF.avoid } }));
+    applyRun.mockImplementationOnce(async () => {
+      briefScreen = { ...briefScreen, brief: BRIEF };
+      return { run: aiRun({ status: "applied" }), state: null };
+    });
     renderPage();
     fireEvent.click(await screen.findByTestId("brief-generate"));
+    fireEvent.click(await screen.findByTestId("brief-generate-dialog-run"));
+    await waitFor(() =>
+      expect(startRun).toHaveBeenCalledWith("authoring", "p", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: "/v1/projects/p/creative-brief/generate", body: JSON.stringify({ note: "" }) }),
+        channel: "api",
+      }),
+    );
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Khán giả phổ thông");
+    expect(applyRun).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("brief-generate-dialog-apply"));
     await screen.findByTestId("brief-field-audience");
-    expect(generate).toHaveBeenCalledTimes(1);
-    expect(review).not.toHaveBeenCalled();
+    expect(applyRun).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("brief-review-none")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("brief-review-run"));
-    await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("brief-field-audience")).toHaveTextContent("Khán giả phổ thông");
     expect(screen.getByTestId("brief-field-duration_seconds")).toHaveTextContent("4:30");
     expect(screen.getByTestId("brief-field-duration_seconds")).toHaveTextContent("270 giây");
     expect(screen.getByTestId("brief-field-tone")).toHaveTextContent("Tò mò");
     expect(screen.getByTestId("brief-field-learning_objectives")).toHaveTextContent("Hiểu lực thủy triều");
     expect(screen.getByTestId("brief-field-avoid")).toHaveTextContent("lớp vỏ cứng");
     expect(screen.getByTestId("brief-status")).toHaveTextContent("Chờ duyệt");
-    expect(await screen.findByTestId("brief-review-panel")).toHaveTextContent("Thiếu cảnh báo.");
-    expect(screen.getByTestId("brief-review-suggestions")).toHaveTextContent("kích thước hố đen");
     expect(screen.getByTestId("creative-brief-next")).toBeDisabled();
+  });
+
+  it("đánh giá brief qua lượt chạy không ghi chú: xem trước rồi áp dụng", async () => {
+    briefScreen = screenOf({ brief: BRIEF });
+    startRun.mockResolvedValueOnce(
+      aiRun({
+        path: "/v1/projects/p/creative-brief/review",
+        body: "",
+        status: "ready",
+        preview: {
+          audience_fit: { rating: "good", comment: "Khán giả rõ." },
+          duration_fit: { rating: "fair", comment: "Hơi dài." },
+          objectives: { rating: "good", comment: "Cụ thể." },
+          avoid_list: { rating: "weak", comment: "Thiếu cảnh báo." },
+          unclear: [],
+          suggestions: ["Thêm một dòng về kích thước hố đen."],
+        },
+      }),
+    );
+    applyRun.mockImplementationOnce(async () => {
+      briefScreen = { ...briefScreen, review: REVIEW };
+      return { run: aiRun({ status: "applied" }), state: null };
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("brief-review-run"));
+    expect(screen.queryByTestId("brief-review-dialog-note")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("brief-review-dialog-run"));
+    await waitFor(() =>
+      expect(startRun).toHaveBeenCalledWith("authoring", "p", expect.objectContaining({
+        request: expect.objectContaining({ method: "POST", path: "/v1/projects/p/creative-brief/review" }),
+      })),
+    );
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Thiếu cảnh báo.");
+    fireEvent.click(screen.getByTestId("brief-review-dialog-apply"));
+    await waitFor(() => expect(screen.getByTestId("brief-review-panel")).toHaveTextContent("Thiếu cảnh báo."));
+    expect(screen.getByTestId("brief-review-suggestions")).toHaveTextContent("kích thước hố đen");
   });
 
   it("ô Creator đã viết hiện nhãn Bạn viết", async () => {
@@ -212,20 +288,38 @@ describe("CreativeBriefStepPage (Bước 2 — Creative brief)", () => {
     expect(edit).not.toHaveBeenCalled();
   });
 
-  it("làm lại kèm ghi chú gửi ghi chú cho AI", async () => {
+  it("làm lại kèm ghi chú gửi ghi chú cho AI trên kênh của bước", async () => {
     briefScreen = screenOf({ brief: BRIEF });
     renderPage();
     fireEvent.click(await screen.findByTestId("brief-actions-redo"));
-    fireEvent.change(await screen.findByTestId("brief-redo-note"), { target: { value: "ngắn hơn" } });
-    fireEvent.click(screen.getByTestId("brief-redo-send"));
-    await waitFor(() => expect(generate).toHaveBeenCalledWith("p", "ngắn hơn", expect.anything()));
+    fireEvent.change(await screen.findByTestId("brief-generate-dialog-note"), { target: { value: " ngắn hơn " } });
+    fireEvent.click(screen.getByTestId("brief-generate-dialog-run"));
+    await waitFor(() =>
+      expect(startRun).toHaveBeenCalledWith("authoring", "p", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: "/v1/projects/p/creative-brief/generate", body: JSON.stringify({ note: "ngắn hơn" }) }),
+        channel: "api",
+      }),
+    );
+  });
+
+  it("lượt chạy còn mở hiện ở nút của nó và mở lại được", async () => {
+    briefScreen = screenOf({ brief: BRIEF });
+    vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([
+      aiRun({ status: "unreadable", reply: "lỗi", error: "Không đọc được JSON" }),
+    ]);
+    renderPage();
+    const pill = await screen.findByTestId("brief-redo-ai-run");
+    expect(pill).toHaveTextContent("Câu trả lời chưa dùng được");
+    fireEvent.click(pill);
+    expect(await screen.findByTestId("brief-generate-dialog-error")).toHaveTextContent("Không đọc được JSON");
   });
 
   it("ý tưởng đã đổi sau khi viết brief thì báo và để Creator quyết", async () => {
     briefScreen = screenOf({ brief: BRIEF, ideaChanged: true });
     renderPage();
     expect(await screen.findByTestId("brief-idea-changed")).toHaveTextContent("đã đổi");
-    expect(generate).not.toHaveBeenCalled();
+    expect(startRun).not.toHaveBeenCalled();
   });
 
   it("đánh giá cũ thì báo cần đánh giá lại", async () => {

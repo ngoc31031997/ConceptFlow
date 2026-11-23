@@ -80,3 +80,7 @@ Viết và đánh giá chạy trên model Creator chọn cho khoá `brief` (`PUT
 | `409` | Project không còn là bản nháp, hoặc ý tưởng ở bước 1 chưa duyệt |
 | `502` | Câu trả lời của AI không đọc được, thiếu trường hoặc thời lượng ngoài khoảng; không lưu gì |
 | `503` | Chưa cấu hình AI (Creator tự viết brief) |
+
+## Lượt chạy AI (ADR-0052)
+
+Hai lượt AI của bước chạy qua lượt chạy có xem trước của authoring-service, `/v1/projects/{id}/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md), khoá kênh `brief`. Điểm dừng xem trước của từng lượt: `POST /creative-brief/generate` (viết và làm lại kèm ghi chú) → brief sẽ lưu `{audience, duration_seconds, tone, learning_objectives, avoid}`, đã ghép với ô Creator tự viết; `POST /creative-brief/review` → đánh giá sẽ lưu `{audience_fit, duration_fit, objectives, avoid_list, unclear, suggestions, brief_hash, created_at}`. Cả hai dừng sau khi câu trả lời được đọc và kiểm, trước mọi lần ghi.

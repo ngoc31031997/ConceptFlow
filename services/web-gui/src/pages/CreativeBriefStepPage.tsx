@@ -1,5 +1,6 @@
 import { useContext, useState, type HTMLAttributes } from "react";
 import { useNavigate } from "react-router-dom";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import { ProjectBriefCard } from "../components/brief/ProjectBriefCard";
 import { SelectableOption } from "../components/SelectableOption";
@@ -78,7 +79,7 @@ export function CreativeBriefStepPage({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const choicesLocked = readOnly || !created || brief.writing || brief.screen === null;
+  const choicesLocked = readOnly || !created || brief.screen === null;
 
   async function save(action: () => Promise<void>) {
     setSaveError(null);
@@ -127,7 +128,6 @@ export function CreativeBriefStepPage({
 
   function strip(): StepStripProps | undefined {
     if (readOnly) return undefined;
-    if (brief.writing) return { tone: "run", label: "AI đang viết brief", message: "Ô bạn đã sửa giữ nguyên." };
     if (!stored && !approvedIdea) {
       return { tone: "todo", label: "Chưa có brief", message: "Duyệt ý tưởng ở bước 1 trước: brief được viết từ ý tưởng đã duyệt." };
     }
@@ -190,7 +190,9 @@ export function CreativeBriefStepPage({
             )}
           </Card>
 
-          <ProjectBriefCard projectId={draft.projectId} created={created} brief={brief} aiAvailable={aiAvailable} />
+          <AiRunsProvider projectId={draft.projectId} step="brief" service="authoring">
+            <ProjectBriefCard projectId={draft.projectId} created={created} brief={brief} aiAvailable={aiAvailable} />
+          </AiRunsProvider>
         </div>
         {readOnly && (
           <Button variant="ghost" onClick={onBack} data-testid="brief-read-only-back">
