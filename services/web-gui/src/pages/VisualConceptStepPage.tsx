@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { VisualConceptState, VisualConceptUnitKey } from "../api/client";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import lockStyles from "../components/lock/lock.module.css";
 import researchStyles from "../components/research/research.module.css";
@@ -148,70 +149,72 @@ export function VisualConceptStepPage() {
           </p>
         )}
         {state && !concept.notOpen && (
-          <div className={researchStyles.body}>
-            <VisualHeadCard
-              projectId={projectId}
-              state={state}
-              concept={concept}
-              readOnly={readOnly}
-            />
-            <div className={lockStyles.tabs} role="tablist">
-              <button
-                type="button"
-                role="tab"
-                className={lockStyles.tab}
-                aria-selected={tab === "rules"}
-                onClick={() => setTab("rules")}
-                data-testid="concept-tab-rules"
-              >
-                Quy tắc hình ảnh
-                <span className={lockStyles.tabCount}>
-                  {state.approved_count}/{state.units.length}
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                className={lockStyles.tab}
-                aria-selected={tab === "review"}
-                onClick={() => setTab("review")}
-                data-testid="concept-tab-review"
-              >
-                Rà soát và chốt
-                <span className={lockStyles.tabCount}>{state.review.open_count} vấn đề</span>
-              </button>
-            </div>
-            {tab === "rules" && (
-              <>
-                <ReferencePicker state={state} concept={concept} readOnly={readOnly} />
-                {state.units.map((u) => (
-                  <ConceptUnitCard
-                    key={u.key}
-                    projectId={projectId}
-                    unit={u}
-                    concept={concept}
-                    readOnly={readOnly}
-                    forceOpen={opened === u.key}
-                    onFold={() => setOpened(null)}
-                  />
-                ))}
-              </>
-            )}
-            {tab === "review" && (
-              <ConceptReviewTab
+          <AiRunsProvider projectId={projectId} step="visual_concept" service="visual">
+            <div className={researchStyles.body}>
+              <VisualHeadCard
                 projectId={projectId}
                 state={state}
                 concept={concept}
                 readOnly={readOnly}
-                onOpenUnit={openUnit}
               />
-            )}
-            {concept.actionError && (
-              <p className={researchStyles.error} role="alert" data-testid="concept-error">
-                {concept.actionError}
-              </p>
-            )}
-          </div>
+              <div className={lockStyles.tabs} role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  className={lockStyles.tab}
+                  aria-selected={tab === "rules"}
+                  onClick={() => setTab("rules")}
+                  data-testid="concept-tab-rules"
+                >
+                  Quy tắc hình ảnh
+                  <span className={lockStyles.tabCount}>
+                    {state.approved_count}/{state.units.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  className={lockStyles.tab}
+                  aria-selected={tab === "review"}
+                  onClick={() => setTab("review")}
+                  data-testid="concept-tab-review"
+                >
+                  Rà soát và chốt
+                  <span className={lockStyles.tabCount}>{state.review.open_count} vấn đề</span>
+                </button>
+              </div>
+              {tab === "rules" && (
+                <>
+                  <ReferencePicker state={state} concept={concept} readOnly={readOnly} />
+                  {state.units.map((u) => (
+                    <ConceptUnitCard
+                      key={u.key}
+                      projectId={projectId}
+                      unit={u}
+                      concept={concept}
+                      readOnly={readOnly}
+                      forceOpen={opened === u.key}
+                      onFold={() => setOpened(null)}
+                    />
+                  ))}
+                </>
+              )}
+              {tab === "review" && (
+                <ConceptReviewTab
+                  projectId={projectId}
+                  state={state}
+                  concept={concept}
+                  readOnly={readOnly}
+                  onOpenUnit={openUnit}
+                />
+              )}
+              {concept.actionError && (
+                <p className={researchStyles.error} role="alert" data-testid="concept-error">
+                  {concept.actionError}
+                </p>
+              )}
+            </div>
+          </AiRunsProvider>
         )}
       </AppShell>
 

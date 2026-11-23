@@ -93,3 +93,7 @@ Vai prompt `visual_concept_<unit_key>` (8) và `visual_concept_review`, seed ở
 | 404 | phần, vấn đề hay phiên bản không có |
 | 409 | chưa chốt kịch bản (`script_not_locked`), AI đang viết, phần chưa đạt kiểm hoặc chưa viết, chưa đủ điều kiện chốt, không có thay đổi, trùng phiên bản |
 | 502 | câu trả lời AI không dùng được; llm-service hoặc authoring-service lỗi |
+
+## Lượt chạy AI (ADR-0052)
+
+Hai lượt AI một-prompt của bước 8 chạy qua lượt chạy có xem trước của visual-service, `/v1/projects/{id}/visual/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md). Điểm dừng xem trước: `/visual-concept/units/{key}/generate` → `{key, content}` (nội dung phần sau khi giữ trường của Creator và áp luật máy); `/visual-concept/review` → trạng thái rà soát đã gộp với vấn đề cũ `{findings, next_seq, notes, rounds, checks}`. `POST /visual-concept/generate` (viết cả bộ, từng phần đọc phần trước đã lưu) lưu từng phần ngay, không đi qua lượt chạy.

@@ -8,12 +8,10 @@ import {
   approveVisualConceptUnit,
   editVisualConceptUnit,
   generateVisualConcept,
-  generateVisualConceptUnit,
   getVisualConcept,
   isRequestCancelled,
   lockVisualConcept,
   newOperationId,
-  reviewVisualConcept,
   setVisualConceptModel,
   setVisualConceptRefs,
   unapproveVisualConceptUnit,
@@ -21,8 +19,8 @@ import {
   type VisualConceptUnitKey,
 } from "../api/client";
 
-/** What the system's AI is doing now: every empty part, one part, or the review. */
-export type ConceptRunning = "all" | VisualConceptUnitKey | "review" | null;
+/** What the system's AI is doing now: writing the parts of the whole set, or nothing. */
+export type ConceptRunning = "all" | null;
 
 /** What the step 8 screen gets from useVisualConcept. */
 export interface VisualConceptControls {
@@ -39,8 +37,6 @@ export interface VisualConceptControls {
   /** Stops the AI run in flight; the server drops the call when the connection closes. */
   stop: () => void;
   generateAll: (note: string, rewriteAll: boolean) => Promise<boolean>;
-  generateUnit: (key: VisualConceptUnitKey, note: string, findingId?: string) => Promise<boolean>;
-  review: (note: string) => Promise<boolean>;
   /** Saves a hand edit; throws so the form can show why it failed. */
   edit: (key: VisualConceptUnitKey, fields: Record<string, unknown>) => Promise<void>;
   approve: (key: VisualConceptUnitKey) => Promise<boolean>;
@@ -153,9 +149,6 @@ export function useVisualConcept(projectId: string): VisualConceptControls {
     stop: () => abort.current?.abort(),
     generateAll: (note, rewriteAll) =>
       runAi("all", (op) => generateVisualConcept(projectId, note, rewriteAll, op)),
-    generateUnit: (key, note, findingId) =>
-      runAi(key, (op) => generateVisualConceptUnit(projectId, key, note, op, findingId)),
-    review: (note) => runAi("review", (op) => reviewVisualConcept(projectId, note, op)),
     edit: async (key, fields) => {
       loadSeq.current += 1;
       setState(await editVisualConceptUnit(projectId, key, fields));

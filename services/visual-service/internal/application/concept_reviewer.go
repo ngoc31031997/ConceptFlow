@@ -82,7 +82,11 @@ func (d *ConceptDesk) Review(ctx context.Context, projectID, note string) (*Conc
 	if err != nil {
 		return nil, err
 	}
-	if err := d.saveReview(ctx, data, domain.MergeReview(data.review, parsed)); err != nil {
+	merged := domain.MergeReview(data.review, parsed)
+	if err := stopForPreview(ctx, merged); err != nil {
+		return nil, err
+	}
+	if err := d.saveReview(ctx, data, merged); err != nil {
 		return nil, err
 	}
 	return d.State(ctx, projectID)

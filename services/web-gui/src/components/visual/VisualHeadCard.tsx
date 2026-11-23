@@ -7,6 +7,8 @@ import {
   type VisualConceptUnit,
 } from "../../api/client";
 import { useAiQueue } from "../../hooks/useAiQueue";
+import { ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
 import type { VisualConceptControls } from "../../hooks/useVisualConcept";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, CopyBox, Dialog, Dropdown } from "../ui";
@@ -55,13 +57,17 @@ interface VisualHeadCardProps {
 /**
  * The head of step 8: what the AI reads, the colour strip over the beats, the
  * machine checks of the whole concept, the model, and the actions on every part
- * at once (write the empty parts, rewrite all, queue on an outside AI, approve the rest).
+ * at once: one button that writes the empty parts (or rewrites all) on the step's channel
+ * (the API stores each part as it is written, the extension queues one item per part not approved;
+ * each part reads the stored parts before it, so there is no preview and no manual channel), and
+ * approving the rest.
  */
 export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHeadCardProps) {
   const [inputOpen, setInputOpen] = useState(false);
   const [rewriteOpen, setRewriteOpen] = useState(false);
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const ai = useAiRuns();
   const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/visual-concept`)) void concept.reload();
   });
@@ -79,6 +85,10 @@ export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHe
 
   // One queue item per part not approved, in part order, so each is written after the one before it and reads it.
   async function queueAll() {
+    if (notApproved.length === 0) {
+      setQueueNote({ tone: "error", text: "Mọi phần đã duyệt. Bỏ duyệt phần cần viết lại trước khi đưa vào hàng đợi." });
+      return;
+    }
     setQueueing(true);
     setQueueNote(null);
     let added = 0;
@@ -215,11 +225,7 @@ export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHe
         {concept.running && (
           <div className={researchStyles.banner} role="status" data-testid="concept-running">
             <UnitStatusChip state="running" />{" "}
-            {concept.running === "all"
-              ? "AI đang viết các phần, lần lượt từ phần 1. Phần đã duyệt và trường bạn sửa tay giữ nguyên."
-              : concept.running === "review"
-                ? "AI đang rà soát cả bộ quy tắc."
-                : "AI đang viết một phần."}{" "}
+            AI đang viết các phần, lần lượt từ phần 1. Phần đã duyệt và trường bạn sửa tay giữ nguyên.{" "}
             <Button variant="ghost" onClick={concept.stop} data-testid="concept-stop">
               Dừng
             </Button>
@@ -234,35 +240,21 @@ export function VisualHeadCard({ projectId, state, concept, readOnly }: VisualHe
             disabled={disabled}
             data-testid="concept-model"
           />
-          {unwritten.length > 0 ? (
-            <Button
-              variant="run"
-              onClick={() => void concept.generateAll("", false)}
-              disabled={disabled}
-              data-testid="concept-generate"
-            >
-              AI viết {unwritten.length} phần còn trống
-            </Button>
-          ) : (
-            <Button
-              variant={approvedWritten > 0 ? "impact" : "run"}
-              onClick={() => setRewriteOpen(true)}
-              disabled={disabled}
-              data-testid="concept-rewrite-all"
-            >
-              Viết lại cả bộ quy tắc
-            </Button>
-          )}
-          {queue.available && notApproved.length > 0 && (
-            <Button
-              variant="run"
-              onClick={() => void queueAll()}
-              disabled={disabled || queueing}
-              data-testid="concept-queue"
-            >
-              Thêm tất cả vào hàng đợi AI ({notApproved.length})
-            </Button>
-          )}
+          <ChannelButton
+            channel={ai.defaultChannel}
+            label={unwritten.length > 0 ? `Viết ${unwritten.length} phần còn trống` : "Viết lại cả bộ quy tắc"}
+            onRun={(c) => {
+              if (c !== "api") void queueAll();
+              else if (unwritten.length > 0) void concept.generateAll("", false);
+              else setRewriteOpen(true);
+            }}
+            disabled={disabled || queueing}
+            unavailable={{
+              manual: "Chạy hàng loạt không làm thủ công được; chạy thủ công ở từng phần bên dưới",
+              ...(queue.available ? {} : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }),
+            }}
+            testId={unwritten.length > 0 ? "concept-generate" : "concept-rewrite-all"}
+          />
           <span className={researchStyles.grow} />
           <Button
             variant="primary"
