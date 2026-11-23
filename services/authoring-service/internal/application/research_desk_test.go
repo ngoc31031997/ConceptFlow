@@ -231,6 +231,36 @@ func TestGenerateQuestionsKeepsTheCreatorsAndNeverReusesACode(t *testing.T) {
 	}
 }
 
+func TestGenerateQuestionsStopsForPreviewBeforeStoring(t *testing.T) {
+	for _, mode := range []ExternalAIMode{ExternalAIPreview, ExternalAIPaste} {
+		f := newResearchFixture()
+		f.seedBrief(t, domain.UnitApproved)
+		f.uc.provider = NewExternalAIProvider(f.llm, echoReplier{})
+		run := NewExternalAIRun(mode, questionsReplyJSON)
+		ctx := WithExternalAI(context.Background(), run)
+
+		got, err := f.uc.GenerateQuestions(ctx, "p1", false, "")
+		stored, _ := f.uc.questions(context.Background(), "p1")
+		if mode == ExternalAIPreview {
+			if !errors.Is(err, ErrExternalAIPreviewReady) {
+				t.Fatalf("preview: err = %v, want ErrExternalAIPreviewReady", err)
+			}
+			p, ok := run.Preview()
+			want := `{"questions":["Quả sung có phải là hoa không?","Ong nào thụ phấn cho sung?","Ong mẹ có chết trong quả không?"]}`
+			if !ok || string(p) != want {
+				t.Errorf("preview = %s, want %s", p, want)
+			}
+			if len(stored) != 0 {
+				t.Errorf("preview must store nothing, got %v", questionTexts(stored))
+			}
+			continue
+		}
+		if err != nil || len(got) != 3 || len(stored) != 3 {
+			t.Fatalf("paste must store: err %v, got %v", err, questionTexts(stored))
+		}
+	}
+}
+
 func TestGenerateQuestionsFailsWithoutChangingTheList(t *testing.T) {
 	f := newResearchFixture()
 	f.seedBrief(t, domain.UnitApproved)

@@ -95,9 +95,37 @@ beforeEach(() => {
   vi.spyOn(apiClient, "getResearch").mockImplementation(async () => state);
   vi.spyOn(apiClient, "getResearchPrompt").mockResolvedValue("PROMPT NGHIÊN CỨU\nQ1. Quả sung có phải là hoa không?");
   vi.spyOn(apiClient, "getFollowUpPrompt").mockResolvedValue("PROMPT BỔ SUNG\nQ2. Ong nào thụ phấn cho sung?");
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { research: "api" },
+  });
   vi.spyOn(apiClient, "getFactImpact").mockImplementation(async (_p, id) => impacts[id] ?? []);
   vi.spyOn(apiClient, "getUnitImpact").mockImplementation(async (_p, ref) => impacts[ref.key] ?? []);
 });
+
+const GENERATE_PATH = "/v1/projects/p1/research/questions/generate";
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Sinh câu hỏi nghiên cứu",
+    method: "POST",
+    path: GENERATE_PATH,
+    body: '{"replace_edited":false,"note":""}',
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT CÂU HỎI",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -369,40 +397,93 @@ describe("ResearchStepPage", () => {
       await waitFor(() => expect(del).toHaveBeenCalledWith("p1", "Q2"));
     });
 
-    it("regenerates straight away when the Creator wrote none of the questions", async () => {
-      const generate = vi.spyOn(apiClient, "generateResearchQuestions").mockResolvedValue([]);
+    it("opens the AI run dialog when the Creator wrote none of the questions, and starts a run on the step's channel", async () => {
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
       await ready();
       expect(screen.getByTestId("question-generate")).toHaveTextContent("Sinh lại từ brief");
       fireEvent.click(screen.getByTestId("question-generate"));
-      await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: false, note: undefined }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })));
       expect(screen.queryByTestId("question-generate-dialog")).not.toBeInTheDocument();
+      fireEvent.click(await screen.findByTestId("question-generate-run-dialog-run"));
+      await waitFor(() =>
+        expect(start).toHaveBeenCalledWith("authoring", "p1", {
+          label: expect.any(String),
+          request: expect.objectContaining({ method: "POST", path: GENERATE_PATH, body: JSON.stringify({ replace_edited: false, note: "" }) }),
+          channel: "api",
+        }),
+      );
     });
 
-    it("asks what to do with the Creator's own questions before regenerating", async () => {
-      const generate = vi.spyOn(apiClient, "generateResearchQuestions").mockResolvedValue([]);
+    it("asks what to do with the Creator's own questions before the run dialog, and sends the choice", async () => {
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
       state = baseState({ questions: [question("Q1", "Của AI"), question("Q2", "Của tôi", { mine: true })] });
       await ready();
       fireEvent.click(screen.getByTestId("question-generate"));
       const dialog = await screen.findByTestId("question-generate-dialog");
       expect(dialog).toHaveTextContent("Câu hỏi bạn đã viết hoặc sửa: Q2.");
-      expect(generate).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("question-generate-run-dialog")).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId("question-generate-replace"));
-      await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: true, note: undefined }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })));
-
-      fireEvent.click(screen.getByTestId("question-generate"));
-      fireEvent.click(await screen.findByTestId("question-generate-keep"));
-      await waitFor(() => expect(generate).toHaveBeenLastCalledWith("p1", { replaceEdited: false, note: undefined }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })));
+      expect(await screen.findByTestId("question-generate-run-dialog")).toHaveTextContent("kể cả câu bạn đã viết");
+      fireEvent.click(screen.getByTestId("question-generate-run-dialog-run"));
+      await waitFor(() =>
+        expect(start).toHaveBeenCalledWith("authoring", "p1", expect.objectContaining({
+          request: expect.objectContaining({ body: JSON.stringify({ replace_edited: true, note: "" }) }),
+        })),
+      );
     });
 
-    it("picks where the questions are generated and keeps the model choice for the system AI only", async () => {
+    it("keeps the Creator's questions when the choice is keep", async () => {
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
+      state = baseState({ questions: [question("Q1", "Của AI"), question("Q2", "Của tôi", { mine: true })] });
       await ready();
-      expect(screen.getByTestId("question-engine-system")).toHaveAttribute("aria-checked", "true");
-      expect(screen.queryByTestId("question-engine-queue")).not.toBeInTheDocument();
-      fireEvent.click(screen.getByTestId("question-engine-outside"));
-      expect(screen.getByTestId("question-engine-outside")).toHaveAttribute("aria-checked", "true");
-      expect(screen.getByTestId("question-engine-system")).toHaveAttribute("aria-checked", "false");
-      expect(screen.queryByTestId("research-model-field")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("question-generate"));
+      fireEvent.click(await screen.findByTestId("question-generate-keep"));
+      fireEvent.change(await screen.findByTestId("question-generate-run-dialog-note"), { target: { value: "cơ chế" } });
+      fireEvent.click(screen.getByTestId("question-generate-run-dialog-run"));
+      await waitFor(() =>
+        expect(start).toHaveBeenCalledWith("authoring", "p1", expect.objectContaining({
+          request: expect.objectContaining({ body: JSON.stringify({ replace_edited: false, note: "cơ chế" }) }),
+        })),
+      );
+    });
+
+    it("pastes the reply by hand, shows the new questions, and reloads the step only after Apply", async () => {
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "waiting" }));
+      const preview = { questions: ["Quả sung có phải là hoa không?", "Ong nào thụ phấn cho sung?"] };
+      const reply = vi.spyOn(apiClient, "replyAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "ready", reply: "{...}", preview }));
+      const apply = vi.spyOn(apiClient, "applyAiRun").mockResolvedValue({ run: aiRun({ channel: "manual", status: "applied" }), state: {} });
+      await ready();
+      fireEvent.click(screen.getByTestId("question-generate"));
+      fireEvent.click(await screen.findByTestId("question-generate-run-dialog-run-more"));
+      fireEvent.click(screen.getByTestId("question-generate-run-dialog-run-manual"));
+      await waitFor(() => expect(start).toHaveBeenCalledWith("authoring", "p1", expect.objectContaining({ channel: "manual" })));
+      expect(await screen.findByTestId("question-generate-run-dialog-prompt")).toHaveTextContent("PROMPT CÂU HỎI");
+      fireEvent.click(screen.getByTestId("question-generate-run-dialog-tab-reply"));
+      fireEvent.change(screen.getByTestId("question-generate-run-dialog-reply"), { target: { value: "{...}" } });
+      fireEvent.click(screen.getByTestId("question-generate-run-dialog-read"));
+      await waitFor(() => expect(reply).toHaveBeenCalledWith("authoring", "p1", "r1", "{...}"));
+      expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("2 câu hỏi mới sẽ được lưu");
+      expect(screen.getByTestId("ai-run-preview")).toHaveTextContent("Ong nào thụ phấn cho sung?");
+      expect(apply).not.toHaveBeenCalled();
+      const reloads = vi.mocked(apiClient.getResearch).mock.calls.length;
+      fireEvent.click(screen.getByTestId("question-generate-run-dialog-apply"));
+      await waitFor(() => expect(apply).toHaveBeenCalledWith("authoring", "p1", "r1"));
+      await waitFor(() => expect(vi.mocked(apiClient.getResearch).mock.calls.length).toBeGreaterThan(reloads));
+      await waitFor(() => expect(screen.queryByTestId("question-generate-run-dialog")).toBeNull());
+    });
+
+    it("shows where an open run stands beside the button and opens it again", async () => {
+      vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([aiRun({ channel: "manual", status: "ready", preview: { questions: ["Một?"] } })]);
+      await ready();
+      const pill = await screen.findByTestId("question-generate-run");
+      expect(pill).toHaveTextContent("Đã có kết quả");
+      fireEvent.click(screen.getByTestId("question-generate"));
+      expect(await screen.findByTestId("question-generate-run-dialog-apply")).toBeInTheDocument();
+    });
+
+    it("keeps the model choice for the system AI", async () => {
+      await ready();
+      expect(await screen.findByTestId("research-model-field")).toBeInTheDocument();
     });
 
     it("offers to generate when there are no questions, and has no prompt to show yet", async () => {
@@ -413,17 +494,6 @@ describe("ResearchStepPage", () => {
       expect(screen.getByTestId("research-questions-empty")).toHaveTextContent("AI sinh từ brief, hoặc bạn tự thêm");
       expect(screen.getByTestId("research-prompt-empty")).toBeInTheDocument();
       expect(screen.getByTestId("step-strip")).toHaveTextContent("Chưa có dữ kiện");
-    });
-
-    it("turns the system AI off without an AI, falls back to the AI outside and tells the Creator to add questions by hand", async () => {
-      vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: false, provider: "", reason: "Chưa cấu hình" });
-      state = baseState({ questions: [], coverage: [], facts: [] });
-      await ready();
-      await waitFor(() => expect(screen.getByTestId("research-questions-empty")).toHaveTextContent("Chưa cấu hình AI nên bạn tự thêm câu hỏi"));
-      expect(screen.getByTestId("question-engine-system")).toBeDisabled();
-      expect(screen.getByTestId("question-engine-outside")).toHaveAttribute("aria-checked", "true");
-      expect(screen.getByTestId("question-add")).not.toBeDisabled();
-      expect(screen.queryByTestId("research-model-field")).not.toBeInTheDocument();
     });
 
     it("lets the Creator pick the model that writes the questions", async () => {
@@ -454,11 +524,11 @@ describe("ResearchStepPage", () => {
       expect(within(dialog).getByTestId("research-input-brief")).toHaveTextContent("Nói ong bị ăn thịt");
     });
 
-    it("calls the AI straight away, without asking again what it will read", async () => {
-      const gen = vi.spyOn(apiClient, "generateResearchQuestions").mockResolvedValue([]);
+    it("starts the run without opening the AI's input first", async () => {
+      vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
       await ready();
       fireEvent.click(screen.getByTestId("question-generate"));
-      await waitFor(() => expect(gen).toHaveBeenCalled());
+      fireEvent.click(await screen.findByTestId("question-generate-run-dialog-run"));
       expect(screen.queryByTestId("research-input-dialog")).not.toBeInTheDocument();
     });
 
@@ -470,11 +540,12 @@ describe("ResearchStepPage", () => {
       expect(screen.getByTestId("research-input-brief")).toBeInTheDocument();
     });
 
-    it("shows the failure of the AI and keeps the page usable", async () => {
-      vi.spyOn(apiClient, "generateResearchQuestions").mockRejectedValue(new apiClient.ApiError("Chưa cấu hình HIVE_API_KEY", undefined, undefined, 503));
+    it("shows the failure of the run in the dialog and keeps the page usable", async () => {
+      vi.spyOn(apiClient, "startAiRun").mockRejectedValue(new apiClient.ApiError("Chưa cấu hình HIVE_API_KEY", undefined, undefined, 503));
       await ready();
       fireEvent.click(screen.getByTestId("question-generate"));
-      expect(await screen.findByTestId("research-error")).toHaveTextContent("Chưa cấu hình HIVE_API_KEY");
+      fireEvent.click(await screen.findByTestId("question-generate-run-dialog-run"));
+      expect(await screen.findByTestId("question-generate-run-dialog-error")).toHaveTextContent("Chưa cấu hình HIVE_API_KEY");
       expect(screen.getByTestId("question-generate")).not.toBeDisabled();
     });
   });

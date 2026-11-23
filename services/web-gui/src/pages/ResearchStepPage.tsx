@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { researchPasteRequest, type ResearchFact, type ResearchState } from "../api/client";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import type { StepStripProps } from "../components/StepStrip";
@@ -15,7 +16,6 @@ import styles from "../components/research/research.module.css";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import type { AiBridgeModes } from "../hooks/useAiBridge";
-import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useQueuedExternalRun } from "../hooks/useQueuedExternalRun";
 import { useResearch } from "../hooks/useResearch";
 import { VIEW_RESEARCH, readOnlyReason, storyRoute } from "../utils/flow";
@@ -73,7 +73,6 @@ export function ResearchStepPage() {
   const draft = useContext(ProjectDraftContext);
   const flow = useProjectFlow();
   const navigate = useNavigate();
-  const llm = useLlmStatus();
   const projectId = params.id ?? draft.projectId;
   const research = useResearch(projectId, !!projectId);
   const [skipping, setSkipping] = useState(false);
@@ -97,7 +96,6 @@ export function ResearchStepPage() {
 
   const state = research.state;
   const locked = !flow.editable;
-  const aiAvailable = llm?.enabled === true;
 
   async function readPaste(raw: string): Promise<boolean> {
     const read = await research.pasteResults(raw);
@@ -144,14 +142,10 @@ export function ResearchStepPage() {
           coverage={s.coverage}
           checking={checkingQuestions}
           stale={s.questionsStale}
-          aiAvailable={aiAvailable}
-          running={research.running}
-          run={research.run}
           locked={locked}
           idea={s.idea}
           brief={s.brief}
           onReloadInput={research.reload}
-          onGenerate={research.generateQuestions}
           onAdd={research.addQuestion}
           onSave={research.saveQuestion}
           onDelete={research.deleteQuestion}
@@ -234,7 +228,11 @@ export function ResearchStepPage() {
             Đang tải…
           </p>
         )}
-        {state && <div className={styles.body}>{content(state)}</div>}
+        {state && (
+          <AiRunsProvider projectId={projectId} step="research" service="authoring">
+            <div className={styles.body}>{content(state)}</div>
+          </AiRunsProvider>
+        )}
       </AppShell>
 
       <WizardNav
