@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -353,3 +354,43 @@ func TestFactDependentsNameTheBeatsThatRestOnAFact(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestGenerateInPreviewModeStopsBeforeStoring(t *testing.T) {
+	f := newStoryFixture()
+	f.open(t)
+	if _, err := f.uc.Edit(context.Background(), "p1", StoryPatch{CentralQuestion: ptr("Câu hỏi của tôi?")}); err != nil {
+		t.Fatalf("Edit: %v", err)
+	}
+	before := *f.store.story
+	run := NewExternalAIRun(ExternalAIPreview, "")
+	_, err := f.uc.Generate(WithExternalAI(context.Background(), run), "p1", "")
+	if !errors.Is(err, ErrExternalAIPreviewReady) {
+		t.Fatalf("err = %v, want ErrExternalAIPreviewReady", err)
+	}
+	preview, ok := run.Preview()
+	if !ok {
+		t.Fatal("no preview was kept")
+	}
+	var got domain.StoryStructure
+	if err := json.Unmarshal(preview, &got); err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	if got.CentralQuestion != "Câu hỏi của tôi?" || got.CoreAnswer != "Ong là cái giá của một quan hệ." || len(got.NarrativeArc) != 3 {
+		t.Errorf("preview = %s, want the reply merged with the Creators field", preview)
+	}
+	if f.store.story.Status != before.Status || f.store.story.Story.CoreAnswer != before.Story.CoreAnswer {
+		t.Error("the story changed in preview mode")
+	}
+}
+
+func TestGenerateInPasteModeStores(t *testing.T) {
+	f := newStoryFixture()
+	f.open(t)
+	run := NewExternalAIRun(ExternalAIPaste, storyReplyFull)
+	if _, err := f.uc.Generate(WithExternalAI(context.Background(), run), "p1", ""); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if f.store.story == nil || len(f.store.story.Story.NarrativeArc) != 3 {
+		t.Error("paste mode must store the story")
+	}
+}

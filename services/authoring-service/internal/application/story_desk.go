@@ -373,6 +373,9 @@ func (uc *StoryDeskUseCase) Generate(ctx context.Context, projectID, note string
 	current.BriefHash = in.brief.Hash()
 	current.ResearchHash = domain.ResearchHash(in.facts)
 	current.UpdatedAt = uc.now()
+	if err := stopForPreview(ctx, written); err != nil {
+		return domain.StoredStory{}, err
+	}
 	if err := uc.store.SaveProjectStory(ctx, current); err != nil {
 		return domain.StoredStory{}, err
 	}

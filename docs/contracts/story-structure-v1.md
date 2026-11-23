@@ -39,3 +39,7 @@ Duyệt chỉ cần máy kiểm qua: đủ ba trường, mạch có từ 3 đế
 ## Prompt
 
 Vai `story_frame` (sửa được ở Cài đặt prompt) nhận `{{brief}}`, `{{research}}`, `{{brief_language}}`, `{{current_story}}`, `{{kept_fields}}`, `{{redo_note}}` và trả một khối JSON `{"central_question", "core_answer", "narrative_arc":[{"beat","text","facts"}]}`. Vai `story_approaches` đã bỏ cùng bước chọn góc tiếp cận.
+
+## Lượt chạy AI (ADR-0052)
+
+Lượt AI duy nhất của bước chạy qua lượt chạy có xem trước của authoring-service, `/v1/projects/{id}/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md), khoá kênh `story`. Điểm dừng xem trước của `POST /story/generate`: `{central_question, core_answer, narrative_arc:[{beat, text, facts}]}`, đã ghép với các ô Creator tự viết và qua kiểm tra dữ kiện; chưa lưu gì trước khi áp dụng.
