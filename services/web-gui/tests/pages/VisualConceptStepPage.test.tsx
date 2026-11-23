@@ -13,6 +13,36 @@ import type {
 } from "../../src/api/client";
 import type { Project } from "../../src/types";
 
+vi.mock("../../src/hooks/useAiQueue", () => ({
+  useAiQueue: () => ({
+    available: true,
+    outdated: false,
+    counts: null,
+    add: vi.fn(),
+    items: {},
+  }),
+}));
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Viết phần 5",
+    method: "POST",
+    path: "/v1/projects/p1/visual-concept/units/typography/generate",
+    body: '{"note":""}',
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT PART",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
+
 const EMPTY_REF_DRAWING: apiClient.ReferenceDrawing = {
   medium: "",
   shape: "",
@@ -245,6 +275,12 @@ beforeEach(() => {
   vi.spyOn(apiClient, "listProjects").mockResolvedValue([]);
   vi.spyOn(apiClient, "getResearch").mockRejectedValue(new Error("no"));
   vi.spyOn(apiClient, "getVisualConcept").mockImplementation(async () => state);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { visual_concept: "api" },
+  });
 });
 
 afterEach(() => {
@@ -306,7 +342,7 @@ describe("VisualConceptStepPage", () => {
     );
     expect(screen.getByTestId("concept-unit-visual_language-approve")).toBeDisabled();
     expect(screen.getByTestId("concept-unit-color_system")).toHaveTextContent("· bạn sửa");
-    expect(screen.getByTestId("concept-generate")).toHaveTextContent("AI viết 5 phần còn trống");
+    expect(screen.getByTestId("concept-generate")).toHaveTextContent("Viết 5 phần còn trống (API)");
   });
 
   it("approves a part and writes the empty parts with the system's AI", async () => {
@@ -392,8 +428,10 @@ describe("VisualConceptStepPage", () => {
     );
   });
 
-  it("opens the AI dialog to fix a finding that cannot be written directly", async () => {
-    const generate = vi.spyOn(apiClient, "generateVisualConceptUnit").mockResolvedValue(baseState());
+  it("opens the AI run dialog to fix a finding that cannot be written directly", async () => {
+    const start = vi
+      .spyOn(apiClient, "startAiRun")
+      .mockResolvedValue(aiRun({ path: "/v1/projects/p1/visual-concept/units/typography/generate" }));
     state = baseState({
       review: {
         ...baseState().review,
@@ -405,16 +443,90 @@ describe("VisualConceptStepPage", () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("concept-tab-review"));
     fireEvent.click(screen.getByTestId("concept-finding-apply-f1"));
-    fireEvent.click(await screen.findByTestId("concept-apply-dialog-send"));
+    fireEvent.click(await screen.findByTestId("concept-apply-dialog-run"));
     await waitFor(() =>
-      expect(generate).toHaveBeenCalledWith(
-        "p1",
-        "typography",
-        expect.stringContaining("Chú thích mơ hồ"),
-        expect.anything(),
-        "f1",
-      ),
+      expect(start).toHaveBeenCalledWith("visual", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({
+          method: "POST",
+          path: "/v1/projects/p1/visual-concept/units/typography/generate",
+          body: expect.stringContaining("Chú thích mơ hồ"),
+        }),
+        channel: "api",
+      }),
     );
+    const sent = start.mock.calls[0][2].request;
+    expect(JSON.parse(sent.body ?? "{}").finding_id).toBe("f1");
+  });
+
+  it("rewrites one part by hand: paste the reply, see the part, then apply", async () => {
+    const start = vi
+      .spyOn(apiClient, "startAiRun")
+      .mockResolvedValue(aiRun({ channel: "manual", status: "waiting" }));
+    const preview = { key: "typography", content: { font: "Be Vietnam Pro", captions: "ngắn" } };
+    const reply = vi
+      .spyOn(apiClient, "replyAiRun")
+      .mockResolvedValue(aiRun({ channel: "manual", status: "ready", reply: "{...}", preview }));
+    const apply = vi
+      .spyOn(apiClient, "applyAiRun")
+      .mockResolvedValue({ run: aiRun({ channel: "manual", status: "applied" }), state });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("concept-unit-typography-ai"));
+    fireEvent.click(await screen.findByTestId("concept-unit-typography-ai-dialog-run-more"));
+    fireEvent.click(screen.getByTestId("concept-unit-typography-ai-dialog-run-manual"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("visual", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({
+          method: "POST",
+          path: "/v1/projects/p1/visual-concept/units/typography/generate",
+          body: JSON.stringify({ note: "" }),
+        }),
+        channel: "manual",
+      }),
+    );
+    expect(await screen.findByTestId("concept-unit-typography-ai-dialog-prompt")).toHaveTextContent("PROMPT PART");
+    fireEvent.click(screen.getByTestId("concept-unit-typography-ai-dialog-tab-reply"));
+    fireEvent.change(screen.getByTestId("concept-unit-typography-ai-dialog-reply"), { target: { value: "{...}" } });
+    fireEvent.click(screen.getByTestId("concept-unit-typography-ai-dialog-read"));
+    await waitFor(() => expect(reply).toHaveBeenCalledWith("visual", "p1", "r1", "{...}"));
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Be Vietnam Pro");
+    expect(apply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("concept-unit-typography-ai-dialog-apply"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("visual", "p1", "r1"));
+  });
+
+  it("runs the AI review by hand and previews the findings before applying", async () => {
+    const reviewPath = "/v1/projects/p1/visual-concept/review";
+    const start = vi
+      .spyOn(apiClient, "startAiRun")
+      .mockResolvedValue(aiRun({ channel: "manual", status: "waiting", path: reviewPath }));
+    const preview = { findings: [{ id: "f1", unit_key: "typography", text: "Chú thích mơ hồ", fix: "", state: "open" }], notes: [] };
+    vi.spyOn(apiClient, "replyAiRun").mockResolvedValue(
+      aiRun({ channel: "manual", status: "ready", reply: "{...}", preview, path: reviewPath }),
+    );
+    renderPage();
+    fireEvent.click(await screen.findByTestId("concept-tab-review"));
+    fireEvent.click(await screen.findByTestId("concept-review-run"));
+    fireEvent.click(await screen.findByTestId("concept-review-dialog-run-more"));
+    fireEvent.click(screen.getByTestId("concept-review-dialog-run-manual"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("visual", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: reviewPath, body: JSON.stringify({ note: "" }) }),
+        channel: "manual",
+      }),
+    );
+    fireEvent.click(await screen.findByTestId("concept-review-dialog-tab-reply"));
+    fireEvent.change(screen.getByTestId("concept-review-dialog-reply"), { target: { value: "{...}" } });
+    fireEvent.click(screen.getByTestId("concept-review-dialog-read"));
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Chú thích mơ hồ");
+  });
+
+  it("has no manual channel for writing the whole set, which stores each part at once", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("concept-generate-more"));
+    expect(screen.getByRole("menuitem", { name: /thủ công/i })).toBeDisabled();
   });
 
   it("locks v2 with the changes listed, and opens the next step once locked", async () => {

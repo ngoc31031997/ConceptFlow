@@ -56,6 +56,13 @@ func askJSON(ctx context.Context, llm LLMPort, prompts PromptLibraryPort, call a
 	return res.JSON, nil
 }
 
+// conceptPartPreview is what a previewed part rewrite would store: the part
+// key and its content.
+type conceptPartPreview struct {
+	Key     string          `json:"key"`
+	Content json.RawMessage `json:"content"`
+}
+
 // writeUnit has the AI write part key from the inputs and the parts already
 // written, and stores it once the answer is in. The Creator's fields keep
 // their values; the part goes back to review.
@@ -94,6 +101,9 @@ func (d *ConceptDesk) writeUnit(ctx context.Context, projectID string, data *des
 	if f, ok := v.(*domain.Feasibility); ok {
 		domain.MachineScope(f, len(data.in.Beats), data.parts.RepresentationRules)
 		canon, _ = json.Marshal(f)
+	}
+	if err := stopForPreview(ctx, conceptPartPreview{Key: key, Content: canon}); err != nil {
+		return err
 	}
 	u := domain.ReviewUnit{ProjectID: projectID, Kind: domain.UnitKindConcept, Key: key, Status: domain.UnitPending,
 		Content: canon, CreatorFields: []string{}, InputHashes: data.hashesFor(key)}

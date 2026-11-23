@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { generateVisualConceptUnit, type VisualConceptUnit } from "../../api/client";
+import { describeAiRequest, generateVisualConceptUnit, type VisualConceptUnit } from "../../api/client";
 import type { VisualConceptControls } from "../../hooks/useVisualConcept";
 import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
-import { ConceptAiDialog } from "./ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { ConceptRunPreview } from "./ConceptRunPreview";
 import { PART_SCHEMAS, partSummary } from "./conceptSchema";
 import { PartEditDialog } from "./PartEditDialog";
 import { PartView } from "./PartView";
@@ -40,9 +41,10 @@ export function ConceptUnitCard({
   const [redoing, setRedoing] = useState(false);
   const approved = unit.status === "approved";
   const running =
-    unit.status === "running" || concept.running === unit.key || concept.running === "all";
+    unit.status === "running" || concept.running === "all";
   const disabled = readOnly || concept.busy || concept.running !== null;
   const testId = `concept-unit-${unit.key}`;
+  const runPath = `/v1/projects/${projectId}/visual-concept/units/${unit.key}/generate`;
 
   if (approved && !open && !forceOpen && !unit.stale) {
     return (
@@ -137,6 +139,7 @@ export function ConceptUnitCard({
               >
                 {unit.written ? "Làm lại kèm ghi chú" : "Viết bằng AI"}
               </Button>
+              <AiRunPill runPath={runPath} onOpen={() => setRedoing(true)} testId={`${testId}-ai-run`} />
               <Button
                 variant="primary"
                 onClick={() => {
@@ -163,22 +166,22 @@ export function ConceptUnitCard({
         onSave={(fields) => concept.edit(unit.key, fields)}
         testId={`${testId}-edit-dialog`}
       />
-      <ConceptAiDialog
+      <AiRunDialog
         open={redoing}
         onClose={() => setRedoing(false)}
         title={`${unit.written ? "Làm lại" : "Viết"} phần ${unit.number} · ${unit.title}`}
+        runPath={runPath}
+        describe={(note) =>
+          describeAiRequest((external) => generateVisualConceptUnit(projectId, unit.key, note, { external }))
+        }
+        renderPreview={(p) => <ConceptRunPreview kind="unit" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             Các phần khác giữ nguyên. Trường bạn đã sửa tay giữ nguyên trừ khi ghi chú yêu cầu đổi.
             Phần này về “chờ duyệt”.
           </p>
         }
-        onSystem={(note) => void concept.generateUnit(unit.key, note)}
-        external={{
-          run: (note, external) =>
-            generateVisualConceptUnit(projectId, unit.key, note, { external }),
-          onDone: concept.reload,
-        }}
+        onApplied={concept.reload}
         testId={`${testId}-ai-dialog`}
       />
     </Card>

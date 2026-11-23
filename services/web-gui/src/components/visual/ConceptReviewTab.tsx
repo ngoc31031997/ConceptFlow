@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  describeAiRequest,
   generateVisualConceptUnit,
   getVisualConceptVersion,
   reviewVisualConcept,
@@ -11,7 +12,8 @@ import { visualErrorText, type VisualConceptControls } from "../../hooks/useVisu
 import lockStyles from "../lock/lock.module.css";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, CopyBox, Dialog, FormField, TextInput } from "../ui";
-import { ConceptAiDialog } from "./ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { ConceptRunPreview } from "./ConceptRunPreview";
 import styles from "./visual.module.css";
 
 const STATE_LABEL: Record<string, string> = {
@@ -55,6 +57,7 @@ export function ConceptReviewTab({
   const disabled = readOnly || concept.busy || concept.running !== null;
   const failing = state.checks.filter((c) => !c.ok);
   const v2 = state.locked_version > 0;
+  const reviewPath = `/v1/projects/${projectId}/visual-concept/review`;
 
   async function openVersion(n: number) {
     setViewError(null);
@@ -84,6 +87,7 @@ export function ConceptReviewTab({
             >
               {state.review.reviewed ? "Rà soát lại" : "Rà soát bằng AI"}
             </Button>
+            <AiRunPill runPath={reviewPath} onOpen={() => setReviewOpen(true)} testId="concept-review-ai-run" />
           </div>
           {!state.review.reviewed && failing.length === 0 && (
             <p className={researchStyles.hint} data-testid="concept-review-none">
@@ -146,6 +150,13 @@ export function ConceptReviewTab({
                       >
                         {f.direct ? "Áp dụng gợi ý" : "Nhờ AI sửa"}
                       </Button>
+                      {!f.direct && (
+                        <AiRunPill
+                          runPath={`/v1/projects/${projectId}/visual-concept/units/${f.unit_key}/generate`}
+                          onOpen={() => setApplying(f)}
+                          testId={`concept-finding-ai-run-${f.id}`}
+                        />
+                      )}
                       <Button
                         variant="ghost"
                         onClick={() => void concept.accept(f.id, "")}
@@ -244,48 +255,50 @@ export function ConceptReviewTab({
         </div>
       </Card>
 
-      <ConceptAiDialog
+      <AiRunDialog
         open={applying !== null}
         onClose={() => setApplying(null)}
         title={`Nhờ AI sửa · phần ${applying?.unit_number ?? ""} · ${applying?.unit_title ?? ""}`}
+        runPath={`/v1/projects/${projectId}/visual-concept/units/${applying?.unit_key ?? ""}/generate`}
+        describe={(note) => {
+          if (!applying) return Promise.reject(new Error("no finding picked"));
+          const extra = note ? ` Ghi chú thêm: ${note}` : "";
+          return describeAiRequest((external) =>
+            generateVisualConceptUnit(projectId, applying.unit_key, `${fixNote(applying)}${extra}`, { external }, applying.id),
+          );
+        }}
+        renderPreview={(p) => <ConceptRunPreview kind="unit" preview={p} />}
         impact={
-          <p className={researchStyles.hint}>
-            AI viết lại phần này theo vấn đề đã nêu. Các phần khác giữ nguyên; trường bạn đã sửa tay
-            giữ nguyên trừ khi ghi chú yêu cầu đổi. Phần này về “chờ duyệt”.
-          </p>
+          <>
+            <p className={researchStyles.hint}>
+              AI viết lại phần này theo vấn đề đã nêu: “{applying ? fixNote(applying) : ""}”. Ghi chú bên dưới được thêm vào lời nhắn đó.
+            </p>
+            <p className={researchStyles.hint}>
+              Các phần khác giữ nguyên; trường bạn đã sửa tay giữ nguyên trừ khi ghi chú yêu cầu đổi.
+              Phần này về “chờ duyệt”.
+            </p>
+          </>
         }
-        initialNote={applying ? fixNote(applying) : ""}
-        onSystem={(note) => {
-          if (applying) void concept.generateUnit(applying.unit_key, note, applying.id);
-        }}
-        external={{
-          run: (note, external) =>
-            applying
-              ? generateVisualConceptUnit(projectId, applying.unit_key, note, { external }, applying.id)
-              : Promise.reject(new Error("no finding picked")),
-          onDone: concept.reload,
-        }}
+        onApplied={concept.reload}
         testId="concept-apply-dialog"
       />
 
-      <ConceptAiDialog
+      <AiRunDialog
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
         title={state.review.reviewed ? "Rà soát lại bộ quy tắc" : "Rà soát bộ quy tắc"}
+        runPath={reviewPath}
+        describe={(note) => describeAiRequest((external) => reviewVisualConcept(projectId, note, { external }))}
+        renderPreview={(p) => <ConceptRunPreview kind="review" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI so bộ quy tắc hiện tại với các vấn đề cũ: vấn đề đã hết thì đánh dấu đã sửa, vấn đề
             mới thì thêm vào.
           </p>
         }
-        onSystem={(note) => void concept.review(note)}
-        external={{
-          run: (note, external) => reviewVisualConcept(projectId, note, { external }),
-          onDone: concept.reload,
-        }}
+        onApplied={concept.reload}
         testId="concept-review-dialog"
       />
-
 
       <Dialog
         open={lockOpen}
