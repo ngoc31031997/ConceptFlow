@@ -204,6 +204,16 @@ func creatorFieldsOf(dst *domain.Beat, src domain.Beat, fields []string) {
 	}
 }
 
+// beatPreview is what a single-beat AI run would store: the beat as it will be
+// saved (function and facts from the skeleton, the Creator's parts kept) and
+// where it goes. Key names the beat being written again; After names the beat
+// a new beat is put behind.
+type beatPreview struct {
+	Key   string      `json:"key,omitempty"`
+	After string      `json:"after,omitempty"`
+	Beat  domain.Beat `json:"beat"`
+}
+
 // ErrBeatSkeletonNeeded is returned when the content is asked for before the
 // Creator approved the skeleton.
 var ErrBeatSkeletonNeeded = errors.New("duyệt bộ khung của beat sheet trước khi AI viết nội dung")
@@ -514,6 +524,9 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 			return "", fmt.Errorf("%w: cần đúng một beat mới", domain.ErrBeatReplyUnusable)
 		}
 		beat = drafts[0].Beat
+		if err := stopForPreview(ctx, beatPreview{After: after, Beat: beat}); err != nil {
+			return "", err
+		}
 		if slot.StoryHash, err = uc.storyHash(ctx, projectID); err != nil {
 			return "", err
 		}

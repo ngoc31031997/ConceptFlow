@@ -64,3 +64,7 @@ Các lượt AI chạy trên model Creator chọn cho bước, lưu theo project
 | `409` | Câu chuyện chưa duyệt, bộ khung chưa duyệt khi cần AI viết (cả bảng, thêm hay làm lại một beat), bộ khung đã duyệt khi dựng lại, hoặc project không còn là bản nháp |
 | `502` | Câu trả lời của AI cho một beat không đọc được sau hai lần thử (JSON hỏng, thiếu mục tiêu hay nội dung, chức năng lạ, thời lượng ngoài khoảng, trích dữ kiện lạ), hoặc không có cách chia thời lượng cho tổng khớp mục tiêu; không lưu gì |
 | `503` | Chưa cấu hình AI |
+
+## Lượt chạy AI (ADR-0052)
+
+Hai lượt AI một beat chạy qua lượt chạy có xem trước của authoring-service, `/v1/projects/{id}/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md). Điểm dừng xem trước của từng lượt, sau khi câu trả lời đã đọc và ghép với bộ khung và phần Creator viết, trước mọi lần lưu: `POST /beats/{key}/redo` → `{key, beat}`; `POST /beats` (`blank: false`) → `{after, beat}`; `beat` là `{fn, title, goal, content, facts, dur, next, step}` như sẽ lưu (chưa cân lại độ dài cả bảng). `POST /beats/generate` viết nhiều beat liên tiếp, mỗi beat đọc beat vừa viết, nên không đi qua lượt chạy: chạy hàng loạt lưu luôn kết quả, không xem trước; extension xếp mỗi beat chưa có nội dung một mục hàng đợi gọi `/beats/{key}/redo`.

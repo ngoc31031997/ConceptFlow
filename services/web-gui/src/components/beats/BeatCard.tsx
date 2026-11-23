@@ -1,19 +1,20 @@
 import { useState } from "react";
-import { BEAT_DURATION_STEP, BEAT_FNS, BEAT_MIN_SECONDS, addBeat, getBeatImpact, redoBeat, type Beat, type BeatFn, type BeatState } from "../../api/client";
+import { BEAT_DURATION_STEP, BEAT_FNS, BEAT_MIN_SECONDS, addBeat, describeAiRequest, getBeatImpact, redoBeat, type Beat, type BeatFn, type BeatState } from "../../api/client";
 import type { BeatsControls } from "../../hooks/useBeats";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
-import { AiModelSelect } from "../AiModelSelect";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { isOpen, useAiRuns } from "../airun/AiRunsContext";
 import { AiOperationCard } from "../AiOperationCard";
 import { FactTags } from "../story/FactTags";
 import { ImpactConfirm } from "../research/ImpactConfirm";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dropdown } from "../ui";
 import { UnitEditModal } from "../units/UnitEditModal";
-import { UnitRedoModal } from "../units/UnitRedoModal";
+import { ImpactList } from "../units/ImpactList";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import unitStyles from "../units/units.module.css";
 import { UnitStatusChip } from "../units/UnitStatusChip";
-import { BeatAiDialog } from "./BeatAiDialog";
+import { BeatRunPreview } from "./BeatRunPreview";
 import styles from "./beats.module.css";
 
 /** How long a closing dialog takes to leave, so the page is scrolled after it has gone. */
@@ -26,8 +27,6 @@ interface BeatCardProps {
   index: number;
   state: BeatState;
   beats: BeatsControls;
-  /** A language model is configured, so the AI can write and redo beats. */
-  aiAvailable: boolean;
   /** The step cannot be changed now (the project is past editing). */
   locked: boolean;
 }
@@ -42,6 +41,16 @@ const TEXT_FIELDS = [
 
 /** What the warning on a beat without a fact says. */
 const NO_FACT_TIP = "Chưa gắn dữ kiện: điều beat này nói chưa có gì làm chứng. Gắn dữ kiện, hoặc bỏ ý này.";
+
+/** The beat a run of the add route puts its new beat behind, read from the request body the run holds. */
+function addRunAfter(body: string): string {
+  try {
+    const after = (JSON.parse(body) as { after?: unknown }).after;
+    return typeof after === "string" ? after : "";
+  } catch {
+    return "";
+  }
+}
 
 function Block({ label, text, testId }: { label: string; text: string; testId: string }) {
   return (
@@ -67,20 +76,25 @@ function showBeat(key: string) {
  * function, the story line and the facts show, since the length and the text
  * are not written yet.
  */
-export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, locked }: BeatCardProps) {
+export function BeatCard({ projectId, beat, index, state, beats, locked }: BeatCardProps) {
   const [editing, setEditing] = useState(false);
-  const [redoing, setRedoing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  // The AI dialogs: writing this beat, and adding a beat after it.
+  // The AI dialogs: writing this beat (first time or again with a note), and adding a beat after it.
   const [writeOpen, setWriteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const { runs } = useAiRuns();
   // An approved beat shows as one line until the Creator opens it.
   const [expanded, setExpanded] = useState(false);
   // Moving a beat changes how it joins its neighbours, so it asks first once dialogue is approved.
   const [moving, setMoving] = useState<-1 | 1 | null>(null);
   const unit = { kind: "beat", key: beat.key };
   const editImpact = useUnitImpact(projectId, unit, editing, getBeatImpact);
-  const redoImpact = useUnitImpact(projectId, unit, redoing, getBeatImpact);
+  const redoImpact = useUnitImpact(projectId, unit, writeOpen, getBeatImpact);
+  const redoPath = `/v1/projects/${projectId}/beats/${beat.key}/redo`;
+  // Every beat adds through the same route; the pill shows on the beat the open run adds after.
+  const addPath = `/v1/projects/${projectId}/beats`;
+  const addRun = runs[addPath];
+  const addsAfterThis = isOpen(addRun) && addRunAfter(addRun.body) === beat.key;
 
   const no = index + 1;
   const last = index === state.beats.length - 1;
@@ -92,8 +106,6 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
   const skeleton = state.phase === "skeleton";
   const unwritten = !beat.goal.trim() && !beat.content.trim();
   const collapsed = !skeleton && beat.status === "approved" && !expanded && !writing;
-  const modelSelect = (id: string) =>
-    aiAvailable ? <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId={id} /> : undefined;
 
   const deleteList = [
     "Beat này bị xoá khỏi bảng; các beat còn lại giữ nguyên.",
@@ -249,7 +261,7 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
               busy={busy}
               canRedo
               onEdit={() => setEditing(true)}
-              onRedo={() => setRedoing(true)}
+              onRedo={() => setWriteOpen(true)}
               onApprove={() => void beats.approve(beat.key)}
               onUnapprove={() => void beats.unapprove(beat.key)}
               testId={`beat-review-${beat.key}`}
@@ -272,6 +284,7 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
               Viết beat này
             </Button>
           )}
+          {!skeleton && <AiRunPill runPath={redoPath} onOpen={() => setWriteOpen(true)} testId={`beat-write-run-${beat.key}`} />}
           <Button
             variant="ghost"
             className={researchStyles.sm}
@@ -281,6 +294,18 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
           >
             {skeleton ? "+ Thêm beat trống sau" : "+ Thêm beat sau"}
           </Button>
+          {!skeleton && (
+            <Button
+              variant="ghost"
+              className={researchStyles.sm}
+              onClick={() => void beats.add(beat.key, true, "")}
+              disabled={busy}
+              data-testid={`beat-add-blank-${beat.key}`}
+            >
+              + Thêm beat trống sau
+            </Button>
+          )}
+          {addsAfterThis && <AiRunPill runPath={addPath} onOpen={() => setAddOpen(true)} testId={`beat-add-run-${beat.key}`} />}
           <span className={researchStyles.grow} />
           <Button variant="danger" className={researchStyles.sm} onClick={() => setDeleting(true)} disabled={busy} data-testid={`beat-delete-${beat.key}`}>
             Xoá beat
@@ -288,34 +313,42 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
         </div>
       </div>
 
-      <BeatAiDialog
+      <AiRunDialog
         open={writeOpen}
         onClose={() => setWriteOpen(false)}
-        title={`Viết beat · B${no} ${beat.title}`}
-        modelSelect={modelSelect(`beat-write-model-${beat.key}`)}
-        onSystem={aiAvailable ? (note) => void beats.redo(beat.key, note) : undefined}
-        external={{
-          run: (note, external) => redoBeat(projectId, beat.key, note, { external }),
-          onDone: async () => {
-            await beats.reload();
-            showBeat(beat.key);
-          },
+        title={unwritten ? `Viết beat · B${no} ${beat.title}` : `Làm lại kèm ghi chú · B${no} ${beat.title}`}
+        runPath={redoPath}
+        describe={(note) => describeAiRequest((external) => redoBeat(projectId, beat.key, note, { external }))}
+        renderPreview={(p) => <BeatRunPreview kind="write" preview={p} />}
+        impact={
+          <>
+            <p className={researchStyles.hint} data-testid={`beat-write-impact-${beat.key}`}>
+              AI viết lại beat này, đọc các beat khác và thời lượng còn lại. Chức năng, dữ kiện và độ dài bạn đặt giữ nguyên; phần chữ bạn viết được thay. Beat về chờ duyệt.
+            </p>
+            <ImpactList head="AI làm lại beat này thì phần phụ thuộc sẽ làm lại:" impact={redoImpact} testId={`beat-redo-impact-${beat.key}`} />
+          </>
+        }
+        onApplied={async () => {
+          await beats.reload();
+          showBeat(beat.key);
         }}
         testId={`beat-write-dialog-${beat.key}`}
       />
-      <BeatAiDialog
+      <AiRunDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title={`Thêm beat sau B${no} · ${beat.title}`}
-        modelSelect={modelSelect(`beat-add-model-${beat.key}`)}
-        onSystem={aiAvailable ? (note) => void beats.add(beat.key, false, note) : undefined}
-        onBlank={() => void beats.add(beat.key, true, "")}
-        external={{
-          run: (note, external) => addBeat(projectId, beat.key, false, note, { external }),
-          onDone: async () => {
-            await beats.reload();
-            showBeat(beat.key);
-          },
+        runPath={addPath}
+        describe={(note) => describeAiRequest((external) => addBeat(projectId, beat.key, false, note, { external }))}
+        renderPreview={(p) => <BeatRunPreview kind="add" preview={p} />}
+        impact={
+          <p className={researchStyles.hint} data-testid={`beat-add-impact-${beat.key}`}>
+            AI viết một beat mới giữa beat này và beat sau; các beat có sẵn giữ nguyên. Muốn một beat trống để tự viết thì dùng “+ Thêm beat trống sau”.
+          </p>
+        }
+        onApplied={async () => {
+          await beats.reload();
+          showBeat(beat.key);
         }}
         testId={`beat-add-dialog-${beat.key}`}
       />
@@ -329,23 +362,6 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
         note="Phần bạn sửa thành “Bạn viết”: AI giữ nguyên khi viết lại. Xoá trắng mục tiêu, nội dung hoặc chuyển tiếp thì AI viết lại phần đó. Sửa xong beat về chờ duyệt."
         size="lg"
         testId={`beat-edit-${beat.key}`}
-      />
-      <UnitRedoModal
-        open={redoing}
-        onClose={() => setRedoing(false)}
-        title={`Làm lại kèm ghi chú · B${no} ${beat.title}`}
-        impact={redoImpact}
-        initialNote={beats.failedNote}
-        modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId={`beat-redo-model-${beat.key}`} /> : undefined}
-        onSend={aiAvailable ? (note) => void beats.redo(beat.key, note) : undefined}
-        external={{
-          run: (note, external) => redoBeat(projectId, beat.key, note, { external }),
-          onDone: async () => {
-            await beats.reload();
-            showBeat(beat.key);
-          },
-        }}
-        testId={`beat-redo-${beat.key}`}
       />
       <ImpactConfirm
         open={moving !== null}
