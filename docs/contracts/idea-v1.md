@@ -48,6 +48,10 @@ Hai lượt AI (`generate`, `review`) nhận header `X-Operation-Id` và ghi nh�
 
 `input_changed` là true khi đoạn gõ (hoặc ngôn ngữ) lúc này khác lúc AI viết ý tưởng. `review_stale` là true khi ý tưởng đã đổi sau đánh giá.
 
+## Lượt chạy AI (ADR-0052)
+
+Hai lượt AI chạy qua lượt chạy có xem trước của authoring-service, `/v1/projects/{id}/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md); khoá kênh `idea`. Điểm dừng xem trước: `/idea/generate` → ý tưởng sẽ lưu `{central_question, curiosity_points, scope}` (đã giữ nguyên ô Creator viết); `/idea/review` → đánh giá `{clarity, researchability, scope_fit, unclear, suggestions, idea_hash, created_at}`. Trước điểm dừng không ghi gì.
+
 ## Đánh giá của AI
 
 Ba mục `clarity` (độ rõ), `researchability` (khả năng nghiên cứu), `scope_fit` (phạm vi), mỗi mục `{"rating": "good"|"fair"|"weak", "comment": "…"}`, cùng `unclear[]` (chỗ chưa rõ), `suggestions[]` (gợi ý), `idea_hash`, `created_at`. Đánh giá chỉ để Creator tham khảo: nó không đổi ý tưởng, không đổi trạng thái duyệt và không chặn duyệt.

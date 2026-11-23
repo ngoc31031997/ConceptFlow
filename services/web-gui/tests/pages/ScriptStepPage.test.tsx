@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
-import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useContext, useEffect, type ReactNode } from "react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
@@ -9,7 +9,17 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { IdeaReview, IdeaScreen, ProjectIdea } from "../../src/api/client";
 import type { Project } from "../../src/types";
-import { installFakeAiBridge } from "../helpers/fakeAiBridge";
+
+vi.mock("../../src/hooks/useAiQueue", () => ({
+  useAiQueue: () => ({
+    available: false,
+    outdated: false,
+    counts: null,
+    defaultProvider: null,
+    add: vi.fn(),
+    items: {},
+  }),
+}));
 
 const SUBJECT = "Chuyện gì xảy ra nếu ta rơi vào hố đen?";
 
@@ -43,6 +53,43 @@ let saveModels: MockInstance<typeof apiClient.saveAuthoringModels>;
 let generate: MockInstance<typeof apiClient.generateProjectIdea>;
 let review: MockInstance<typeof apiClient.reviewProjectIdea>;
 let llmEnabled: boolean;
+let startRun: MockInstance<typeof apiClient.startAiRun>;
+let applyRun: MockInstance<typeof apiClient.applyAiRun>;
+const startedPaths: Record<string, string> = {};
+
+const IDEA_PREVIEW = {
+  central_question: "Người rơi thấy gì, người ở xa thấy gì?",
+  curiosity_points: ["Chân trời sự kiện là gì?", "Cơ thể có bị kéo dài không?"],
+  scope: "Giải thích trực quan, không đi sâu vào toán.",
+};
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Ý tưởng",
+    method: "POST",
+    path: "/v1/projects/p1/idea/generate",
+    body: '{"note":""}',
+    channel: "api",
+    status: "ready",
+    prompt: "PROMPT Ý TƯỞNG",
+    reply: "{}",
+    preview: IDEA_PREVIEW,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
+
+/** Runs the open dialog on the API channel and applies the result it shows. */
+async function runAndApply(dialog: string) {
+  fireEvent.click(await screen.findByTestId(`${dialog}-run`));
+  await screen.findByTestId("ai-run-preview");
+  fireEvent.click(screen.getByTestId(`${dialog}-apply`));
+  await waitFor(() => expect(screen.queryByTestId(dialog)).toBeNull());
+}
 
 beforeEach(() => {
   llmEnabled = true;
@@ -63,13 +110,35 @@ beforeEach(() => {
   createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
   patchSettings = vi.spyOn(apiClient, "patchWizardSettings").mockResolvedValue(undefined);
   saveModels = vi.spyOn(apiClient, "saveAuthoringModels").mockResolvedValue(undefined);
-  generate = vi.spyOn(apiClient, "generateProjectIdea").mockImplementation(async () => {
-    server = { ...server, idea: ideaOf() };
-    return ideaOf();
+  // The dialogs only describe the step's request; the run itself goes through startAiRun.
+  generate = vi.spyOn(apiClient, "generateProjectIdea").mockImplementation(async (id, note) => {
+    throw new apiClient.ExternalRequestDescribed({
+      gateway: "",
+      method: "POST",
+      path: `/v1/projects/${id}/idea/generate`,
+      body: JSON.stringify({ note }),
+    });
   });
-  review = vi.spyOn(apiClient, "reviewProjectIdea").mockImplementation(async () => {
-    server = { ...server, review: REVIEW, reviewStale: false };
-    return REVIEW;
+  review = vi.spyOn(apiClient, "reviewProjectIdea").mockImplementation(async (id) => {
+    throw new apiClient.ExternalRequestDescribed({ gateway: "", method: "POST", path: `/v1/projects/${id}/idea/review` });
+  });
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({ defaultChannel: "api", stepChannels: {}, effective: { idea: "api" } });
+  startRun = vi.spyOn(apiClient, "startAiRun").mockImplementation(async (_svc, _id, run) => {
+    const isReview = run.request.path.endsWith("/review");
+    startedPaths[isReview ? "r-review" : "r-idea"] = run.request.path;
+    return aiRun({
+      id: isReview ? "r-review" : "r-idea",
+      path: run.request.path,
+      body: run.request.body ?? "",
+      channel: run.channel,
+      preview: isReview ? { ...REVIEW, scope_fit: REVIEW.scopeFit } : IDEA_PREVIEW,
+    });
+  });
+  applyRun = vi.spyOn(apiClient, "applyAiRun").mockImplementation(async (_svc, _id, rid) => {
+    if (rid === "r-review") server = { ...server, review: REVIEW, reviewStale: false };
+    else server = { ...server, idea: ideaOf() };
+    return { run: aiRun({ id: rid, path: startedPaths[rid], status: "applied" }), state: {} };
   });
 });
 
@@ -111,6 +180,11 @@ function renderPage({ reopen }: { reopen?: { projectId: string; topic: string } 
   );
 }
 
+async function runReview() {
+  fireEvent.click(screen.getByTestId("idea-review-run"));
+  await runAndApply("idea-review-dialog");
+}
+
 function typeText(value: string) {
   fireEvent.change(screen.getByTestId("script-step-topic"), { target: { value } });
 }
@@ -119,6 +193,7 @@ async function createWithAI(text = SUBJECT) {
   await screen.findByText("Tạo project và viết ý tưởng →");
   typeText(text);
   fireEvent.click(screen.getByTestId("script-step-create"));
+  await runAndApply("idea-write-dialog");
   await screen.findByTestId("idea-field-central_question");
 }
 
@@ -143,51 +218,48 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
   });
 
-  it("tạo project rồi mở hộp thoại AI ngoài để viết ý tưởng, không gọi AI của hệ thống", async () => {
-    generate.mockImplementation(async (_id, _note, call) => {
-      if (call && "external" in call && call.external.mode === "prompt") throw new apiClient.ExternalPromptReady("PROMPT Ý TƯỞNG");
-      return ideaOf() as never;
-    });
+  it("tạo project rồi mở hộp thoại viết ý tưởng; chưa gọi AI trước khi Creator bấm chạy", async () => {
     renderPage();
     await screen.findByText("Tạo project và viết ý tưởng →");
     typeText(SUBJECT);
-    fireEvent.click(screen.getByTestId("script-step-create-external"));
+    fireEvent.click(screen.getByTestId("script-step-create"));
 
-    expect(await screen.findByTestId("idea-create-external-dialog-prompt")).toHaveTextContent("PROMPT Ý TƯỞNG");
+    expect(await screen.findByTestId("idea-write-dialog-run")).toBeInTheDocument();
     expect(createDraft).toHaveBeenCalledWith(expect.any(String), SUBJECT, "vi");
-    expect(generate).toHaveBeenCalledTimes(1);
-    expect(generate).toHaveBeenCalledWith(expect.any(String), "", { external: { mode: "prompt" } });
+    expect(startRun).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("idea-field-central_question")).not.toBeInTheDocument();
   });
 
-  it("tạo project rồi thêm ý tưởng vào hàng đợi AI; extension đọc câu trả lời, trang chỉ tải lại", async () => {
-    const bridge = installFakeAiBridge({ queue: true });
-    const request = { gateway: "http://localhost:8080", method: "POST", path: "/v1/projects/p1/idea/generate", body: "{}" };
-    try {
-      generate.mockImplementation(async (_id, _note, call) => {
-        if (call && "external" in call) {
-          if (call.external.mode === "describe") throw new apiClient.ExternalRequestDescribed(request);
-          if (call.external.mode === "prompt") throw new apiClient.ExternalPromptReady("PROMPT Ý TƯỞNG");
-        }
-        return ideaOf() as never;
-      });
-      renderPage();
-      await screen.findByText("Tạo project và viết ý tưởng →");
-      typeText(SUBJECT);
-      fireEvent.click(await screen.findByTestId("script-step-create-queue"));
+  it("Chỉ tạo project: tạo xong không mở hộp thoại AI, ý tưởng viết sau bằng nút AI viết ý tưởng", async () => {
+    renderPage();
+    await screen.findByText("Tạo project và viết ý tưởng →");
+    typeText(SUBJECT);
+    fireEvent.click(screen.getByTestId("script-step-create-only"));
 
-      await waitFor(() => expect(bridge.queued).toHaveLength(1));
-      expect(createDraft).toHaveBeenCalledWith(expect.any(String), SUBJECT, "vi");
-      expect(bridge.queued[0].item).toMatchObject({ label: "Ý tưởng", request });
-      expect(generate).toHaveBeenCalledWith(expect.any(String), "", { external: { mode: "describe" } });
-      server = { ...server, idea: ideaOf() };
-      act(() => bridge.announce("q1", { status: "done", provider: "gemini" }));
+    fireEvent.click(await screen.findByTestId("idea-generate"));
+    expect(await screen.findByTestId("idea-write-dialog-run")).toBeInTheDocument();
+    expect(startRun).not.toHaveBeenCalled();
+  });
 
-      expect(await screen.findByTestId("idea-field-central_question")).toHaveTextContent("Người rơi thấy gì");
-      expect(generate).not.toHaveBeenCalledWith(expect.any(String), "", { external: expect.objectContaining({ mode: "paste" }) });
-      expect(review).not.toHaveBeenCalled();
-    } finally {
-      bridge.remove();
-    }
+  it("ghi chú đi cùng yêu cầu của lượt chạy; kết quả chỉ lưu sau khi bấm Áp dụng", async () => {
+    renderPage();
+    await createWithAI();
+    fireEvent.click(screen.getByTestId("idea-actions-redo"));
+    fireEvent.change(await screen.findByTestId("idea-write-dialog-note"), { target: { value: "nhấn mạnh ngộ nhận" } });
+    fireEvent.click(screen.getByTestId("idea-write-dialog-run"));
+
+    await waitFor(() =>
+      expect(startRun).toHaveBeenLastCalledWith("authoring", expect.any(String), {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", body: JSON.stringify({ note: "nhấn mạnh ngộ nhận" }) }),
+        channel: "api",
+      }),
+    );
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Chân trời sự kiện là gì?");
+    expect(applyRun).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("idea-write-dialog-apply"));
+    await waitFor(() => expect(applyRun).toHaveBeenCalledTimes(2));
+    expect(review).not.toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ id: expect.any(String) }));
   });
 
   it("tạo project với giá trị mặc định, AI viết ba trường; đánh giá chỉ chạy khi Creator nhờ", async () => {
@@ -195,12 +267,13 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     await screen.findByText("Tạo project và viết ý tưởng →");
     typeText("  " + SUBJECT + "  ");
     fireEvent.click(screen.getByTestId("script-step-create"));
+    await runAndApply("idea-write-dialog");
 
     await screen.findByTestId("idea-field-central_question");
     expect(createDraft).toHaveBeenCalledWith(expect.any(String), SUBJECT, "vi");
     expect(patchSettings).not.toHaveBeenCalled();
-    expect(saveModels.mock.invocationCallOrder[0]).toBeLessThan(generate.mock.invocationCallOrder[0]);
-    expect(generate).toHaveBeenCalledWith(expect.any(String), "", expect.objectContaining({ id: expect.any(String) }));
+    expect(saveModels.mock.invocationCallOrder[0]).toBeLessThan(startRun.mock.invocationCallOrder[0]);
+    expect(startRun).toHaveBeenCalledWith("authoring", expect.any(String), expect.objectContaining({ channel: "api" }));
 
     expect(screen.queryByTestId("idea-field-refined_topic")).not.toBeInTheDocument();
     expect(screen.getByTestId("idea-field-central_question")).toHaveTextContent("Người rơi thấy gì");
@@ -210,10 +283,8 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chờ bạn duyệt ý tưởng");
 
     // Writing the idea does not start a review; the Creator asks for one.
-    expect(review).not.toHaveBeenCalled();
     expect(screen.getByTestId("idea-review-none")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("idea-review-run"));
-    await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
+    await runReview();
     expect(await screen.findByTestId("idea-review-unclear")).toHaveTextContent("Khán giả là ai?");
     expect(screen.getByTestId("idea-review-suggestions")).toHaveTextContent("hố đen sao hay siêu nặng");
     expect(screen.getByTestId("idea-review-panel")).toHaveTextContent("Phạm vi hơi rộng");
@@ -229,16 +300,9 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(screen.getByTestId("script-step-topic")).toHaveValue("Vì sao người ta nói “ăn sung là ăn xác ong”? Đường dẫn C:/tmp");
 
     fireEvent.click(screen.getByTestId("script-step-create"));
+    await runAndApply("idea-write-dialog");
     await screen.findByTestId("idea-field-central_question");
     expect(createDraft).toHaveBeenCalledWith(expect.any(String), "Vì sao người ta nói “ăn sung là ăn xác ong”? Đường dẫn C:/tmp", "vi");
-  });
-
-  it("ghi chú làm lại cũng được làm sạch dấu nháy kép", async () => {
-    renderPage();
-    await createWithAI();
-    fireEvent.click(screen.getByTestId("idea-actions-redo"));
-    fireEvent.change(await screen.findByTestId("idea-redo-note"), { target: { value: 'nhấn mạnh "ngộ nhận"' } });
-    expect(screen.getByTestId("idea-redo-note")).toHaveValue("nhấn mạnh “ngộ nhận”");
   });
 
   it("ngôn ngữ đã chọn đi cùng lúc tạo project", async () => {
@@ -247,6 +311,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     fireEvent.click(screen.getByTestId("content-language-en"));
     typeText("What if we fell into a black hole?");
     fireEvent.click(screen.getByTestId("script-step-create"));
+    await runAndApply("idea-write-dialog");
     await screen.findByTestId("idea-field-central_question");
     expect(createDraft).toHaveBeenCalledWith(expect.any(String), "What if we fell into a black hole?", "en");
   });
@@ -258,10 +323,11 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     fireEvent.click(await screen.findByTestId("idea-brief-model-option-ollama"));
     typeText("Ong sung");
     fireEvent.click(screen.getByTestId("script-step-create"));
+    await runAndApply("idea-write-dialog");
 
     await screen.findByTestId("idea-field-central_question");
     expect(saveModels).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ brief: "ollama" }));
-    expect(saveModels.mock.invocationCallOrder[0]).toBeLessThan(generate.mock.invocationCallOrder[0]);
+    expect(saveModels.mock.invocationCallOrder[0]).toBeLessThan(startRun.mock.invocationCallOrder[0]);
   });
 
   it("cảnh báo chủ đề trùng ngay sau khi tạo project, không chặn bước", async () => {
@@ -285,29 +351,31 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(screen.getByTestId("script-step-create")).not.toBeDisabled();
   });
 
-  it("báo lỗi AI ngay trên thẻ ý tưởng, và vẫn cho tự viết hoặc nhờ AI viết lại", async () => {
-    generate.mockRejectedValue(new apiClient.ApiError("câu trả lời của AI không dùng được làm ý tưởng. Thử làm lại, hoặc tự điền các ô.", undefined, undefined, 502));
+  it("lượt viết lỗi báo ngay trong hộp thoại; ý tưởng chưa có thì vẫn cho tự viết", async () => {
+    startRun.mockRejectedValueOnce(new apiClient.ApiError("Chưa cấu hình AI", undefined, undefined, 503));
     renderPage();
     await screen.findByText("Tạo project và viết ý tưởng →");
     typeText("Ong sung");
     fireEvent.click(screen.getByTestId("script-step-create"));
+    fireEvent.click(await screen.findByTestId("idea-write-dialog-run"));
 
-    expect(await screen.findByTestId("idea-error")).toHaveTextContent("không dùng được làm ý tưởng");
-    expect(screen.getByTestId("idea-write-own")).toBeInTheDocument();
+    expect(await screen.findByTestId("idea-write-dialog-error")).toHaveTextContent("Chưa cấu hình AI");
+    fireEvent.click(screen.getByTestId("idea-write-dialog-cancel"));
+    expect(await screen.findByTestId("idea-write-own")).toBeInTheDocument();
     expect(screen.getByTestId("idea-generate")).toBeInTheDocument();
-    expect(review).not.toHaveBeenCalled();
   });
 
-  it("đánh giá lỗi không làm mất ý tưởng; chạy lại được", async () => {
-    review.mockRejectedValueOnce(new apiClient.ApiError("câu trả lời của AI không dùng được làm đánh giá ý tưởng.", undefined, undefined, 502));
+  it("đánh giá xem trước rồi mới lưu; chưa áp dụng thì ý tưởng chưa có đánh giá", async () => {
     renderPage();
     await createWithAI();
     fireEvent.click(screen.getByTestId("idea-review-run"));
-    expect(await screen.findByTestId("idea-error")).toHaveTextContent("đánh giá ý tưởng");
-    expect(screen.getByTestId("idea-field-central_question")).toHaveTextContent("Người rơi thấy gì");
+    fireEvent.click(await screen.findByTestId("idea-review-dialog-run"));
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Khán giả là ai?");
+    expect(screen.getByTestId("ai-run-preview")).toHaveTextContent("Phạm vi hơi rộng");
+    expect(applyRun).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("idea-review-none")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("idea-review-run"));
+    fireEvent.click(screen.getByTestId("idea-review-dialog-apply"));
     await screen.findByTestId("idea-review-unclear");
     expect(screen.queryByTestId("idea-review-stale")).not.toBeInTheDocument();
   });
@@ -319,7 +387,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     });
     renderPage();
     await createWithAI();
-    fireEvent.click(screen.getByTestId("idea-review-run"));
+    await runReview();
     await screen.findByTestId("idea-review-unclear");
 
     const panel = screen.getByTestId("idea-review-panel");
@@ -337,9 +405,9 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
   });
 
   it("không cho duyệt ý tưởng còn ô trống, và nói ô nào", async () => {
-    generate.mockImplementation(async () => {
+    applyRun.mockImplementationOnce(async (_svc, _id, rid) => {
       server = { ...server, idea: ideaOf({ scope: "", curiosityPoints: [] }) };
-      return ideaOf();
+      return { run: aiRun({ id: rid, path: startedPaths[rid], status: "applied" }), state: {} };
     });
     renderPage();
     await createWithAI();
@@ -357,7 +425,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     });
     renderPage();
     await createWithAI();
-    fireEvent.click(screen.getByTestId("idea-review-run"));
+    await runReview();
     await screen.findByTestId("idea-review-unclear");
 
     fireEvent.click(screen.getByTestId("idea-actions-edit"));
@@ -382,31 +450,25 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(await screen.findByTestId("idea-edit")).toHaveTextContent("về chờ duyệt");
   });
 
-  it("Làm lại kèm ghi chú: nút tím, cần ghi chú, gửi ghi chú cho AI; không tự đánh giá", async () => {
+  it("Làm lại kèm ghi chú: ghi chú không bắt buộc; không tự đánh giá", async () => {
     renderPage();
     await createWithAI();
+    startRun.mockClear();
 
     fireEvent.click(screen.getByTestId("idea-actions-redo"));
-    const send = await screen.findByTestId("idea-redo-send");
-    await waitFor(() => expect(send.className).toContain("runBtn"));
-    expect(send).toBeDisabled();
-
-    fireEvent.change(screen.getByTestId("idea-redo-note"), { target: { value: "  nhấn mạnh ngộ nhận " } });
-    fireEvent.click(screen.getByTestId("idea-redo-send"));
-
-    await waitFor(() =>
-      expect(generate).toHaveBeenLastCalledWith(expect.any(String), "nhấn mạnh ngộ nhận", expect.objectContaining({ id: expect.any(String) })),
-    );
-    await waitFor(() => expect(screen.queryByTestId("idea-redo")).not.toBeInTheDocument());
-    expect(review).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("idea-write-dialog-note")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("idea-write-dialog-run"));
+    await waitFor(() => expect(startRun).toHaveBeenCalledTimes(1));
+    expect(startRun.mock.calls[0][2].request.body).toBe(JSON.stringify({ note: "" }));
+    expect(startRun.mock.calls.some((c) => c[2].request.path.endsWith("/review"))).toBe(false);
   });
 
-  it("đổi model AI ở modal làm lại thì lưu lên project", async () => {
+  it("đổi model AI ở hộp thoại viết ý tưởng thì lưu lên project", async () => {
     renderPage();
     await createWithAI();
     fireEvent.click(screen.getByTestId("idea-actions-redo"));
-    fireEvent.click(await screen.findByTestId("idea-redo-model"));
-    fireEvent.click(await screen.findByTestId("idea-redo-model-option-ollama"));
+    fireEvent.click(await screen.findByTestId("idea-write-model"));
+    fireEvent.click(await screen.findByTestId("idea-write-model-option-ollama"));
     await waitFor(() => expect(saveModels).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ brief: "ollama" })));
   });
 
@@ -426,12 +488,12 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
   it("không có AI: chỉ tạo project, rồi Creator tự viết ý tưởng và không có nút đánh giá", async () => {
     llmEnabled = false;
     renderPage();
-    await screen.findByText("Tạo project →");
+    await screen.findByText("Chỉ tạo project");
     typeText("Ong sung");
-    fireEvent.click(screen.getByTestId("script-step-create"));
+    fireEvent.click(screen.getByTestId("script-step-create-only"));
 
     fireEvent.click(await screen.findByTestId("idea-write-own"));
-    expect(generate).not.toHaveBeenCalled();
+    expect(startRun).not.toHaveBeenCalled();
     expect(await screen.findByText("Tự viết · Ý tưởng")).toBeInTheDocument();
   });
 

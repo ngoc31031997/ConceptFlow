@@ -1,9 +1,15 @@
 import { useState } from "react";
-import { generateProjectIdea, reviewProjectIdea, type IdeaAspect, type IdeaRating, type ProjectIdeaField } from "../../api/client";
+import {
+  describeAiRequest,
+  generateProjectIdea,
+  reviewProjectIdea,
+  type IdeaAspect,
+  type IdeaRating,
+  type ProjectIdeaField,
+} from "../../api/client";
 import type { ProjectIdeaControls } from "../../hooks/useProjectIdea";
 import { AiModelSelect } from "../AiModelSelect";
-import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiButton } from "../ExternalAiButton";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import { Button, Card } from "../ui";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import { UnitStatusChip } from "../units/UnitStatusChip";
@@ -11,7 +17,7 @@ import unitStyles from "../units/units.module.css";
 import cardStyles from "../CreativeBriefCard.module.css";
 import styles from "./ProjectIdeaCard.module.css";
 import { IdeaEditModal } from "./IdeaEditModal";
-import { IdeaRedoModal } from "./IdeaRedoModal";
+import { IdeaRunPreview } from "./IdeaRunPreview";
 
 const FIELD_LABELS: Record<ProjectIdeaField, string> = {
   central_question: "Câu hỏi trung tâm",
@@ -36,8 +42,11 @@ interface ProjectIdeaCardProps {
   /** The project exists on the server; before that there is no idea to load. */
   created: boolean;
   idea: ProjectIdeaControls;
-  /** A language model is configured, so the AI can write, redo and review the idea. */
+  /** The system's own language model is configured; it only changes the hints, since an outside AI can run too. */
   aiAvailable: boolean;
+  /** The dialog that has the AI write or redo the idea is open; the page opens it right after it creates the project. */
+  writeOpen: boolean;
+  onWriteOpenChange: (open: boolean) => void;
 }
 
 function Aspect({ label, aspect }: { label: string; aspect: IdeaAspect }) {
@@ -57,12 +66,21 @@ function Aspect({ label, aspect }: { label: string; aspect: IdeaAspect }) {
  * AI's review of it, and the actions that decide it. The review comes before
  * the approve button (docs/ux-ui-design-rules.md, rule 1) and only advises;
  * approval needs the three fields filled and nothing else. "Sửa tay" and
- * "Làm lại kèm ghi chú" open their dialogs (rule 4). Without a language model
+ * "Làm lại kèm ghi chú" open their dialogs (rule 4); the AI actions run in the shared run dialog, which shows the result before it is stored (ADR-0052). Without a language model
  * the Creator writes the idea and approves it.
  */
-export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: ProjectIdeaCardProps) {
+export function ProjectIdeaCard({
+  projectId,
+  created,
+  idea,
+  aiAvailable,
+  writeOpen,
+  onWriteOpenChange,
+}: ProjectIdeaCardProps) {
   const [editOpen, setEditOpen] = useState(false);
-  const [redoOpen, setRedoOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const ideaPath = `/v1/projects/${projectId}/idea/generate`;
+  const reviewPath = `/v1/projects/${projectId}/idea/review`;
 
   const screen = idea.screen;
   const stored = screen?.idea ?? null;
@@ -73,18 +91,16 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
     if (stored.curiosityPoints.length === 0) missing.push("curiosity_points");
     if (!stored.scope.trim()) missing.push("scope");
   }
-  const working = idea.writing || idea.reviewing;
-
-  const chip = idea.writing ? (
-    <UnitStatusChip state="running" testId="idea-status" />
-  ) : stored ? (
-    <UnitStatusChip state={stored.status} testId="idea-status" />
-  ) : null;
+  const chip = stored ? <UnitStatusChip state={stored.status} testId="idea-status" /> : null;
 
   function mine(name: ProjectIdeaField) {
     if (!stored?.creatorFields.includes(name)) return null;
     return (
-      <span className={unitStyles.mine} title="AI giữ nguyên ô này khi làm lại" data-testid={`idea-mine-${name}`}>
+      <span
+        className={unitStyles.mine}
+        title="AI giữ nguyên ô này khi làm lại"
+        data-testid={`idea-mine-${name}`}
+      >
         ✎ Bạn viết
       </span>
     );
@@ -97,7 +113,9 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
           {FIELD_LABELS[name]}
           {mine(name)}
         </span>
-        <p className={cardStyles.value}>{value.trim() || <span className={cardStyles.empty}>(trống)</span>}</p>
+        <p className={cardStyles.value}>
+          {value.trim() || <span className={cardStyles.empty}>(trống)</span>}
+        </p>
       </div>
     );
   }
@@ -109,18 +127,19 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
         <div className={styles.reviewHead}>
           <h4>Đánh giá của AI</h4>
           <div className={cardStyles.actions}>
-            <ExternalAiButton
-              title="Đánh giá ý tưởng · AI ngoài"
-              run={(external) => reviewProjectIdea(projectId, { external })}
-              onDone={idea.reload}
-              disabled={working || idea.busy || missing.length > 0}
-              testId="idea-review-external"
+            <Button
+              variant="run"
+              onClick={() => setReviewOpen(true)}
+              disabled={idea.busy || missing.length > 0}
+              data-testid="idea-review-run"
+            >
+              {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
+            </Button>
+            <AiRunPill
+              runPath={reviewPath}
+              onOpen={() => setReviewOpen(true)}
+              testId="idea-review-ai-run"
             />
-            {aiAvailable && (
-              <Button variant="run" onClick={() => void idea.review()} disabled={working || idea.busy || missing.length > 0} data-testid="idea-review-run">
-                {review ? "Đánh giá lại" : "Nhờ AI đánh giá"}
-              </Button>
-            )}
           </div>
         </div>
         {!review && (
@@ -164,7 +183,6 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
             )}
           </>
         )}
-        <AiOperationCard run={idea.reviewRun} active={idea.reviewing} testId="idea-review-progress" title="AI đang đọc ý tưởng" />
       </div>
     );
   }
@@ -201,30 +219,37 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
       );
     }
     if (!stored) {
-      if (idea.writing) return null;
       return (
         <>
           <p className={cardStyles.hint}>
             {aiAvailable
               ? "Chưa có ý tưởng. AI viết từ nội dung bạn đã gõ, hoặc bạn tự viết."
-              : "Chưa có ý tưởng. Chưa cấu hình AI nên bạn tự viết ý tưởng rồi duyệt."}
+              : "Chưa có ý tưởng. AI viết từ nội dung bạn đã gõ (qua extension hoặc dán tay khi chưa cấu hình model hệ thống), hoặc bạn tự viết."}
           </p>
-          {aiAvailable && <AiModelSelect projectId={projectId} step="brief" label="Model AI viết ý tưởng" testId="idea-model" />}
+          {aiAvailable && (
+            <AiModelSelect
+              projectId={projectId}
+              step="brief"
+              label="Model AI viết ý tưởng"
+              testId="idea-model"
+            />
+          )}
           <div className={cardStyles.actions}>
             <Button variant="ghost" onClick={() => setEditOpen(true)} data-testid="idea-write-own">
               Tự viết ý tưởng
             </Button>
-            <ExternalAiButton
-              title="Ý tưởng · AI ngoài"
-              run={(external) => generateProjectIdea(projectId, "", { external })}
-              onDone={idea.reload}
-              testId="idea-generate-external"
+            <Button
+              variant="run"
+              onClick={() => onWriteOpenChange(true)}
+              data-testid="idea-generate"
+            >
+              AI viết ý tưởng
+            </Button>
+            <AiRunPill
+              runPath={ideaPath}
+              onOpen={() => onWriteOpenChange(true)}
+              testId="idea-ai-run"
             />
-            {aiAvailable && (
-              <Button variant="run" onClick={() => void idea.generate()} data-testid="idea-generate">
-                AI viết ý tưởng
-              </Button>
-            )}
           </div>
         </>
       );
@@ -232,11 +257,13 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
     return (
       <>
         <p className={cardStyles.hint}>
-          AI viết từ nội dung bạn đã gõ. Ô nào cũng sửa được bằng “Sửa tay”; ô bạn đã sửa thì AI giữ nguyên khi làm lại.
+          AI viết từ nội dung bạn đã gõ. Ô nào cũng sửa được bằng “Sửa tay”; ô bạn đã sửa thì AI giữ
+          nguyên khi làm lại.
         </p>
         {screen.inputChanged && (
           <p className={styles.banner} data-testid="idea-input-changed">
-            Nội dung hoặc ngôn ngữ đã đổi sau khi AI viết ý tưởng này. Dùng “Làm lại kèm ghi chú” nếu muốn viết lại theo bản mới.
+            Nội dung hoặc ngôn ngữ đã đổi sau khi AI viết ý tưởng này. Dùng “Làm lại kèm ghi chú”
+            nếu muốn viết lại theo bản mới.
           </p>
         )}
         {text("central_question", stored.centralQuestion)}
@@ -261,17 +288,18 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
         {reviewPanel()}
         {stored.status === "pending" && missing.length > 0 && (
           <p className={cardStyles.hint} data-testid="idea-missing">
-            Còn trống: {missing.map((f) => FIELD_LABELS[f]).join("; ")}. Điền đủ các ô rồi mới duyệt được.
+            Còn trống: {missing.map((f) => FIELD_LABELS[f]).join("; ")}. Điền đủ các ô rồi mới duyệt
+            được.
           </p>
         )}
         <UnitReviewBar
           status={stored.status}
           approveLabel="Duyệt ý tưởng"
           approveDisabled={missing.length > 0}
-          busy={idea.busy || working}
+          busy={idea.busy}
           canRedo
           onEdit={() => setEditOpen(true)}
-          onRedo={() => setRedoOpen(true)}
+          onRedo={() => onWriteOpenChange(true)}
           onApprove={() => void idea.approve()}
           onUnapprove={() => void idea.unapprove()}
           testId="idea-actions"
@@ -288,7 +316,6 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
           {chip}
         </div>
         {body()}
-        <AiOperationCard run={idea.writeRun} active={idea.writing} testId="idea-progress" title="AI đang viết ý tưởng" />
         {idea.actionError && (
           <p className={cardStyles.error} role="alert" data-testid="idea-error">
             {idea.actionError}
@@ -296,18 +323,56 @@ export function ProjectIdeaCard({ projectId, created, idea, aiAvailable }: Proje
         )}
       </div>
 
-      <IdeaEditModal open={editOpen} onClose={() => setEditOpen(false)} idea={stored} onSave={idea.edit} />
-      <IdeaRedoModal
-        open={redoOpen}
-        onClose={() => setRedoOpen(false)}
-        approved={stored?.status === "approved"}
-        initialNote={idea.failedNote}
-        modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="brief" label="Model AI viết ý tưởng" testId="idea-redo-model" /> : undefined}
-        onSend={aiAvailable ? (note) => void idea.generate(note) : undefined}
-        external={{
-          run: (note, external) => generateProjectIdea(projectId, note, { external }),
-          onDone: idea.reload,
-        }}
+      <IdeaEditModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        idea={stored}
+        onSave={idea.edit}
+      />
+      <AiRunDialog
+        open={writeOpen}
+        onClose={() => onWriteOpenChange(false)}
+        title={stored ? "Làm lại kèm ghi chú · Ý tưởng" : "Viết ý tưởng"}
+        runPath={ideaPath}
+        describe={(note) =>
+          describeAiRequest((external) => generateProjectIdea(projectId, note, { external }))
+        }
+        renderPreview={(p) => <IdeaRunPreview kind="idea" preview={p} />}
+        impact={
+          <>
+            <p className={unitStyles.note}>
+              AI viết lại các ô bạn chưa sửa; ô “Bạn viết” giữ nguyên.
+              {stored?.status === "approved" ? " Ý tưởng đang được duyệt sẽ về chờ duyệt." : ""}
+            </p>
+            {aiAvailable && (
+              <AiModelSelect
+                projectId={projectId}
+                step="brief"
+                label="Model AI viết ý tưởng"
+                testId="idea-write-model"
+              />
+            )}
+          </>
+        }
+        onApplied={idea.reload}
+        testId="idea-write-dialog"
+      />
+      <AiRunDialog
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        title="Đánh giá ý tưởng"
+        runPath={reviewPath}
+        describe={() => describeAiRequest((external) => reviewProjectIdea(projectId, { external }))}
+        noNote
+        renderPreview={(p) => <IdeaRunPreview kind="review" preview={p} />}
+        impact={
+          <p className={unitStyles.note}>
+            AI đọc ý tưởng về độ rõ, khả năng nghiên cứu và phạm vi. Đánh giá chỉ để bạn tham khảo:
+            không đổi ý tưởng, không đổi trạng thái duyệt.
+          </p>
+        }
+        onApplied={idea.reload}
+        testId="idea-review-dialog"
       />
     </Card>
   );
