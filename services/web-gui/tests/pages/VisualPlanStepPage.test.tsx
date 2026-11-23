@@ -9,6 +9,39 @@ import * as apiClient from "../../src/api/client";
 import type { VisualPlanBeat, VisualPlanState, VisualPlanUnit } from "../../src/api/client";
 import type { Project } from "../../src/types";
 
+const queueAdd = vi.fn();
+let queueAvailable = true;
+
+vi.mock("../../src/hooks/useAiQueue", () => ({
+  useAiQueue: () => ({
+    available: queueAvailable,
+    outdated: false,
+    counts: null,
+    add: queueAdd,
+    items: {},
+  }),
+}));
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Kế hoạch hình",
+    method: "POST",
+    path: "/v1/projects/p1/visual-plan/beats/b3/generate",
+    body: '{"note":""}',
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT BEAT",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
+
 function Where() {
   const l = useLocation();
   return <span data-testid="where">{l.pathname}</span>;
@@ -127,6 +160,14 @@ beforeEach(() => {
   vi.spyOn(apiClient, "listProjects").mockResolvedValue([]);
   vi.spyOn(apiClient, "getResearch").mockRejectedValue(new Error("no"));
   vi.spyOn(apiClient, "getVisualPlan").mockImplementation(async () => state);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { visual_plan: "api" },
+  });
+  queueAdd.mockReset();
+  queueAvailable = true;
   Element.prototype.scrollIntoView = vi.fn();
 });
 
@@ -297,37 +338,99 @@ describe("VisualPlanStepPage", () => {
     await waitFor(() => expect(merge).toHaveBeenCalledWith("p1", "VP-002", "VP-003"));
   });
 
-  it("plans one beat with a note on the system's AI", async () => {
-    const gen = vi.spyOn(apiClient, "generateVisualPlanBeat").mockResolvedValue(baseState());
+  it("plans one beat with a note on the step's channel", async () => {
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
     renderPage();
     fireEvent.click(await screen.findByTestId("plan-beat-b3-generate"));
     expect(screen.getByTestId("plan-beat-b3-generate")).toHaveTextContent("Lập kế hoạch beat này");
     expect(screen.getByTestId("plan-beat-b2-generate")).toHaveTextContent("Lập lại beat này");
     const dialog = await screen.findByTestId("plan-beat-b3-dialog");
     fireEvent.change(within(dialog).getByTestId("plan-beat-b3-dialog-note"), { target: { value: "ít chữ" } });
-    fireEvent.click(within(dialog).getByTestId("plan-beat-b3-dialog-send"));
+    fireEvent.click(within(dialog).getByTestId("plan-beat-b3-dialog-run"));
     await waitFor(() =>
-      expect(gen).toHaveBeenCalledWith("p1", "b3", "ít chữ", expect.objectContaining({ signal: expect.anything() })),
+      expect(start).toHaveBeenCalledWith("visual", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({
+          method: "POST",
+          path: "/v1/projects/p1/visual-plan/beats/b3/generate",
+          body: JSON.stringify({ note: "ít chữ" }),
+        }),
+        channel: "api",
+      }),
     );
   });
 
-  it("redoes a unit's beat with a note from the unit", async () => {
-    const gen = vi.spyOn(apiClient, "generateVisualPlanBeat").mockResolvedValue(baseState());
+  it("redoes a unit's beat from the unit through the same run as the beat", async () => {
+    const start = vi
+      .spyOn(apiClient, "startAiRun")
+      .mockResolvedValue(aiRun({ path: "/v1/projects/p1/visual-plan/beats/b2/generate" }));
     renderPage();
     fireEvent.click(await screen.findByTestId("plan-unit-VP-003-redo"));
     const dialog = await screen.findByTestId("plan-unit-VP-003-redo-dialog");
-    fireEvent.click(within(dialog).getByTestId("plan-unit-VP-003-redo-dialog-send"));
-    await waitFor(() => expect(gen).toHaveBeenCalledWith("p1", "b2", "", expect.anything()));
+    fireEvent.click(within(dialog).getByTestId("plan-unit-VP-003-redo-dialog-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("visual", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ path: "/v1/projects/p1/visual-plan/beats/b2/generate", body: JSON.stringify({ note: "" }) }),
+        channel: "api",
+      }),
+    );
   });
 
-  it("plans every empty beat in one run", async () => {
+  it("plans a beat by hand: paste the reply, see the units, then apply", async () => {
+    vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "waiting" }));
+    const preview = [
+      {
+        unit_id: "",
+        script_refs: ["b3.1", "b3.2"],
+        narration_summary: "Hố đen nuốt sao",
+        communication_goal: "Thấy sao bị xé",
+        visual_approach: { method: "diagram", description: "Sơ đồ sao rơi", concept_rule_refs: [] },
+      },
+    ];
+    const reply = vi
+      .spyOn(apiClient, "replyAiRun")
+      .mockResolvedValue(aiRun({ channel: "manual", status: "ready", reply: "{...}", preview }));
+    const apply = vi
+      .spyOn(apiClient, "applyAiRun")
+      .mockResolvedValue({ run: aiRun({ channel: "manual", status: "applied" }), state: baseState() });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("plan-beat-b3-generate"));
+    fireEvent.click(await screen.findByTestId("plan-beat-b3-dialog-run-more"));
+    fireEvent.click(screen.getByTestId("plan-beat-b3-dialog-run-manual"));
+    expect(await screen.findByTestId("plan-beat-b3-dialog-prompt")).toHaveTextContent("PROMPT BEAT");
+    fireEvent.click(screen.getByTestId("plan-beat-b3-dialog-tab-reply"));
+    fireEvent.change(screen.getByTestId("plan-beat-b3-dialog-reply"), { target: { value: "{...}" } });
+    fireEvent.click(screen.getByTestId("plan-beat-b3-dialog-read"));
+    await waitFor(() => expect(reply).toHaveBeenCalledWith("visual", "p1", "r1", "{...}"));
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Hố đen nuốt sao");
+    expect(apply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("plan-beat-b3-dialog-apply"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("visual", "p1", "r1"));
+  });
+
+  it("plans every empty beat in one run on the system's AI", async () => {
     const gen = vi.spyOn(apiClient, "generateVisualPlan").mockResolvedValue(baseState());
     renderPage();
     const open = await screen.findByTestId("plan-generate");
-    expect(open).toHaveTextContent("AI lập 1 beat còn trống");
+    expect(open).toHaveTextContent("Lập kế hoạch 1 beat còn trống");
+    expect(open).toHaveTextContent("(API)");
     fireEvent.click(open);
     fireEvent.click(await screen.findByTestId("plan-generate-confirm"));
     await waitFor(() => expect(gen).toHaveBeenCalledWith("p1", "", expect.objectContaining({ signal: expect.anything() })));
+  });
+
+  it("queues one AI item per beat not approved, and has no manual batch", async () => {
+    const request = { gateway: "http://gw", method: "POST", path: "/v1/projects/p1/visual-plan/beats/b2/generate", body: "{}" };
+    vi.spyOn(apiClient, "generateVisualPlanBeat").mockRejectedValue(new apiClient.ExternalRequestDescribed(request));
+    queueAdd.mockResolvedValue({ ok: true, added: true });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("plan-generate-more"));
+    expect(screen.getByTestId("plan-generate-manual")).toBeDisabled();
+    expect(screen.getByTestId("plan-generate-manual")).toHaveTextContent("chạy thủ công ở từng beat");
+    fireEvent.click(screen.getByTestId("plan-generate-extension"));
+    await waitFor(() => expect(queueAdd).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("plan-queue-note")).toHaveTextContent("Đã thêm 2 beat vào hàng đợi AI");
   });
 
   it("approves every unit that is ready", async () => {
@@ -406,15 +509,22 @@ describe("VisualPlanStepPage", () => {
     expect(screen.getByTestId("plan-tab-plan")).toHaveAttribute("aria-selected", "true");
   });
 
-  it("runs the review on the system's AI with a note", async () => {
-    const review = vi.spyOn(apiClient, "reviewVisualPlan").mockResolvedValue(baseState());
+  it("runs the review on the step's channel with a note", async () => {
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path: "/v1/projects/p1/visual-plan/review" }));
     renderPage();
     fireEvent.click(await screen.findByTestId("plan-tab-review"));
     expect(screen.getByTestId("plan-review-run")).toHaveTextContent("Rà soát lại");
     fireEvent.click(screen.getByTestId("plan-review-run"));
     const dialog = await screen.findByTestId("plan-review-dialog");
-    fireEvent.click(within(dialog).getByTestId("plan-review-dialog-send"));
-    await waitFor(() => expect(review).toHaveBeenCalledWith("p1", "", expect.objectContaining({ signal: expect.anything() })));
+    fireEvent.change(within(dialog).getByTestId("plan-review-dialog-note"), { target: { value: "kỹ" } });
+    fireEvent.click(within(dialog).getByTestId("plan-review-dialog-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("visual", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ path: "/v1/projects/p1/visual-plan/review", body: JSON.stringify({ note: "kỹ" }) }),
+        channel: "api",
+      }),
+    );
   });
 
   it("locks with a reason when it cannot: the blockers and the criteria say what is missing", async () => {
