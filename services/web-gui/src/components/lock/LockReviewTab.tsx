@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { reviewScript, type FindingState, type ReviewFinding } from "../../api/client";
+import { describeAiRequest, reviewScript, type FindingState, type ReviewFinding } from "../../api/client";
 import type { ScriptLockControls } from "../../hooks/useScriptLock";
 import { scriptRoute } from "../../utils/flow";
-import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiButton } from "../ExternalAiButton";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, FormField, TextArea } from "../ui";
 import styles from "./lock.module.css";
+import { LockRunPreview } from "./LockRunPreview";
 
 interface LockReviewTabProps {
   projectId: string;
@@ -43,9 +43,11 @@ function lineLink(projectId: string, line: string): string {
 export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockReviewTabProps) {
   const state = lock.state;
   const [note, setNote] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
   if (!state) return null;
   const busy = locked || lock.busy || lock.running !== null;
   const reviewed = state.reviewed;
+  const reviewPath = `/v1/projects/${projectId}/script-lock/review`;
 
   const row = (f: ReviewFinding) => {
     const chip = CHIP[f.state];
@@ -112,28 +114,15 @@ export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockRevi
             <span className={researchStyles.hint}>máy kiểm và AI rà soát · {state.openCount} mục cần xử lý</span>
           </div>
           <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
-            <ExternalAiButton
-              title="Rà soát kịch bản · AI ngoài"
-              label="Rà soát bằng AI ngoài"
-              run={(external) => reviewScript(projectId, { external })}
-              onDone={lock.reload}
-              disabled={busy || !state.scriptReady}
-              testId="lock-review-external"
-            />
-            {aiAvailable ? (
-              <Button variant="run" onClick={() => void lock.review()} disabled={busy || !state.scriptReady} data-testid="lock-review-run">
-                {reviewed ? "Rà soát lại" : "AI rà soát"}
-              </Button>
-            ) : (
-              <span className={researchStyles.hint}>Chưa cấu hình AI: chỉ có phần máy kiểm. Mục “AI chưa rà soát” chấp nhận kèm lý do được, hoặc rà soát bằng AI ngoài.</span>
-            )}
-            {aiAvailable && (
-              <span className={researchStyles.hint}>
-                {reviewed ? "AI so bản lời thoại hiện tại với các mục đã phát hiện." : "AI đọc cả kịch bản một lượt."}
-              </span>
-            )}
+            <Button variant="run" onClick={() => setReviewOpen(true)} disabled={busy || !state.scriptReady} data-testid="lock-review-run">
+              {reviewed ? "Rà soát lại" : "Rà soát bằng AI"}
+            </Button>
+            <AiRunPill runPath={reviewPath} onOpen={() => setReviewOpen(true)} testId="lock-review-ai-run" />
+            <span className={researchStyles.hint}>
+              {reviewed ? "AI so bản lời thoại hiện tại với các mục đã phát hiện." : "AI đọc cả kịch bản một lượt."}
+              {!aiAvailable && " Chưa cấu hình AI của hệ thống: chạy bằng extension hoặc thủ công."}
+            </span>
           </div>
-          <AiOperationCard run={lock.run} active={lock.running === "review"} testId="lock-review-progress" title="AI đang rà soát kịch bản" />
           <div className={styles.findings}>{state.findings.map(row)}</div>
         </div>
       </Card>
@@ -170,6 +159,23 @@ export function LockReviewTab({ projectId, lock, aiAvailable, locked }: LockRevi
           </div>
         </div>
       </Card>
+
+      <AiRunDialog
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        title={reviewed ? "Rà soát lại kịch bản" : "Rà soát kịch bản"}
+        runPath={reviewPath}
+        describe={() => describeAiRequest((external) => reviewScript(projectId, { external }))}
+        noNote
+        renderPreview={(p) => <LockRunPreview kind="review" preview={p} />}
+        impact={
+          <p className={researchStyles.hint}>
+            AI so bản lời thoại hiện tại với các mục đã phát hiện: mục đã hết thì đánh dấu đã sửa, mục mới thì thêm vào.
+          </p>
+        }
+        onApplied={lock.reload}
+        testId="lock-review-dialog"
+      />
     </>
   );
 }

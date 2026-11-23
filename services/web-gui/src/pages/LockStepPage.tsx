@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { ScriptLockState } from "../api/client";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import { LockHandoffTab } from "../components/lock/LockHandoffTab";
 import { LockPackageTab } from "../components/lock/LockPackageTab";
@@ -107,6 +108,7 @@ export function LockStepPage() {
           </p>
         )}
         {state && state.scriptReady && (
+          <AiRunsProvider projectId={projectId} step="lock" service="authoring">
           <div className={researchStyles.body}>
             <div className={lockStyles.tabs} role="tablist">
               {tabs.map((t) => (
@@ -135,6 +137,7 @@ export function LockStepPage() {
               </p>
             )}
           </div>
+          </AiRunsProvider>
         )}
       </AppShell>
 

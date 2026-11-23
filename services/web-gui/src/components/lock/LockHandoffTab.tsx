@@ -1,20 +1,22 @@
 import { useState } from "react";
-import { ExternalRequestDescribed, generateHandoff, handoffBeatUnit, redoUnit, type ExternalRequest, type LockBeat } from "../../api/client";
+import { ExternalRequestDescribed, describeAiRequest, generateHandoff, handoffBeatUnit, redoUnit, type ExternalRequest, type LockBeat } from "../../api/client";
 import type { ScriptLockControls } from "../../hooks/useScriptLock";
 import { useAiQueue } from "../../hooks/useAiQueue";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
-import { ExternalAiButton } from "../ExternalAiButton";
+import { AiRunDialog, AiRunPill, ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
 import beatStyles from "../beats/beats.module.css";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, FormField, TextInput } from "../ui";
 import { UnitEditModal } from "../units/UnitEditModal";
-import { UnitRedoModal } from "../units/UnitRedoModal";
+import { ImpactList } from "../units/ImpactList";
 import { UnitReviewBar } from "../units/UnitReviewBar";
 import unitStyles from "../units/units.module.css";
 import { UnitStatusChip } from "../units/UnitStatusChip";
 import styles from "./lock.module.css";
+import { LockRunPreview } from "./LockRunPreview";
 import { ROLE_LABELS } from "./roles";
 
 interface LockHandoffTabProps {
@@ -35,9 +37,10 @@ async function describeWrite(projectId: string, beat: LockBeat): Promise<Externa
   throw new Error("Không dựng được yêu cầu viết ghi chú này.");
 }
 
-function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { projectId: string; beat: LockBeat } & Omit<LockHandoffTabProps, "projectId">) {
+function HandoffBeatCard({ projectId, beat, lock, locked }: { projectId: string; beat: LockBeat } & Omit<LockHandoffTabProps, "projectId" | "aiAvailable">) {
   const [editing, setEditing] = useState(false);
   const [redoing, setRedoing] = useState(false);
+  const redoPath = `/v1/projects/${projectId}/units/handoff_beat/${beat.key}/redo`;
   // An approved note shows as one line until the Creator opens it.
   const [expanded, setExpanded] = useState(false);
   const unit = handoffBeatUnit(beat.key);
@@ -98,19 +101,10 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
 
         {!beat.written ? (
           <div className={styles.row}>
-            <ExternalAiButton
-              title={`Ghi chú bàn giao B${beat.number} ${beat.title} · AI ngoài`}
-              label="Viết ghi chú bằng AI ngoài"
-              run={(external) => generateHandoff(projectId, beat.key, { external })}
-              onDone={lock.reload}
-              disabled={busy}
-              testId={`handoff-write-external-${beat.key}`}
-            />
-            {aiAvailable && (
-              <Button variant="run" className={researchStyles.sm} onClick={() => void lock.generate(beat.key)} disabled={busy} data-testid={`handoff-write-${beat.key}`}>
-                AI viết ghi chú beat này
-              </Button>
-            )}
+            <Button variant="run" className={researchStyles.sm} onClick={() => setRedoing(true)} disabled={busy} data-testid={`handoff-write-${beat.key}`}>
+              AI viết ghi chú beat này
+            </Button>
+            <AiRunPill runPath={redoPath} onOpen={() => setRedoing(true)} testId={`handoff-write-ai-run-${beat.key}`} />
             <Button variant="ghost" className={researchStyles.sm} onClick={() => setEditing(true)} disabled={busy} data-testid={`handoff-by-hand-${beat.key}`}>
               Tự viết
             </Button>
@@ -153,6 +147,7 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
                 </Button>
               </div>
             )}
+            <AiRunPill runPath={redoPath} onOpen={() => setRedoing(true)} testId={`handoff-redo-ai-run-${beat.key}`} />
             {!beat.stale && (
               <UnitReviewBar
                 status={beat.status}
@@ -196,18 +191,16 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
         size="lg"
         testId={`handoff-edit-${beat.key}`}
       />
-      <UnitRedoModal
+      <AiRunDialog
         open={redoing}
         onClose={() => setRedoing(false)}
-        title={`Làm lại kèm ghi chú · Ghi chú bàn giao B${beat.number} ${beat.title}`}
-        impact={redoImpact}
-        initialNote={lock.failedNote}
-        modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="story" label="Model AI cho bước Rà soát và chốt" testId={`handoff-redo-model-${beat.key}`} /> : undefined}
-        onSend={aiAvailable ? (note) => void lock.redo(beat.key, note) : undefined}
-        external={{
-          run: (note, external) => redoUnit(projectId, handoffBeatUnit(beat.key), note, { external }),
-          onDone: lock.reload,
-        }}
+        title={`${beat.written ? "Làm lại kèm ghi chú" : "Viết ghi chú"} · Ghi chú bàn giao B${beat.number} ${beat.title}`}
+        runPath={redoPath}
+        describe={(note) => describeAiRequest((external) => redoUnit(projectId, unit, note, { external }))}
+        noNote={!beat.written}
+        renderPreview={(p) => <LockRunPreview kind="handoff" preview={p} sections={sections} />}
+        impact={<ImpactList head="AI làm lại mục này thì phần phụ thuộc sẽ làm lại:" impact={redoImpact} testId={`handoff-redo-${beat.key}-impact`} />}
+        onApplied={lock.reload}
         testId={`handoff-redo-${beat.key}`}
       />
     </Card>
@@ -222,6 +215,7 @@ function HandoffBeatCard({ projectId, beat, lock, aiAvailable, locked }: { proje
  */
 export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHandoffTabProps) {
   const state = lock.state;
+  const ai = useAiRuns();
   const [adding, setAdding] = useState(false);
   const [term, setTerm] = useState({ term: "", say: "", draw: "", avoid: "" });
   const [error, setError] = useState<string | null>(null);
@@ -285,26 +279,26 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
         <Card data-testid="handoff-write-card">
           <div className={researchStyles.body}>
             <p className={researchStyles.hint}>
-              {aiAvailable
-                ? `${unwritten} beat chưa có ghi chú bàn giao. AI viết lần lượt từng beat, hoặc bạn tự viết.`
-                : `${unwritten} beat chưa có ghi chú bàn giao. Chưa cấu hình AI nên bạn tự viết từng beat.`}
+              {`${unwritten} beat chưa có ghi chú bàn giao. AI viết lần lượt từng beat, hoặc bạn tự viết.`}
+              {!aiAvailable && " Chưa cấu hình AI của hệ thống: chạy bằng extension hoặc viết từng beat thủ công."}
             </p>
-            {aiAvailable && (
-              <>
-                <AiModelSelect projectId={projectId} step="story" label="Model AI cho bước Rà soát và chốt" testId="lock-model" />
-                <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
-                  <Button variant="run" onClick={() => void lock.generate("")} disabled={busy} data-testid="handoff-generate">
-                    AI viết ghi chú bàn giao
-                  </Button>
-                  {queue.available && (
-                    <Button variant="run" onClick={() => void queueAll(unwrittenBeats)} disabled={busy || queueing} data-testid="handoff-queue-all">
-                      {queueing ? "Đang thêm…" : `Thêm tất cả vào hàng đợi AI (${unwritten})`}
-                    </Button>
-                  )}
-                  <span className={researchStyles.hint}>Ghi chú đã có giữ nguyên; thuật ngữ AI đề xuất gộp vào bảng chung.</span>
-                </div>
-              </>
-            )}
+            {aiAvailable && <AiModelSelect projectId={projectId} step="story" label="Model AI cho bước Rà soát và chốt" testId="lock-model" />}
+            <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
+              <ChannelButton
+                channel={ai.defaultChannel}
+                label={`Viết ${unwritten} ghi chú bàn giao`}
+                onRun={(c) => (c === "api" ? void lock.generate("") : void queueAll(unwrittenBeats))}
+                disabled={busy || queueing}
+                unavailable={{
+                  manual: "Chạy hàng loạt không làm thủ công được; viết từng beat ở bên dưới",
+                  ...(queue.available ? {} : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }),
+                }}
+                testId="handoff-generate"
+              />
+              <span className={researchStyles.hint}>
+                Chạy hàng loạt lưu luôn từng ghi chú, không dừng để xem trước; ghi chú đã có giữ nguyên, thuật ngữ AI đề xuất gộp vào bảng chung. Muốn xem trước thì viết từng beat ở bên dưới.
+              </span>
+            </div>
             {queue.counts && (queue.counts.waiting > 0 || queue.counts.running > 0 || queue.counts.failed > 0) && (
               <p className={researchStyles.hint} data-testid="handoff-queue-state">
                 Hàng đợi AI: {queue.counts.running} đang chạy · {queue.counts.waiting} chờ · {queue.counts.failed} lỗi{queue.counts.paused ? " · đang tạm dừng" : ""}.
@@ -369,7 +363,7 @@ export function LockHandoffTab({ projectId, lock, aiAvailable, locked }: LockHan
       </Card>
 
       {state.beats.map((b) => (
-        <HandoffBeatCard key={b.key} projectId={projectId} beat={b} lock={lock} aiAvailable={aiAvailable} locked={locked} />
+        <HandoffBeatCard key={b.key} projectId={projectId} beat={b} lock={lock} locked={locked} />
       ))}
 
       {state.beats.some((b) => b.written) && (

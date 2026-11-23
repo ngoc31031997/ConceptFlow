@@ -173,6 +173,9 @@ func (uc *ScriptLockDeskUseCase) Review(ctx context.Context, projectID string) e
 		return err
 	}
 	next := domain.ApplyReview(prev, parsed, domain.ScriptSHA(lc.lineSHAParts()))
+	if err := stopForPreview(ctx, next); err != nil {
+		return err
+	}
 	return uc.saveReview(ctx, projectID, unit, next)
 }
 
@@ -203,6 +206,14 @@ func glossaryText(g domain.Glossary) string {
 		rows = append(rows, fmt.Sprintf("%s → nói là %q, vẽ là %q, tránh %q", t.Term, t.Say, t.Draw, t.Avoid))
 	}
 	return strings.Join(rows, "\n")
+}
+
+// handoffPreview is what writing one beat's handoff stores: the note and the
+// glossary rows it adds.
+type handoffPreview struct {
+	Beat  string                `json:"beat"`
+	Note  domain.HandoffNote    `json:"note"`
+	Terms []domain.GlossaryTerm `json:"terms"`
 }
 
 // writeHandoff has the AI write the handoff note of the beat at index at and
@@ -243,6 +254,10 @@ func (uc *ScriptLockDeskUseCase) writeHandoff(ctx context.Context, projectID str
 	if err != nil {
 		return err
 	}
+	merged := glossary.Merge(parsed.Terms)
+	if err := stopForPreview(ctx, handoffPreview{Beat: b.unit.Key, Note: parsed.Note, Terms: append([]domain.GlossaryTerm{}, merged.Terms[len(glossary.Terms):]...)}); err != nil {
+		return err
+	}
 	unit := domain.ReviewUnit{Status: domain.UnitPending, CreatorFields: []string{}}
 	if old != nil {
 		unit.RedoCount = old.unit.RedoCount + 1
@@ -251,7 +266,7 @@ func (uc *ScriptLockDeskUseCase) writeHandoff(ctx context.Context, projectID str
 		return err
 	}
 	if len(parsed.Terms) > 0 {
-		return uc.saveGlossary(ctx, projectID, glossary.Merge(parsed.Terms))
+		return uc.saveGlossary(ctx, projectID, merged)
 	}
 	return nil
 }

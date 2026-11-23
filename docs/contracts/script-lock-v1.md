@@ -68,3 +68,9 @@ Trả `{version, locked_at, brief?, glossary?, beats:[{key, number, fn?, title?,
 Đầu vào của AI rà soát: brief đã duyệt (`project_brief`), dữ kiện đang giữ (`project_research`), khung câu chuyện (`project_story`), dàn beat đầy đủ (`project_beat`: thời lượng, nội dung, chỗ nối — `{{outline}}`) và lời thoại (`project_script`). Cờ bỏ qua bước Nghiên cứu đọc từ `project_research_gate`.
 
 Model AI của bước là model Creator chọn ở khoá `story` (như bước Viết kịch bản). Vai prompt: `script_review` (rà soát) và `script_handoff` (ghi chú bàn giao của một beat). Lượt AI ghi nhận dưới kind `script_review` và `handoff_beat`.
+
+## Lượt chạy AI (ADR-0052)
+
+Hai lượt AI một-prompt của bước chạy qua lượt chạy có xem trước của authoring-service, `/v1/projects/{id}/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md). Điểm dừng xem trước của từng lượt: `POST /script-lock/review` → `ScriptReview` sẽ lưu (`findings`, `ai_notes`, `rounds`…, đã gộp với lần rà soát trước); `POST /units/handoff_beat/{beat}/redo` → `{beat, note:{must,terms,exact,free,unsure}, terms:[{term,say,draw,avoid,mine}]}` (ghi chú sẽ lưu và các dòng thuật ngữ mới sẽ gộp vào bảng chung). Viết ghi chú cho một beat chưa có ghi chú cũng đi qua route `redo` này, để mỗi beat có đường dẫn riêng.
+
+`POST /script-lock/handoff/generate` viết ghi chú cho mọi beat chưa có, beat sau đọc bảng thuật ngữ đã lưu của beat trước, nên là chạy hàng loạt: lưu luôn từng beat, không qua lượt chạy. Với `beat` được nêu, route cũng dừng ở điểm xem trước như trên.
