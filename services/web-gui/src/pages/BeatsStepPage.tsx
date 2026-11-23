@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { BeatState } from "../api/client";
 import { AiModelSelect } from "../components/AiModelSelect";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import { BeatCard } from "../components/beats/BeatCard";
 import { BeatSheetCard } from "../components/beats/BeatSheetCard";
@@ -125,7 +126,7 @@ export function BeatsStepPage() {
               onRebuild={() => setRebuildOpen(true)}
             />
             {s.beats.map((beat, index) => (
-              <BeatCard key={beat.key} projectId={projectId} beat={beat} index={index} state={s} beats={beats} aiAvailable={aiAvailable} locked={locked} />
+              <BeatCard key={beat.key} projectId={projectId} beat={beat} index={index} state={s} beats={beats} locked={locked} />
             ))}
           </>
         )}
@@ -170,7 +171,11 @@ export function BeatsStepPage() {
             Đang tải…
           </p>
         )}
-        {state && <div className={researchStyles.body}>{content(state)}</div>}
+        {state && (
+          <AiRunsProvider projectId={projectId} step="beats" service="authoring">
+            <div className={researchStyles.body}>{content(state)}</div>
+          </AiRunsProvider>
+        )}
       </AppShell>
 
       <WizardNav

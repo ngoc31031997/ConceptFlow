@@ -81,7 +81,36 @@ beforeEach(() => {
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
   vi.spyOn(apiClient, "getBeats").mockImplementation(async () => state);
   vi.spyOn(apiClient, "getBeatImpact").mockResolvedValue([]);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({ defaultChannel: "api", stepChannels: {}, effective: { beats: "api" } });
 });
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Viết beat",
+    method: "POST",
+    path: "/v1/projects/p1/beats/b2/redo",
+    body: '{"note":""}',
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT BEAT",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
+
+const unwrittenState = () =>
+  baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
+
+/** The step's own request for beat `key`, as the client's describe mode hands it back. */
+const described = (path: string, body: unknown) =>
+  new apiClient.ExternalRequestDescribed({ gateway: "http://gw", method: "POST", path, body: JSON.stringify(body) });
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -217,26 +246,57 @@ describe("BeatsStepPage", () => {
     expect(screen.getByTestId("beats-rewrite")).toBeInTheDocument();
   });
 
-  it("gives a beat without content its own run, and a written beat none", async () => {
-    state = baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
-    const redo = vi.spyOn(apiClient, "redoBeat").mockResolvedValue(baseState());
+  it("gives a beat without content its own run on the step's channel, and starts it with the note", async () => {
+    state = unwrittenState();
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
+    vi.spyOn(apiClient, "redoBeat").mockRejectedValue(described("/v1/projects/p1/beats/b2/redo", { note: "nhấn vào cái giá" }));
     await ready();
     expect(screen.queryByTestId("beat-write-b1")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("beat-write-b2"));
-    expect(await screen.findByTestId("beat-write-dialog-b2-external")).toBeInTheDocument();
-    expect(screen.getByTestId("beat-write-dialog-b2-note")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-send"));
-    await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", "b2", "", expect.anything()));
+    fireEvent.change(await screen.findByTestId("beat-write-dialog-b2-note"), { target: { value: "nhấn vào cái giá" } });
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: "/v1/projects/p1/beats/b2/redo", body: JSON.stringify({ note: "nhấn vào cái giá" }) }),
+        channel: "api",
+      }),
+    );
   });
 
-  it("sends the note of the write dialog along", async () => {
-    state = baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
-    const redo = vi.spyOn(apiClient, "redoBeat").mockResolvedValue(baseState());
+  it("reads a pasted reply of one beat, shows the beat that would be stored, and applies it only on the Creator's click", async () => {
+    state = unwrittenState();
+    vi.spyOn(apiClient, "redoBeat").mockRejectedValue(described("/v1/projects/p1/beats/b2/redo", { note: "" }));
+    vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "waiting" }));
+    const preview = { key: "b2", beat: { fn: "Giải thích cơ chế", title: "Cửa hẹp", goal: "Ong mất cánh", content: "Ong chui qua cửa", facts: ["F02"], dur: 40, next: "Vào trong" } };
+    const reply = vi.spyOn(apiClient, "replyAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "ready", reply: "{...}", preview }));
+    const apply = vi.spyOn(apiClient, "applyAiRun").mockResolvedValue({ run: aiRun({ channel: "manual", status: "applied" }), state });
+    const get = vi.mocked(apiClient.getBeats);
     await ready();
     fireEvent.click(screen.getByTestId("beat-write-b2"));
-    fireEvent.change(await screen.findByTestId("beat-write-dialog-b2-note"), { target: { value: "nhấn vào cái giá" } });
-    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-send"));
-    await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", "b2", "nhấn vào cái giá", expect.anything()));
+    fireEvent.click(await screen.findByTestId("beat-write-dialog-b2-run-more"));
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-run-manual"));
+    expect(await screen.findByTestId("beat-write-dialog-b2-prompt")).toHaveTextContent("PROMPT BEAT");
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-tab-reply"));
+    fireEvent.change(screen.getByTestId("beat-write-dialog-b2-reply"), { target: { value: "{...}" } });
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-read"));
+    await waitFor(() => expect(reply).toHaveBeenCalledWith("authoring", "p1", "r1", "{...}"));
+    const shown = await screen.findByTestId("ai-run-preview");
+    expect(shown).toHaveTextContent("Cửa hẹp");
+    expect(shown).toHaveTextContent("Ong mất cánh");
+    expect(apply).not.toHaveBeenCalled();
+    const loads = get.mock.calls.length;
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-apply"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("authoring", "p1", "r1"));
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(loads));
+  });
+
+  it("reopens an open run of a beat from its pill", async () => {
+    state = unwrittenState();
+    vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([aiRun({ status: "unreadable", reply: "lỗi", error: "Không đọc được JSON" })]);
+    await ready();
+    fireEvent.click(await screen.findByTestId("beat-write-run-b2"));
+    expect(await screen.findByTestId("beat-write-dialog-b2-error")).toHaveTextContent("Không đọc được JSON");
   });
 
   it("folds an approved beat to one line and opens it again", async () => {
@@ -336,19 +396,41 @@ describe("BeatsStepPage", () => {
     await waitFor(() => expect(reorder).toHaveBeenCalledWith("p1", ["b2", "b1", "b3"]));
   });
 
-  it("has the AI write a new beat after another", async () => {
-    const add = vi.spyOn(apiClient, "addBeat").mockResolvedValue(baseState());
+  it("has the AI write a new beat after another through a run, and shows its pill only on that beat", async () => {
+    const body = { after: "b1", blank: false, note: "x" };
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path: "/v1/projects/p1/beats", body: JSON.stringify(body) }));
+    vi.spyOn(apiClient, "addBeat").mockRejectedValue(described("/v1/projects/p1/beats", body));
     await ready();
     fireEvent.click(screen.getByTestId("beat-add-b1"));
-    fireEvent.click(await screen.findByTestId("beat-add-dialog-b1-send"));
-    await waitFor(() => expect(add).toHaveBeenCalledWith("p1", "b1", false, "", expect.anything()));
+    fireEvent.change(await screen.findByTestId("beat-add-dialog-b1-note"), { target: { value: "x" } });
+    fireEvent.click(screen.getByTestId("beat-add-dialog-b1-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", expect.objectContaining({ request: expect.objectContaining({ path: "/v1/projects/p1/beats" }), channel: "api" })),
+    );
+    expect(await screen.findByTestId("beat-add-run-b1")).toBeInTheDocument();
+    expect(screen.queryByTestId("beat-add-run-b2")).not.toBeInTheDocument();
   });
 
-  it("adds an empty beat from the add dialog without asking the AI", async () => {
+  it("shows the new beat a run would add before it is stored", async () => {
+    vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([
+      aiRun({
+        path: "/v1/projects/p1/beats",
+        body: '{"after":"b1","blank":false,"note":""}',
+        status: "ready",
+        preview: { after: "b1", beat: { fn: "Cao trào", title: "Mới", goal: "G", content: "C", facts: [], dur: 20, next: "N" } },
+      }),
+    ]);
+    await ready();
+    fireEvent.click(await screen.findByTestId("beat-add-run-b1"));
+    const shown = await screen.findByTestId("ai-run-preview");
+    expect(shown).toHaveTextContent("Beat mới sẽ được thêm sau b1");
+    expect(shown).toHaveTextContent("Mới");
+  });
+
+  it("adds an empty beat from its own button without asking the AI", async () => {
     const add = vi.spyOn(apiClient, "addBeat").mockResolvedValue(baseState());
     await ready();
-    fireEvent.click(screen.getByTestId("beat-add-b1"));
-    fireEvent.click(await screen.findByTestId("beat-add-dialog-b1-blank"));
+    fireEvent.click(screen.getByTestId("beat-add-blank-b1"));
     await waitFor(() => expect(add).toHaveBeenCalledWith("p1", "b1", true, ""));
   });
 
@@ -369,15 +451,19 @@ describe("BeatsStepPage", () => {
     expect(await screen.findByTestId("beat-delete-dialog-b2-list")).not.toHaveTextContent("bắt buộc");
   });
 
-  it("has the AI redo one beat with the Creator's note", async () => {
-    const redo = vi.spyOn(apiClient, "redoBeat").mockResolvedValue(baseState());
+  it("has the AI redo one beat with the Creator's note through a run", async () => {
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
+    vi.spyOn(apiClient, "redoBeat").mockRejectedValue(described("/v1/projects/p1/beats/b2/redo", { note: "ngắn hơn" }));
     await ready();
     fireEvent.click(screen.getByTestId("beat-review-b2-redo"));
-    fireEvent.change(await screen.findByTestId("beat-redo-b2-note"), { target: { value: "ngắn hơn" } });
-    await waitFor(() => expect(screen.getByTestId("beat-redo-b2-send")).not.toBeDisabled());
-    fireEvent.click(screen.getByTestId("beat-redo-b2-send"));
+    fireEvent.change(await screen.findByTestId("beat-write-dialog-b2-note"), { target: { value: "ngắn hơn" } });
+    fireEvent.click(screen.getByTestId("beat-write-dialog-b2-run"));
     await waitFor(() =>
-      expect(redo).toHaveBeenCalledWith("p1", "b2", "ngắn hơn", expect.anything()),
+      expect(start).toHaveBeenCalledWith(
+        "authoring",
+        "p1",
+        expect.objectContaining({ request: expect.objectContaining({ path: "/v1/projects/p1/beats/b2/redo", body: JSON.stringify({ note: "ngắn hơn" }) }) }),
+      ),
     );
   });
 
@@ -427,11 +513,14 @@ describe("BeatsStepPage", () => {
     const threeUnwritten = () =>
       baseState({ unwritten: 2, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { goal: "", content: "", fn: "Payoff", next: "" })] });
 
-    it("offers no run-all button when the extension has no queue", async () => {
+    it("disables the extension and manual channels of the run-all button when there is no queue", async () => {
       bridge = installFakeAiBridge();
       state = threeUnwritten();
       await ready();
-      expect(screen.queryByTestId("beats-queue-all")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("beats-generate-more"));
+      expect(screen.getByTestId("beats-generate-extension")).toBeDisabled();
+      expect(screen.getByTestId("beats-generate-manual")).toBeDisabled();
+      expect(screen.getByTestId("beats-generate-api")).not.toBeDisabled();
     });
 
     it("queues one item per beat without content, in the order of the sheet, without calling the AI", async () => {
@@ -439,9 +528,11 @@ describe("BeatsStepPage", () => {
       state = threeUnwritten();
       const redo = vi.spyOn(apiClient, "redoBeat");
       await ready();
-      const button = await screen.findByTestId("beats-queue-all");
-      expect(button).toHaveTextContent("Thêm tất cả vào hàng đợi AI (2)");
-      fireEvent.click(button);
+      const button = await screen.findByTestId("beats-generate");
+      expect(button).toHaveTextContent("AI viết nội dung các beat chưa có (2) (API)");
+      fireEvent.click(screen.getByTestId("beats-generate-more"));
+      await waitFor(() => expect(screen.getByTestId("beats-generate-extension")).not.toBeDisabled());
+      fireEvent.click(screen.getByTestId("beats-generate-extension"));
       await waitFor(() => expect(bridge.queued).toHaveLength(2));
       expect(bridge.queued.map((q) => q.item.label)).toEqual(["B2 · Beat b2", "B3 · Beat b3"]);
       const [first] = bridge.queued.map((q) => q.item.request as { method: string; path: string; body: string });
@@ -454,11 +545,11 @@ describe("BeatsStepPage", () => {
       redo.mock.calls.forEach((call) => expect(call[3]).toEqual({ external: { mode: "describe" } }));
     });
 
-    it("hides the run-all button when every beat has content", async () => {
+    it("hides the run button when every beat has content", async () => {
       bridge = installFakeAiBridge({ queue: true });
       await ready();
       await waitFor(() => expect(screen.getByTestId("beats-rewrite")).toBeInTheDocument());
-      expect(screen.queryByTestId("beats-queue-all")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("beats-generate")).not.toBeInTheDocument();
     });
 
     it("says how many are waiting, running or failed, and loads the sheet again when a beat is done", async () => {

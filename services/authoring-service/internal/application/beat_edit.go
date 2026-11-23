@@ -173,6 +173,9 @@ func (uc *BeatDeskUseCase) Redo(ctx context.Context, projectID, key, note string
 	if err != nil {
 		return err
 	}
+	if err := stopForPreview(ctx, beatPreview{Key: key, Beat: beat}); err != nil {
+		return err
+	}
 	work[at].Beat = beat
 	rewritten := make([]bool, len(work))
 	rewritten[at] = true

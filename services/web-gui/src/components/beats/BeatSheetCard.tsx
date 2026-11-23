@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ExternalRequestDescribed, redoBeat, type Beat, type BeatState, type ExternalRequest } from "../../api/client";
 import type { BeatsControls } from "../../hooks/useBeats";
 import { useAiQueue } from "../../hooks/useAiQueue";
+import { ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
 import researchStyles from "../research/research.module.css";
@@ -53,6 +55,7 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
   const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/beats`)) void beats.reload();
   });
+  const ai = useAiRuns();
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
@@ -178,15 +181,19 @@ export function BeatSheetCard({ projectId, state, beats, aiAvailable, busy, pend
                   Viết lại cả bảng
                 </Button>
               )}
-              {aiAvailable && state.unwritten > 0 && (
-                <Button variant="run" onClick={() => void beats.generate("", true)} disabled={busy} data-testid="beats-generate">
-                  AI viết nội dung các beat chưa có ({state.unwritten})
-                </Button>
-              )}
-              {queue.available && unwrittenBeats.length > 0 && (
-                <Button variant="run" onClick={() => void queueAll()} disabled={busy || queueing} data-testid="beats-queue-all">
-                  {queueing ? "Đang thêm…" : `Thêm tất cả vào hàng đợi AI (${unwrittenBeats.length})`}
-                </Button>
+              {(aiAvailable || queue.available) && state.unwritten > 0 && (
+                <ChannelButton
+                  channel={ai.defaultChannel}
+                  label={`AI viết nội dung các beat chưa có (${state.unwritten})`}
+                  onRun={(c) => (c === "api" ? void beats.generate("", true) : void queueAll())}
+                  disabled={busy || queueing}
+                  unavailable={{
+                    manual: "Chạy hàng loạt không làm thủ công được; chạy thủ công ở từng beat bên dưới",
+                    ...(aiAvailable ? {} : { api: "Chưa cấu hình model AI của hệ thống" }),
+                    ...(queue.available ? {} : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }),
+                  }}
+                  testId="beats-generate"
+                />
               )}
               <span className={researchStyles.grow} />
               <Button onClick={() => void beats.approveAll()} disabled={busy || pendingWithGoal === 0} data-testid="beats-approve-all">
