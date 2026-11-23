@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Storyboard Flow Mockup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=Space+Mono&display=swap">
+<style>
+:root{
+  --bg:#f7f1df; --card:#ffffff; --ink:#0a0a0a; --muted:#5b564a;
+  --accent:#e1ad01; --accent-soft:#f5e3a3; --run:#8b5cf6; --run-soft:#e6dcff; --info-soft:#dbe9ff;
+  --ok:#1f9d55; --ok-soft:#d6f1e0; --warn-soft:#fbe3c5; --lock-soft:#ece8dc;
+  --frame-bg:#1b2142;
+  --border:2px solid var(--ink); --shadow:4px 4px 0 var(--ink); --shadow-sm:2px 2px 0 var(--ink);
+  --font-display:"Space Grotesk",system-ui,sans-serif; --font-body:"Inter",system-ui,sans-serif; --font-mono:"Space Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141310; --card:#1c1b18; --ink:#f5f0e6; --muted:#b4ad9b; --accent-soft:#3d3005; --run-soft:#2d2350; --info-soft:#1c2a40;
+  --ok-soft:#16331f; --warn-soft:#4a3510; --lock-soft:#26241f; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#141310; --card:#1c1b18; --ink:#f5f0e6; --muted:#b4ad9b; --accent-soft:#3d3005; --run-soft:#2d2350; --info-soft:#1c2a40;
+  --ok-soft:#16331f; --warn-soft:#4a3510; --lock-soft:#26241f; color-scheme:dark;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5;padding:24px 16px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
+h1{font-size:26px} h2{font-size:18px} h3{font-size:15px}
+p{margin:0}
+.muted{color:var(--muted)} .mono{font-family:var(--font-mono);font-size:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+button{font:inherit;font-weight:600;background:var(--card);color:var(--ink);border:var(--border);box-shadow:var(--shadow-sm);border-radius:4px;padding:6px 12px;cursor:pointer}
+button:focus-visible{outline:3px solid var(--run);outline-offset:2px}
+button.primary{background:var(--accent);color:#0a0a0a} button.run{background:var(--run);color:#fff} button.view{background:var(--info-soft)}
+button[disabled]{opacity:.45;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;border:var(--border);border-radius:99px;padding:1px 8px;background:var(--card);white-space:nowrap}
+.chip.ok{background:var(--ok-soft)} .chip.warn{background:var(--warn-soft)} .chip.acc{background:var(--accent-soft)}
+
+.demo{border:2px dashed var(--muted);border-radius:4px;padding:8px 12px;font-size:13px}
+.demo button{padding:2px 10px;font-size:13px} .demo button[aria-pressed="true"]{background:var(--accent)}
+
+/* Section = one job, numbered, top to bottom */
+.sec{background:var(--card);border:var(--border);box-shadow:var(--shadow);border-radius:4px;padding:16px;display:flex;flex-direction:column;gap:12px;position:relative}
+.sec-h{display:flex;gap:12px;align-items:flex-start}
+.num{flex:none;width:34px;height:34px;border:var(--border);border-radius:50%;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;background:var(--card)}
+.sec-h .txt{flex:1;min-width:0}
+.sec-h .txt p{font-size:13px;color:var(--muted)}
+.sec[data-state="done"] .num{background:var(--ok);color:#fff}
+.sec[data-state="current"]{background:var(--card);outline:3px solid var(--accent);outline-offset:-1px}
+.sec[data-state="current"] .num{background:var(--accent);color:#0a0a0a}
+.sec[data-state="locked"]{background:var(--lock-soft);box-shadow:none;border-style:dashed}
+.sec[data-state="locked"] .num{background:transparent;color:var(--muted)}
+.sec[data-state="locked"] .body{display:none}
+.lockwhy{font-size:13px;color:var(--muted)}
+.sec[data-state="done"].folded .body{display:none}
+.connector{width:2px;height:12px;background:var(--ink);margin:-16px 0 -16px 32px}
+
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.item{border:var(--border);border-radius:4px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--card)}
+.thumb{aspect-ratio:16/9;width:100%;border:var(--border);border-radius:4px;background:var(--frame-bg);display:block}
+.thumb.sq{aspect-ratio:1/1;background:var(--bg);max-height:140px}
+.thumb.empty{background:repeating-linear-gradient(45deg,var(--lock-soft) 0 8px,transparent 8px 16px)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;border-bottom:1px solid var(--muted);padding:6px 8px;vertical-align:top}
+th{font-family:var(--font-display);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.mini{display:flex;gap:6px;flex-wrap:wrap}
+.mini span{display:inline-flex;gap:6px;align-items:center;border:var(--border);border-radius:4px;padding:2px 6px 2px 2px;font-size:12px;background:var(--bg)}
+.mini svg{width:20px;height:20px;border:1px solid var(--ink);border-radius:2px;background:var(--card)}
+.unit{border-left:4px solid var(--ink);padding-left:12px;display:flex;flex-direction:column;gap:10px}
+.missing{border:2px dashed var(--ink);border-radius:4px;padding:10px 12px;background:var(--warn-soft);font-size:13px}
+.kv{display:grid;grid-template-columns:80px 1fr;gap:2px 8px;font-size:13px;margin:0} .kv dt{color:var(--muted)} .kv dd{margin:0}
+.check{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.check li{display:flex;gap:8px;align-items:flex-start}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;border-top:1px dashed var(--muted);padding-top:12px}
+.note{font-size:12px;color:var(--muted);border-top:1px dashed var(--muted);padding-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="demo row" aria-label="Chỉ trong mockup">
+    <span class="muted">Mockup · xem trang ở trạng thái:</span>
+    <button data-demo="a" aria-pressed="true">Mới vào</button>
+    <button data-demo="b" aria-pressed="false">Danh sách đã duyệt, đang vẽ</button>
+    <button data-demo="c" aria-pressed="false">Đang làm shot</button>
+    <button data-demo="d" aria-pressed="false">Sẵn sàng chốt</button>
+  </div>
+
+  <header class="row between">
+    <div>
+      <h1>Bước 11 · Storyboard</h1>
+      <p class="muted">Vẽ phác từng khung hình của video. Làm lần lượt từ trên xuống: mỗi khối mở khi khối trên đã duyệt.</p>
+    </div>
+    <span class="chip" id="status"></span>
+  </header>
+
+  <!-- 1 -->
+  <section class="sec" id="s1">
+    <div class="sec-h">
+      <span class="num">1</span>
+      <div class="txt">
+        <h2>Danh sách tài sản cần vẽ</h2>
+        <p>AI đọc visual concept (bước 8) và visual plan (bước 9), liệt kê nhân vật, vật thể, phông nền sẽ xuất hiện. Mỗi tài sản vẽ một lần, dùng lại ở nhiều shot.</p>
+      </div>
+      <span class="chip" id="s1-chip"></span>
+      <button class="view fold" data-sec="s1" hidden>Mở</button>
+    </div>
+    <p class="lockwhy" id="s1-why"></p>
+    <div class="body" id="s1-body"></div>
+  </section>
+  <div class="connector" aria-hidden="true"></div>
+
+  <!-- 2 -->
+  <section class="sec" id="s2">
+    <div class="sec-h">
+      <span class="num">2</span>
+      <div class="txt">
+        <h2>Vẽ tài sản</h2>
+        <p>Vẽ từng tài sản trong danh sách theo kit của phong cách dự án. Duyệt hình từng cái.</p>
+      </div>
+      <span class="chip" id="s2-chip"></span>
+      <button class="view fold" data-sec="s2" hidden>Mở</button>
+    </div>
+    <p class="lockwhy" id="s2-why"></p>
+    <div class="body" id="s2-body"></div>
+  </section>
+  <div class="connector" aria-hidden="true"></div>
+
+  <!-- 3 -->
+  <section class="sec" id="s3">
+    <div class="sec-h">
+      <span class="num">3</span>
+      <div class="txt">
+        <h2>Shot theo từng unit</h2>
+        <p>Mỗi unit của visual plan thành 1–vài shot, viết lần lượt từ unit đầu. Ảnh khung được ghép từ tài sản ở khối 2, không vẽ bằng AI.</p>
+      </div>
+      <span class="chip" id="s3-chip"></span>
+      <button class="view fold" data-sec="s3" hidden>Mở</button>
+    </div>
+    <p class="lockwhy" id="s3-why"></p>
+    <div class="body" id="s3-body"></div>
+  </section>
+  <div class="connector" aria-hidden="true"></div>
+
+  <!-- 4 -->
+  <section class="sec" id="s4">
+    <div class="sec-h">
+      <span class="num">4</span>
+      <div class="txt">
+        <h2>Rà soát &amp; chốt</h2>
+        <p>Code tự kiểm tra các điều kiện; AI rà soát khi bạn bấm. Chốt tạo phiên bản <span class="mono">storyboard-v1</span> cho bước 12.</p>
+      </div>
+      <span class="chip" id="s4-chip"></span>
+    </div>
+    <p class="lockwhy" id="s4-why"></p>
+    <div class="body" id="s4-body"></div>
+  </section>
+
+  <p class="note">Mockup chỉ minh hoạ bố cục. Dữ liệu (virus, tế bào…) là ví dụ. Khối đã duyệt tự thu gọn còn một dòng, bấm “Mở” để xem lại. Các nút Sửa / Vẽ lại / Làm lại mở modal như hiện tại; mockup không vẽ các modal đó.</p>
+</div>
+
+<script>
+const A=[
+  {id:"AST-VIRUS-1",name:"Virus (vai xấu)",kind:"figure",tier:"hero",c:"#e1ad01",base:"Vẽ mới"},
+  {id:"AST-TEBAO-1",name:"Tế bào",kind:"figure",tier:"support",c:"#ff7aa8",base:"Thư viện: “Tế bào tròn”"},
+  {id:"AST-KHANGTHE-1",name:"Kháng thể",kind:"figure",tier:"support",c:"#8b5cf6",base:"Vẽ mới"},
+  {id:"AST-NEN-MAU-1",name:"Nền mạch máu",kind:"backdrop",tier:"background",c:"#1b2142",base:"Vẽ mới"}
+];
+// per demo: state of each section + data progress
+const S={
+  a:{status:"Chưa bắt đầu",st:["current","locked","locked","locked"],listed:false,drawn:0,shots:"none"},
+  b:{status:"Đang vẽ tài sản",st:["done","current","locked","locked"],listed:true,drawn:2,shots:"none"},
+  c:{status:"Đang làm shot",st:["done","done","current","locked"],listed:true,drawn:4,shots:"half"},
+  d:{status:"Chờ chốt",st:["done","done","done","current"],listed:true,drawn:4,shots:"all"}
+};
+const WHY=["","Mở khi danh sách tài sản ở khối 1 đã duyệt.","Mở khi mọi tài sản ở khối 2 đã duyệt.","Mở khi mọi unit ở khối 3 đã có shot đã duyệt."];
+let demo="a"; const open={};
+const dot=c=>`<svg class="thumb sq" viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="18" fill="${c}"/></svg>`;
+const mini=a=>`<span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="${a.c}"/></svg>${a.id}</span>`;
+
+function s1(d){
+  if(!d.listed) return `<div class="missing">Chưa có danh sách.</div>
+    <div class="actions"><button class="run">Lập danh sách bằng AI</button></div>`;
+  return `<table><thead><tr><th>Mã</th><th>Tên</th><th>Loại</th><th>Mức chi tiết</th><th>Hình gốc</th><th></th></tr></thead><tbody>
+    ${A.map(a=>`<tr><td class="mono">${a.id}</td><td>${a.name}</td><td>${a.kind}</td><td>${a.tier}</td><td>${a.base}</td><td><button>Sửa</button></td></tr>`).join("")}
+    </tbody></table>
+    <div class="actions"><button>+ Thêm tài sản</button><button class="run">Làm lại kèm ghi chú</button><button class="primary">Duyệt danh sách</button></div>`;
+}
+function s2(d){
+  const items=A.map((a,i)=>{
+    const done=i<d.drawn;
+    return `<article class="item">${done?dot(a.c):'<div class="thumb sq empty" aria-hidden="true"></div>'}
+      <div class="row between"><b>${a.name}</b><span class="chip ${done?"ok":"warn"}">${done?"Đã duyệt":"Chưa vẽ"}</span></div>
+      <span class="mono">${a.id}</span>
+      ${done?`<span class="muted" style="font-size:12px">Dùng ở ${a.id.includes("KHANG")?"2":"2"} shot · ☑ Đưa vào thư viện</span>`
+            :`<div class="row"><button class="run">Vẽ</button></div>`}
+    </article>`}).join("");
+  return `<div class="grid">${items}</div>
+    <div class="actions"><button class="run" ${d.drawn===4?"disabled":""}>Vẽ tất cả tài sản còn lại</button></div>`;
+}
+function shotCard(id,purpose,text,assets,ok){
+  return `<article class="item">
+    <svg class="thumb" viewBox="0 0 160 90" role="img" aria-label="Khung ${id}">${assets.map((a,i)=>`<circle cx="${50+i*50}" cy="45" r="${18-i*2}" fill="${a.c}"/>`).join("")}${text!=="—"?`<text x="80" y="82" fill="#f5f0e6" font-size="8" text-anchor="middle">${text}</text>`:""}</svg>
+    <div class="row between"><b class="mono">${id}</b><span class="chip ${ok?"ok":"acc"}">${ok?"Đã duyệt":"Chờ duyệt"}</span></div>
+    <dl class="kv"><dt>Mục đích</dt><dd>${purpose}</dd><dt>Chữ</dt><dd>${text}</dd></dl>
+    <div class="mini">${assets.map(mini).join("")}</div>
+    ${ok?"":`<div class="row"><button>Sửa</button><button class="run">Vẽ lại khung</button><button class="primary">Duyệt</button></div>`}
+  </article>`;
+}
+function s3(d){
+  const u1=`<div class="unit"><div class="row between"><b>Beat B1 · Unit U1 · Virus tấn công tế bào</b><span class="chip ok">2/2 đã duyệt</span></div>
+    <div class="grid">${shotCard("SH-001","Giới thiệu kẻ xâm nhập","Virus đến gần",[A[0],A[1]],true)}${shotCard("SH-002","Virus bám vào màng","—",[A[1],A[0]],true)}</div></div>`;
+  const u2 = d.shots==="all"
+    ? `<div class="unit"><div class="row between"><b>Beat B2 · Unit U2 · Kháng thể xuất hiện</b><span class="chip ok">2/2 đã duyệt</span></div>
+       <div class="grid">${shotCard("SH-003","Kháng thể lao tới","Phản công",[A[2],A[0]],true)}${shotCard("SH-004","Virus bị bao vây","—",[A[2],A[0]],true)}</div></div>`
+    : `<div class="unit"><div class="row between"><b>Beat B2 · Unit U2 · Kháng thể xuất hiện</b><span class="chip warn">Chưa có shot</span></div>
+       <div class="missing row between"><span>Unit này sẽ dùng <span class="mono">AST-KHANGTHE-1</span>, <span class="mono">AST-VIRUS-1</span> (đã duyệt).</span><button class="run">Viết shot U2 bằng AI</button></div></div>`;
+  const u3=`<div class="unit"><div class="row between"><b>Beat B3 · Unit U3 · Cơ thể hồi phục</b><span class="chip ${d.shots==="all"?"ok":"warn"}">${d.shots==="all"?"1/1 đã duyệt":"Chưa có shot"}</span></div>
+     ${d.shots==="all"?`<p class="muted" style="font-size:13px">SH-005 · đã duyệt</p>`:`<p class="muted" style="font-size:13px">Viết sau U2 (AI nhận shot của unit trước để giữ nhất quán).</p>`}</div>`;
+  return u1+u2+u3+(d.shots==="all"?"":`<div class="actions"><button class="run">Viết shot cho mọi unit còn trống</button></div>`);
+}
+function s4(d){
+  const ready=d.shots==="all";
+  return `<div class="row" style="align-items:flex-start;gap:24px">
+    <div style="flex:1;min-width:240px"><h3>Điều kiện để chốt</h3><ul class="check" style="margin-top:8px">
+      <li><span class="chip ok">✓</span>Mọi tài sản dùng trong shot đã duyệt</li>
+      <li><span class="chip ok">✓</span>Mọi unit đã có shot và đã duyệt</li>
+      <li><span class="chip ok">✓</span>Chữ trên màn hình không quá số từ</li>
+      <li><span class="chip ok">✓</span>Có ảnh khung cho mọi shot</li></ul></div>
+    <div style="flex:1;min-width:240px"><h3>Ghi chú của AI</h3><p class="muted" style="margin-top:8px;font-size:13px">Chưa rà soát. Không bắt buộc.</p></div>
+  </div>
+  <div class="actions"><button class="run">Rà soát bằng AI</button><button class="primary" ${ready?"":"disabled"}>Chốt storyboard-v1</button></div>`;
+}
+const BODY=[s1,s2,s3,s4];
+const CHIP=[
+  d=>d.listed?["ok","Đã duyệt · 4 tài sản"]:["warn","Chưa có"],
+  d=>d.drawn?[d.drawn===4?"ok":"acc",`${d.drawn}/4 đã duyệt`]:["","—"],
+  d=>({none:["","—"],half:["acc","2 shot · 2 unit trống"],all:["ok","5/5 đã duyệt"]})[d.shots],
+  d=>d.shots==="all"?["acc","Sẵn sàng chốt"]:["","—"]
+];
+function render(){
+  const d=S[demo];
+  document.getElementById("status").textContent=d.status;
+  d.st.forEach((st,i)=>{
+    const id="s"+(i+1), el=document.getElementById(id);
+    el.dataset.state=st;
+    el.classList.toggle("folded",st==="done"&&!open[id]);
+    el.querySelector(".num").textContent=st==="done"?"✓":i+1;
+    const [cls,txt]=CHIP[i](d); const ch=document.getElementById(id+"-chip"); ch.className="chip "+cls; ch.textContent=txt;
+    document.getElementById(id+"-why").textContent=st==="locked"?"🔒 "+WHY[i]:"";
+    document.getElementById(id+"-body").innerHTML=st==="locked"?"":BODY[i](d);
+    const f=el.querySelector(".fold"); if(f){f.hidden=st!=="done"; f.textContent=open[id]?"Thu gọn":"Mở";}
+  });
+  const cur=document.querySelector('.sec[data-state="current"]');
+  if(cur) cur.scrollIntoView({block:"nearest"});
+}
+document.querySelectorAll("[data-demo]").forEach(b=>b.onclick=()=>{
+  demo=b.dataset.demo; for(const k in open) delete open[k];
+  document.querySelectorAll("[data-demo]").forEach(x=>x.setAttribute("aria-pressed",x===b)); render();
+});
+document.querySelectorAll(".fold").forEach(b=>b.onclick=()=>{open[b.dataset.sec]=!open[b.dataset.sec]; render();});
+render();
+</script>
+</body>
+</html>
