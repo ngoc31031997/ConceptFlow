@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { VisualSequenceState } from "../api/client";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import lockStyles from "../components/lock/lock.module.css";
 import researchStyles from "../components/research/research.module.css";
@@ -197,66 +198,68 @@ export function VisualSequenceStepPage() {
         )}
         {state && !gate && (
           <div className={researchStyles.body}>
-            <SequenceRunningBanner sequence={sequence} />
-            <div className={lockStyles.tabs} role="tablist">
-              <button
-                type="button"
-                role="tab"
-                className={lockStyles.tab}
-                aria-selected={tab === "sequence"}
-                onClick={() => setTab("sequence")}
-                data-testid="seq-tab-sequence"
-              >
-                Chuỗi hình
-                <span className={lockStyles.tabCount}>
-                  {state.items_approved}/{state.coverage.units_total}
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                className={lockStyles.tab}
-                aria-selected={tab === "review"}
-                onClick={() => setTab("review")}
-                data-testid="seq-tab-review"
-              >
-                Rà soát và chốt
-                <span className={lockStyles.tabCount}>{state.review.open_count} vấn đề</span>
-              </button>
-            </div>
-            {tab === "sequence" && (
-              <>
-                <SequenceHeadCard state={state} />
-                <SequenceMotifsCard
+            <AiRunsProvider projectId={projectId} step="visual_sequence" service="visual">
+              <SequenceRunningBanner sequence={sequence} />
+              <div className={lockStyles.tabs} role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  className={lockStyles.tab}
+                  aria-selected={tab === "sequence"}
+                  onClick={() => setTab("sequence")}
+                  data-testid="seq-tab-sequence"
+                >
+                  Chuỗi hình
+                  <span className={lockStyles.tabCount}>
+                    {state.items_approved}/{state.coverage.units_total}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  className={lockStyles.tab}
+                  aria-selected={tab === "review"}
+                  onClick={() => setTab("review")}
+                  data-testid="seq-tab-review"
+                >
+                  Rà soát và chốt
+                  <span className={lockStyles.tabCount}>{state.review.open_count} vấn đề</span>
+                </button>
+              </div>
+              {tab === "sequence" && (
+                <>
+                  <SequenceHeadCard state={state} />
+                  <SequenceMotifsCard
+                    projectId={projectId}
+                    state={state}
+                    sequence={sequence}
+                    readOnly={readOnly}
+                  />
+                  <SequenceRunCard
+                    projectId={projectId}
+                    state={state}
+                    sequence={sequence}
+                    readOnly={readOnly}
+                  />
+                  <SequenceFlowStrip state={state} onOpenUnit={openUnit} />
+                  <SequenceBeatsCard
+                    projectId={projectId}
+                    state={state}
+                    sequence={sequence}
+                    readOnly={readOnly}
+                  />
+                </>
+              )}
+              {tab === "review" && (
+                <SequenceReviewTab
                   projectId={projectId}
                   state={state}
                   sequence={sequence}
                   readOnly={readOnly}
+                  onOpen={open}
                 />
-                <SequenceRunCard
-                  projectId={projectId}
-                  state={state}
-                  sequence={sequence}
-                  readOnly={readOnly}
-                />
-                <SequenceFlowStrip state={state} onOpenUnit={openUnit} />
-                <SequenceBeatsCard
-                  projectId={projectId}
-                  state={state}
-                  sequence={sequence}
-                  readOnly={readOnly}
-                />
-              </>
-            )}
-            {tab === "review" && (
-              <SequenceReviewTab
-                projectId={projectId}
-                state={state}
-                sequence={sequence}
-                readOnly={readOnly}
-                onOpen={open}
-              />
-            )}
+              )}
+            </AiRunsProvider>
             {sequence.actionError && (
               <p className={researchStyles.error} role="alert" data-testid="seq-error">
                 {sequence.actionError}

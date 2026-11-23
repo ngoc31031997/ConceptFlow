@@ -112,6 +112,9 @@ func (d *SequenceDesk) GenerateMotifs(ctx context.Context, projectID, note strin
 	if err != nil {
 		return nil, err
 	}
+	if err := stopForPreview(ctx, merge.Set); err != nil {
+		return nil, err
+	}
 	data.motifRow.InputHashes = data.in.MotifHashes()
 	if err := d.saveMotifs(ctx, data, merge.Set, domain.UnitPending, merge.Fields); err != nil {
 		return nil, err
@@ -159,6 +162,9 @@ func (d *SequenceDesk) writeUnit(ctx context.Context, projectID string, data *se
 	}
 	seq := data.beats[beatKey]
 	items, kept := domain.MergeSequenceItems([]domain.SeqItem{fresh}, seq, mine)
+	if err := stopForPreview(ctx, items[0]); err != nil {
+		return err
+	}
 	at := seq.Index(unitID)
 	if len(seq.Items) == 0 {
 		row.InputHashes = data.in.BeatHashes(beatKey, data.motifs)
@@ -322,7 +328,11 @@ func (d *SequenceDesk) Review(ctx context.Context, projectID, note string) (*Seq
 	if err != nil {
 		return nil, err
 	}
-	data.review = domain.MergeReview(data.review, parsed)
+	merged := domain.MergeReview(data.review, parsed)
+	if err := stopForPreview(ctx, merged); err != nil {
+		return nil, err
+	}
+	data.review = merged
 	if err := d.saveReview(ctx, data); err != nil {
 		return nil, err
 	}

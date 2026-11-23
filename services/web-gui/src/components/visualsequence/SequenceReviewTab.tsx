@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  describeAiRequest,
   getVisualSequenceVersion,
   reviewVisualSequence,
   type VisualSequenceState,
@@ -9,7 +10,8 @@ import type { VisualSequenceControls } from "../../hooks/useVisualSequence";
 import lockStyles from "../lock/lock.module.css";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, CopyBox, Dialog, FormField, TextInput } from "../ui";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { SequenceRunPreview } from "./SequenceRunPreview";
 import visualStyles from "../visual/visual.module.css";
 import { sequenceCriteria } from "./sequenceModel";
 
@@ -43,6 +45,7 @@ export function SequenceReviewTab({
   onOpen,
 }: SequenceReviewTabProps) {
   const [reviewOpen, setReviewOpen] = useState(false);
+  const reviewRunPath = `/v1/projects/${projectId}/visual-sequence/review`;
   const [lockOpen, setLockOpen] = useState(false);
   const [lockNote, setLockNote] = useState("");
   const [viewing, setViewing] = useState<{ version: number; text: string } | null>(null);
@@ -82,6 +85,11 @@ export function SequenceReviewTab({
             >
               {state.review.reviewed ? "Rà soát lại" : "Rà soát bằng AI"}
             </Button>
+            <AiRunPill
+              runPath={reviewRunPath}
+              onOpen={() => setReviewOpen(true)}
+              testId="seq-review-ai-run"
+            />
           </div>
           {!state.review.reviewed && failing.length === 0 && (
             <p className={researchStyles.hint} data-testid="seq-review-none">
@@ -259,21 +267,22 @@ export function SequenceReviewTab({
         </div>
       </Card>
 
-      <ConceptAiDialog
+      <AiRunDialog
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
         title={state.review.reviewed ? "Rà soát lại chuỗi hình" : "Rà soát chuỗi hình"}
+        runPath={reviewRunPath}
+        describe={(note) =>
+          describeAiRequest((external) => reviewVisualSequence(projectId, note, { external }))
+        }
+        renderPreview={(p) => <SequenceRunPreview kind="review" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI so chuỗi hiện tại với các vấn đề cũ: vấn đề đã hết thì đánh dấu đã sửa, vấn đề mới
             thì thêm vào. Nhóm vấn đề như bước 8 và 9: độ chính xác, nhất quán, rõ ràng, khả thi.
           </p>
         }
-        onSystem={(note) => void sequence.review(note)}
-        external={{
-          run: (note, external) => reviewVisualSequence(projectId, note, { external }),
-          onDone: sequence.reload,
-        }}
+        onApplied={sequence.reload}
         testId="seq-review-dialog"
       />
 

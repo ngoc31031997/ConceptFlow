@@ -1,27 +1,13 @@
 import { useState } from "react";
-import {
-  ExternalRequestDescribed,
-  generateSequenceUnit,
-  type ExternalRequest,
-  type SequenceUnit,
-  type VisualSequenceState,
-} from "../../api/client";
+import type { VisualSequenceState } from "../../api/client";
 import { useAiQueue } from "../../hooks/useAiQueue";
+import { ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
 import type { VisualSequenceControls } from "../../hooks/useVisualSequence";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, Dropdown, FormField, TextArea } from "../ui";
 import { motifsReady } from "./sequenceModel";
-
-/** The request that has the AI write one unit, described and not sent, so the extension can make it later. */
-async function describeUnit(projectId: string, unit: SequenceUnit): Promise<ExternalRequest> {
-  try {
-    await generateSequenceUnit(projectId, unit.unit_id, "", { external: { mode: "describe" } });
-  } catch (err) {
-    if (err instanceof ExternalRequestDescribed) return err.request;
-    throw err;
-  }
-  throw new Error("Không dựng được yêu cầu viết chuỗi cho unit này.");
-}
+import { queueUnits, type QueueOutcome } from "./sequenceQueue";
 
 interface SequenceRunCardProps {
   projectId: string;
@@ -32,17 +18,22 @@ interface SequenceRunCardProps {
 
 /**
  * Section 3 of step 10: the model the step runs on, then the run that writes
- * every beat with no sequence yet in plan order, on the system's AI or queued
- * on an outside AI through the extension.
+ * every unit with no sequence yet in plan order, on the step's channel from
+ * Settings (▾ for the other): on the API the system's AI writes them in turn; on
+ * the extension one queue item per unit not approved yet runs on the outside AI.
+ * This run stores each unit as it is written, with no preview, because each unit
+ * reads the stored items before it; a single unit's dialog previews before it
+ * stores.
  */
 export function SequenceRunCard({ projectId, state, sequence, readOnly }: SequenceRunCardProps) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [queueing, setQueueing] = useState(false);
-  const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [queueNote, setQueueNote] = useState<QueueOutcome | null>(null);
   const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/visual-sequence`)) void sequence.reload();
   });
+  const ai = useAiRuns();
   // Units with no item or one still waiting for review, in plan order.
   const notApproved = state.beats
     .flatMap((b) => b.units)
@@ -63,38 +54,14 @@ export function SequenceRunCard({ projectId, state, sequence, readOnly }: Sequen
   async function queueAll() {
     setQueueing(true);
     setQueueNote(null);
-    let added = 0;
-    let already = 0;
-    try {
-      for (const [i, unit] of notApproved.entries()) {
-        const outcome = await queue.add({
-          label: `Chuỗi hình · ${unit.unit_id}`,
-          project: projectId,
-          request: await describeUnit(projectId, unit),
-          modes: { deepThink: true, search: false },
-        });
-        if (!outcome.ok) {
-          setQueueNote({
-            tone: "error",
-            text: `Dừng ở unit ${i + 1}/${notApproved.length}: ${outcome.message}`,
-          });
-          return;
-        }
-        if (outcome.added) added += 1;
-        else already += 1;
-      }
-      setQueueNote({
-        tone: "ok",
-        text: `Đã thêm ${added} unit vào hàng đợi AI${already > 0 ? `, ${already} unit đã có trong hàng đợi` : ""}. Extension chạy lần lượt, mỗi unit một prompt và đọc các unit trước nó; bấm icon extension để xem.`,
-      });
-    } catch (err) {
-      setQueueNote({
-        tone: "error",
-        text: err instanceof Error ? err.message : "Không thêm được vào hàng đợi.",
-      });
-    } finally {
-      setQueueing(false);
-    }
+    setQueueNote(
+      await queueUnits(
+        queue,
+        projectId,
+        notApproved.map((u) => u.unit_id),
+      ),
+    );
+    setQueueing(false);
   }
 
   return (
@@ -113,28 +80,23 @@ export function SequenceRunCard({ projectId, state, sequence, readOnly }: Sequen
             disabled={disabled}
             data-testid="seq-model"
           />
-          <Button
-            variant="run"
-            onClick={() => setOpen(true)}
-            disabled={disabled || !ready || empty.length === 0}
-            title={ready ? undefined : "Duyệt motif trước khi AI viết chuỗi"}
-            data-testid="seq-generate"
-          >
-            {empty.length > 0
-              ? `Viết chuỗi cho ${empty.length} unit còn trống`
-              : "Mọi unit đã có chuỗi"}
-          </Button>
-          {queue.available && notApproved.length > 0 && (
-            <Button
-              variant="run"
-              onClick={() => void queueAll()}
-              disabled={disabled || queueing || !ready}
-              title={ready ? undefined : "Duyệt motif trước khi AI viết chuỗi"}
-              data-testid="seq-queue"
-            >
-              Thêm tất cả vào hàng đợi AI ({notApproved.length})
-            </Button>
-          )}
+          <ChannelButton
+            channel={ai.defaultChannel}
+            label={
+              empty.length > 0
+                ? `Viết chuỗi cho ${empty.length} unit còn trống`
+                : "Mọi unit đã có chuỗi"
+            }
+            onRun={(c) => (c === "api" ? setOpen(true) : void queueAll())}
+            disabled={disabled || queueing || !ready || empty.length === 0}
+            unavailable={{
+              manual: "Chạy hàng loạt không làm thủ công được; chạy thủ công ở từng unit bên dưới",
+              ...(queue.available
+                ? {}
+                : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }),
+            }}
+            testId="seq-generate"
+          />
         </div>
         {queueNote && (
           <p
@@ -161,7 +123,8 @@ export function SequenceRunCard({ projectId, state, sequence, readOnly }: Sequen
         <p className={researchStyles.hint}>
           Mỗi lượt AI viết đúng một unit: đọc các unit khác của beat, unit liền trước và liền sau
           (để viết chuyển cảnh nối), motif đã duyệt, nhịp chung và ngôn ngữ chuyển động của bước 8.
-          Nhịp và chuyển cảnh AI tự viết, không giới hạn trong danh sách nào.
+          Nhịp và chuyển cảnh AI tự viết, không giới hạn trong danh sách nào. Chạy hàng loạt lưu
+          luôn từng unit, không dừng để xem trước; muốn xem trước thì chạy từng unit ở mục 5.
         </p>
       </div>
 

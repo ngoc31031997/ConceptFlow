@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  describeAiRequest,
   generateSequenceUnit,
   type SequenceBeat,
   type SequenceUnit,
@@ -9,11 +10,15 @@ import type { VisualSequenceControls } from "../../hooks/useVisualSequence";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, FormField, TextArea } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill, ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
 import foldStyles from "../visual/visual.module.css";
 import planStyles from "../visualplan/plan.module.css";
 import { METHOD_LABELS, refsLabel, seconds } from "../visualplan/planModel";
+import { useAiQueue } from "../../hooks/useAiQueue";
 import { SequenceItemDialog } from "./SequenceItemDialog";
+import { SequenceRunPreview } from "./SequenceRunPreview";
+import { queueUnits } from "./sequenceQueue";
 import styles from "./sequence.module.css";
 import { approvable, motifName, motifSlot, motifsReady, tempoLabel } from "./sequenceModel";
 
@@ -55,6 +60,7 @@ function SequenceUnitCard({ projectId, state, beat, unit, sequence, readOnly }: 
   const disabled = readOnly || sequence.busy || running;
   const aiDisabled = readOnly || sequence.busy || sequence.running !== null;
   const testId = `seq-unit-${unit.unit_id}`;
+  const runPath = `/v1/projects/${projectId}/visual-sequence/units/${unit.unit_id}/generate`;
   const tr = it?.transition_from_previous ?? null;
   const approveBlock = beat.stale
     ? "Beat đã lỗi thời so với kế hoạch hình, xác nhận hoặc viết lại beat trước"
@@ -205,6 +211,11 @@ function SequenceUnitCard({ projectId, state, beat, unit, sequence, readOnly }: 
             >
               {it ? "Làm lại kèm ghi chú" : "Viết chuỗi unit này"}
             </Button>
+            <AiRunPill
+              runPath={runPath}
+              onOpen={() => setRedoing(true)}
+              testId={`${testId}-ai-run`}
+            />
             {it && (
               <Button
                 variant="primary"
@@ -230,10 +241,17 @@ function SequenceUnitCard({ projectId, state, beat, unit, sequence, readOnly }: 
         unit={unit}
         onSave={(fields) => sequence.edit(unit.unit_id, fields)}
       />
-      <ConceptAiDialog
+      <AiRunDialog
         open={redoing}
         onClose={() => setRedoing(false)}
         title={it ? `Làm lại chuỗi ${unit.unit_id} kèm ghi chú` : `Viết chuỗi ${unit.unit_id}`}
+        runPath={runPath}
+        describe={(note) =>
+          describeAiRequest((external) =>
+            generateSequenceUnit(projectId, unit.unit_id, note, { external }),
+          )
+        }
+        renderPreview={(p) => <SequenceRunPreview kind="unit" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI viết riêng {unit.unit_id} trong một lượt, đọc các unit khác của beat, unit liền trước
@@ -241,12 +259,7 @@ function SequenceUnitCard({ projectId, state, beat, unit, sequence, readOnly }: 
             nguyên.
           </p>
         }
-        onSystem={(note) => void sequence.generateUnit(unit.unit_id, note)}
-        external={{
-          run: (note, external) =>
-            generateSequenceUnit(projectId, unit.unit_id, note, { external }),
-          onDone: sequence.reload,
-        }}
+        onApplied={sequence.reload}
         testId={`${testId}-redo-dialog`}
       />
     </article>
@@ -278,6 +291,12 @@ function SequenceBeatBlock({ projectId, state, beat, sequence, readOnly }: BeatP
         "beat" in sequence.running &&
         sequence.running.beat === beat.key;
   const [note, setNote] = useState("");
+  const [queueing, setQueueing] = useState(false);
+  const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const queue = useAiQueue((path) => {
+    if (path.startsWith(`/v1/projects/${projectId}/visual-sequence`)) void sequence.reload();
+  });
+  const ai = useAiRuns();
   const folded = beat.approved && !expanded && !running;
 
   return (
@@ -324,17 +343,44 @@ function SequenceBeatBlock({ projectId, state, beat, sequence, readOnly }: BeatP
               {folded ? `Mở ${beat.units.length} unit` : "Thu gọn"}
             </Button>
           )}
-          <Button
-            variant="run"
-            onClick={() => setOpen(true)}
-            disabled={disabled || !ready}
-            title={ready ? undefined : "Duyệt motif trước khi AI viết chuỗi"}
-            data-testid={`seq-beat-${beat.key}-generate`}
-          >
-            {beat.written ? "Viết lại beat này" : "Viết chuỗi beat này"}
-          </Button>
+          <ChannelButton
+            channel={ai.defaultChannel}
+            label={beat.written ? "Viết lại beat này" : "Viết chuỗi beat này"}
+            onRun={(c) => {
+              if (c === "api") {
+                setOpen(true);
+                return;
+              }
+              setQueueing(true);
+              setQueueNote(null);
+              void queueUnits(
+                queue,
+                projectId,
+                beat.units.map((u) => u.unit_id),
+              )
+                .then(setQueueNote)
+                .finally(() => setQueueing(false));
+            }}
+            disabled={disabled || queueing || !ready}
+            unavailable={{
+              manual: "Chạy cả beat không làm thủ công được; chạy thủ công ở từng unit",
+              ...(queue.available
+                ? {}
+                : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }),
+            }}
+            testId={`seq-beat-${beat.key}-generate`}
+          />
         </span>
       </div>
+      {queueNote && (
+        <p
+          className={queueNote.tone === "ok" ? researchStyles.hint : researchStyles.error}
+          role="status"
+          data-testid={`seq-beat-${beat.key}-queue-note`}
+        >
+          {queueNote.text}
+        </p>
+      )}
       {!folded &&
         beat.units.map((u) => (
           <SequenceUnitCard
@@ -379,8 +425,8 @@ function SequenceBeatBlock({ projectId, state, beat, sequence, readOnly }: BeatP
           viết. Trường bạn đã sửa tay được giữ; mọi unit của beat về “Chờ duyệt”.
         </p>
         <p className={researchStyles.hint}>
-          Muốn dùng AI ngoài hoặc hàng đợi AI: bấm “Làm lại kèm ghi chú” trên từng unit, hoặc “Thêm tất
-          cả vào hàng đợi AI” ở mục 3.
+          Chạy cả beat lưu luôn từng unit, không dừng để xem trước vì unit sau đọc unit vừa viết.
+          Muốn xem trước hoặc dán tay: bấm “Làm lại kèm ghi chú” trên từng unit.
         </p>
         <FormField label="Ghi chú cho AI (không bắt buộc)">
           <TextArea
