@@ -187,6 +187,9 @@ func (uc *ProjectIdeaUseCase) Generate(ctx context.Context, projectID, note stri
 	if err := written.Validate(); err != nil {
 		return domain.StoredIdea{}, fmt.Errorf("%w: %v", domain.ErrProjectIdeaReplyUnusable, err)
 	}
+	if err := stopForPreview(ctx, written); err != nil {
+		return domain.StoredIdea{}, err
+	}
 
 	if exists {
 		current.RedoCount++
@@ -421,6 +424,9 @@ func (uc *ProjectIdeaUseCase) Review(ctx context.Context, projectID string) (dom
 	}
 	review.IdeaHash = stored.Idea.Hash()
 	review.CreatedAt = uc.now()
+	if err := stopForPreview(ctx, review); err != nil {
+		return domain.IdeaReview{}, err
+	}
 	if err := uc.store.SaveIdeaReview(ctx, projectID, review); err != nil {
 		return domain.IdeaReview{}, err
 	}
