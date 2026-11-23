@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { generateVisualPlanBeat, type VisualPlanBeat, type VisualPlanUnit } from "../../api/client";
+import { describeAiRequest, generateVisualPlanBeat, type VisualPlanBeat, type VisualPlanUnit } from "../../api/client";
 import type { VisualPlanControls } from "../../hooks/useVisualPlan";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import researchStyles from "../research/research.module.css";
 import { Button, CopyBox } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
+import { PlanRunPreview } from "./PlanRunPreview";
 import { PlanAnswerDialog, PlanEditDialog, PlanMergeDialog, PlanSplitDialog } from "./PlanDialogs";
 import { METHOD_LABELS, RELATIONSHIP_LABELS, hasOpenQuestion, refsLabel, seconds } from "./planModel";
 import foldStyles from "../visual/visual.module.css";
@@ -36,6 +37,7 @@ export function PlanUnitCard({ projectId, beat, unit, next, plan, readOnly }: Pl
   const approved = unit.status === "approved";
   const disabled = readOnly || plan.busy || plan.running !== null;
   const testId = `plan-unit-${unit.unit_id}`;
+  const beatRunPath = `/v1/projects/${projectId}/visual-plan/beats/${beat.key}/generate`;
   const open = unit.open_questions.filter((q) => q.answer.trim() === "");
   const longer = unit.effective_planned_s > unit.narration_min_s;
   const warn = unit.risk_notes.length > 0 || unit.problems.length > 0;
@@ -212,6 +214,7 @@ export function PlanUnitCard({ projectId, beat, unit, next, plan, readOnly }: Pl
           </>
         ) : (
           <>
+            <AiRunPill runPath={beatRunPath} onOpen={() => setRedoing(true)} testId={`${testId}-ai-run`} />
             <Button variant="run" onClick={() => setRedoing(true)} disabled={disabled} data-testid={`${testId}-redo`}>
               Làm lại kèm ghi chú
             </Button>
@@ -259,21 +262,20 @@ export function PlanUnitCard({ projectId, beat, unit, next, plan, readOnly }: Pl
         question={unit.open_questions.find((q) => q.id === answering) ?? null}
         onAnswer={(qid, text) => plan.answer(unit.unit_id, qid, text)}
       />
-      <ConceptAiDialog
+      <AiRunDialog
         open={redoing}
         onClose={() => setRedoing(false)}
         title={`Làm lại ${unit.unit_id} kèm ghi chú`}
+        runPath={beatRunPath}
+        describe={(note) => describeAiRequest((external) => generateVisualPlanBeat(projectId, beat.key, note, { external }))}
+        renderPreview={(p) => <PlanRunPreview kind="beat" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI lập lại cả beat {beat.key}: các unit khác của beat giữ mã nếu phủ đúng các câu cũ, trường bạn đã sửa
             tay được giữ, mọi unit của beat về “Chờ duyệt”.
           </p>
         }
-        onSystem={(note) => void plan.generateBeat(beat.key, note)}
-        external={{
-          run: (note, external) => generateVisualPlanBeat(projectId, beat.key, note, { external }),
-          onDone: plan.reload,
-        }}
+        onApplied={plan.reload}
         testId={`${testId}-redo-dialog`}
       />
     </article>

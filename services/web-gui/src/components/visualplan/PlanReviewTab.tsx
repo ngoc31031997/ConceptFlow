@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { getVisualPlanVersion, reviewVisualPlan, type VisualPlanState } from "../../api/client";
+import { describeAiRequest, getVisualPlanVersion, reviewVisualPlan, type VisualPlanState } from "../../api/client";
 import { visualErrorText } from "../../hooks/useVisualConcept";
 import type { VisualPlanControls } from "../../hooks/useVisualPlan";
 import lockStyles from "../lock/lock.module.css";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, CopyBox, Dialog, FormField, TextInput } from "../ui";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { PlanRunPreview } from "./PlanRunPreview";
 import visualStyles from "../visual/visual.module.css";
 import { planCriteria, seconds } from "./planModel";
 
@@ -38,6 +39,7 @@ interface PlanReviewTabProps {
  */
 export function PlanReviewTab({ projectId, state, plan, readOnly, onOpenUnit, onGoUncovered }: PlanReviewTabProps) {
   const [reviewOpen, setReviewOpen] = useState(false);
+  const reviewRunPath = `/v1/projects/${projectId}/visual-plan/review`;
   const [lockOpen, setLockOpen] = useState(false);
   const [lockNote, setLockNote] = useState("");
   const [viewing, setViewing] = useState<{ version: number; text: string } | null>(null);
@@ -67,6 +69,7 @@ export function PlanReviewTab({ projectId, state, plan, readOnly, onOpenUnit, on
               AI rà soát cả kế hoạch cùng kịch bản, ngôn ngữ hình ảnh và hồ sơ nghiên cứu
             </span>
             <span className={researchStyles.grow} />
+            <AiRunPill runPath={reviewRunPath} onOpen={() => setReviewOpen(true)} testId="plan-review-ai-run" />
             <Button
               variant="run"
               onClick={() => setReviewOpen(true)}
@@ -240,20 +243,19 @@ export function PlanReviewTab({ projectId, state, plan, readOnly, onOpenUnit, on
         </div>
       </Card>
 
-      <ConceptAiDialog
+      <AiRunDialog
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
         title={state.review.reviewed ? "Rà soát lại kế hoạch hình" : "Rà soát kế hoạch hình"}
+        runPath={reviewRunPath}
+        describe={(note) => describeAiRequest((external) => reviewVisualPlan(projectId, note, { external }))}
+        renderPreview={(p) => <PlanRunPreview kind="review" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI so kế hoạch hiện tại với các vấn đề cũ: vấn đề đã hết thì đánh dấu đã sửa, vấn đề mới thì thêm vào.
           </p>
         }
-        onSystem={(note) => void plan.review(note)}
-        external={{
-          run: (note, external) => reviewVisualPlan(projectId, note, { external }),
-          onDone: plan.reload,
-        }}
+        onApplied={plan.reload}
         testId="plan-review-dialog"
       />
 

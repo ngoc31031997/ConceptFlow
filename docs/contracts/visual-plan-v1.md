@@ -18,6 +18,17 @@ Ghép với kế hoạch cũ của beat: unit mới phủ **đúng các câu** c
 
 **AI ngoài hệ thống.** `beats/{k}/generate` và `review` nhận header `X-External-AI: prompt` (trả `{"external_prompt":"…"}`, chưa gọi model, chưa ghi gì) hoặc `paste` (body có `external_reply`), như bước 8 (ADR-0047). Một lượt model cho mỗi request.
 
+## Lượt chạy AI (ADR-0052)
+
+Hai lượt AI một-prompt của bước chạy qua lượt chạy có xem trước của visual-service, `/v1/projects/{id}/visual/ai-runs`, theo [`ai-runs-v1.md`](ai-runs-v1.md); khoá kênh `visual_plan`. Điểm dừng xem trước của từng lượt, trước mọi lần ghi (kể cả cấp số unit):
+
+| Route | `preview` |
+|---|---|
+| `POST /beats/{beat}/generate` | mảng unit của beat sau khi ghép với trường Creator đã sửa; unit mới chưa có `unit_id` (số cấp khi áp dụng) |
+| `POST /review` | `ReviewState` sau khi gộp với vòng trước: `findings[]` (mỗi mục có `state`), `notes`, `rounds` |
+
+`POST /generate` (mọi beat còn trống) không đi qua lượt chạy: mỗi beat đọc kế hoạch đã lưu của beat trước nên lưu ngay từng beat.
+
 ## Đầu vào
 
 | Nguồn | Lấy từ | Dùng cho |

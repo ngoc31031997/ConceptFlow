@@ -87,6 +87,9 @@ func (d *PlanDesk) writeBeat(ctx context.Context, projectID string, data *planDa
 	if err != nil {
 		return err
 	}
+	if err := stopForPreview(ctx, merge.Units); err != nil {
+		return err
+	}
 	if len(merge.Fresh) > 0 {
 		first, err := d.store.ReserveUnitNumbers(ctx, projectID, len(merge.Fresh))
 		if err != nil {

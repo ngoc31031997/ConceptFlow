@@ -9,13 +9,11 @@ import {
   approveVisualPlanUnit,
   editVisualPlanUnit,
   generateVisualPlan,
-  generateVisualPlanBeat,
   getVisualPlan,
   isRequestCancelled,
   lockVisualPlan,
   mergeVisualPlanUnit,
   newOperationId,
-  reviewVisualPlan,
   setVisualPlanModel,
   splitVisualPlanUnit,
   unapproveVisualPlanUnit,
@@ -23,8 +21,8 @@ import {
 } from "../api/client";
 import { visualErrorText } from "./useVisualConcept";
 
-/** What the system's AI is doing now: every empty beat, one beat (its key), or the review. */
-export type PlanRunning = "all" | "review" | { beat: string } | null;
+/** What the system's AI is doing now: every empty beat. */
+export type PlanRunning = "all" | null;
 
 /** Why step 9 cannot open yet. */
 export type PlanNotOpen = "script" | "concept" | null;
@@ -44,8 +42,6 @@ export interface VisualPlanControls {
   /** Stops the AI run in flight; the server drops the call when the connection closes. */
   stop: () => void;
   generateAll: (note: string) => Promise<boolean>;
-  generateBeat: (beatKey: string, note: string) => Promise<boolean>;
-  review: (note: string) => Promise<boolean>;
   /** Hand-edit actions throw so the form can show why they failed. */
   edit: (unitId: string, fields: Record<string, unknown>) => Promise<void>;
   answer: (unitId: string, questionId: string, answer: string) => Promise<void>;
@@ -161,9 +157,6 @@ export function useVisualPlan(projectId: string): VisualPlanControls {
     reload,
     stop: () => abort.current?.abort(),
     generateAll: (note) => runAi("all", (op) => generateVisualPlan(projectId, note, op)),
-    generateBeat: (beatKey, note) =>
-      runAi({ beat: beatKey }, (op) => generateVisualPlanBeat(projectId, beatKey, note, op)),
-    review: (note) => runAi("review", (op) => reviewVisualPlan(projectId, note, op)),
     edit: (unitId, fields) => change(() => editVisualPlanUnit(projectId, unitId, fields)),
     answer: (unitId, qid, text) => change(() => answerVisualPlanQuestion(projectId, unitId, qid, text)),
     split: (unitId, atLine) => change(() => splitVisualPlanUnit(projectId, unitId, atLine)),

@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { VisualPlanState } from "../api/client";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import lockStyles from "../components/lock/lock.module.css";
 import researchStyles from "../components/research/research.module.css";
@@ -139,6 +140,7 @@ export function VisualPlanStepPage() {
           </p>
         )}
         {state && !plan.notOpen && (
+          <AiRunsProvider projectId={projectId} step="visual_plan" service="visual">
           <div className={researchStyles.body}>
             <PlanHeadCard projectId={projectId} state={state} plan={plan} readOnly={readOnly} />
             <div className={lockStyles.tabs} role="tablist">
@@ -184,6 +186,7 @@ export function VisualPlanStepPage() {
               </p>
             )}
           </div>
+          </AiRunsProvider>
         )}
       </AppShell>
 

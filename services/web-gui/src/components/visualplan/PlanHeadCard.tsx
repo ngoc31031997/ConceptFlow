@@ -7,6 +7,8 @@ import {
   type VisualPlanState,
 } from "../../api/client";
 import { useAiQueue } from "../../hooks/useAiQueue";
+import { ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
 import type { VisualPlanControls } from "../../hooks/useVisualPlan";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, Dropdown, FormField, TextArea } from "../ui";
@@ -41,6 +43,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
   const [note, setNote] = useState("");
   const [queueing, setQueueing] = useState(false);
   const [queueNote, setQueueNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const ai = useAiRuns();
   const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/visual-plan`)) void plan.reload();
   });
@@ -87,12 +90,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
     }
   }
 
-  const runningText =
-    plan.running === "all"
-      ? "AI đang lập kế hoạch các beat còn trống, lần lượt theo thứ tự beat."
-      : plan.running === "review"
-        ? "AI đang rà soát cả kế hoạch hình."
-        : "AI đang lập kế hoạch một beat. Unit bạn đã sửa tay giữ nguyên.";
+  const runningText = "AI đang lập kế hoạch các beat còn trống, lần lượt theo thứ tự beat.";
 
   return (
     <Card data-testid="plan-head-card">
@@ -130,19 +128,17 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
             disabled={disabled}
             data-testid="plan-model"
           />
-          <Button
-            variant="run"
-            onClick={() => setAllOpen(true)}
-            disabled={disabled || empty.length === 0}
-            data-testid="plan-generate"
-          >
-            {empty.length > 0 ? `AI lập ${empty.length} beat còn trống` : "Mọi beat đã có kế hoạch"}
-          </Button>
-          {queue.available && notApproved.length > 0 && (
-            <Button variant="run" onClick={() => void queueAll()} disabled={disabled || queueing} data-testid="plan-queue">
-              Thêm tất cả vào hàng đợi AI ({notApproved.length})
-            </Button>
-          )}
+          <ChannelButton
+            channel={ai.defaultChannel}
+            label={empty.length > 0 ? `Lập kế hoạch ${empty.length} beat còn trống` : "Mọi beat đã có kế hoạch"}
+            onRun={(c) => (c === "api" ? setAllOpen(true) : void queueAll())}
+            disabled={disabled || queueing || notApproved.length === 0 || (ai.defaultChannel === "api" && empty.length === 0)}
+            unavailable={{
+              manual: "Chạy hàng loạt không làm thủ công được; chạy thủ công ở từng beat bên dưới",
+              ...(queue.available ? {} : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }),
+            }}
+            testId="plan-generate"
+          />
           <span className={researchStyles.grow} />
           {fixable.length > 0 && (
             <Button variant="view" onClick={() => void plan.autoFix()} disabled={disabled} data-testid="plan-auto-fix">
@@ -195,6 +191,7 @@ export function PlanHeadCard({ projectId, state, plan, readOnly }: PlanHeadCardP
             </Button>
             <Button
               variant="run"
+              disabled={empty.length === 0}
               onClick={() => {
                 const n = note.trim();
                 setAllOpen(false);

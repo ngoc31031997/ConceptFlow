@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { generateVisualPlanBeat, type VisualPlanBeat, type VisualPlanState } from "../../api/client";
+import { describeAiRequest, generateVisualPlanBeat, type VisualPlanBeat, type VisualPlanState } from "../../api/client";
 import type { VisualPlanControls } from "../../hooks/useVisualPlan";
 import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import { UnitStatusChip } from "../units/UnitStatusChip";
+import { PlanRunPreview } from "./PlanRunPreview";
 import { PlanUnitCard } from "./PlanUnitCard";
 import {
   FILTER_LABELS,
@@ -42,12 +43,12 @@ interface PlanBeatProps {
 function PlanBeat({ projectId, beat, filter, plan, readOnly }: PlanBeatProps) {
   const [open, setOpen] = useState(false);
   const disabled = readOnly || plan.busy || plan.running !== null;
-  const running =
-    plan.running === "all" ? !beat.written : typeof plan.running === "object" && plan.running?.beat === beat.key;
+  const running = plan.running === "all" && !beat.written;
   const approved = beat.units.length > 0 && beat.units.every((u) => u.status === "approved");
   const shown = beat.units.filter((u) => matchesFilter(u, filter));
   const risks = beat.units.filter((u) => u.risk_notes.length > 0).length;
   const t = beat.timing;
+  const beatRunPath = `/v1/projects/${projectId}/visual-plan/beats/${beat.key}/generate`;
 
   return (
     <div className={styles.beat} id={`plan-beat-${beat.key}`} data-testid={`plan-beat-${beat.key}`}>
@@ -76,6 +77,7 @@ function PlanBeat({ projectId, beat, filter, plan, readOnly }: PlanBeatProps) {
               cần lập lại: {beat.stale_sources.join(", ")} đã đổi
             </span>
           )}
+          <AiRunPill runPath={beatRunPath} onOpen={() => setOpen(true)} testId={`plan-beat-${beat.key}-ai-run`} />
           <Button
             variant="run"
             onClick={() => setOpen(true)}
@@ -105,21 +107,20 @@ function PlanBeat({ projectId, beat, filter, plan, readOnly }: PlanBeatProps) {
           readOnly={readOnly}
         />
       ))}
-      <ConceptAiDialog
+      <AiRunDialog
         open={open}
         onClose={() => setOpen(false)}
         title={`${beat.written ? "Lập lại" : "Lập kế hoạch"} beat ${beat.key}`}
+        runPath={beatRunPath}
+        describe={(note) => describeAiRequest((external) => generateVisualPlanBeat(projectId, beat.key, note, { external }))}
+        renderPreview={(p) => <PlanRunPreview kind="beat" preview={p} />}
         impact={
           <p className={researchStyles.hint}>
             AI đọc lời thoại của beat, beat trước và sau, ngôn ngữ hình ảnh đã chốt. Unit bạn đã sửa tay được giữ; mọi
             unit của beat về “Chờ duyệt”.
           </p>
         }
-        onSystem={(note) => void plan.generateBeat(beat.key, note)}
-        external={{
-          run: (note, external) => generateVisualPlanBeat(projectId, beat.key, note, { external }),
-          onDone: plan.reload,
-        }}
+        onApplied={plan.reload}
         testId={`plan-beat-${beat.key}-dialog`}
       />
     </div>
