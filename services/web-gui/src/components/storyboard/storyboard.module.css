@@ -277,3 +277,99 @@
   padding-left: 20px;
   overflow-wrap: anywhere;
 }
+
+/* The four numbered sections of the page, read top to bottom. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.section[data-state="current"] {
+  outline: 3px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.section[data-state="locked"] {
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sectionHead h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.sectionText {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sectionNum {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: 50%;
+  background: var(--card);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.section[data-state="current"] .sectionNum {
+  background: var(--accent);
+  color: #0a0a0a;
+}
+
+.section[data-state="done"] .sectionNum {
+  background: var(--success);
+  color: #fff;
+}
+
+.section[data-state="locked"] .sectionNum {
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.assetTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.assetTable th,
+.assetTable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ink-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.assetTable th {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}

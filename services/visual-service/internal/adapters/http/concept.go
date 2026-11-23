@@ -110,6 +110,8 @@ func writeConceptError(w http.ResponseWriter, err error) {
 		status, code = http.StatusConflict, "assets_missing"
 	case errors.Is(err, domain.ErrAssetNoDetail):
 		status, code = http.StatusConflict, "asset_no_detail"
+	case errors.Is(err, domain.ErrAssetListNotApproved):
+		status, code = http.StatusConflict, "asset_list_not_approved"
 	case errors.Is(err, domain.ErrAssetInUse):
 		status, code = http.StatusConflict, "asset_in_use"
 	case errors.Is(err, domain.ErrLastShot):

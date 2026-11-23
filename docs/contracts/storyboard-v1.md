@@ -132,11 +132,11 @@ Mọi route (trừ `GET /versions/{n}`, `GET /frames/{shot}` và `GET /assets/{a
 | POST | `/assets` | `{fields}` | thêm tài sản (`planned`): `concept_id, name, kind, tier, portrayal, must_not_imply, palette_tokens, expressions, base_illustration_id, units, to_library, library_folder_id`; `portrayal` có thể trống (AI viết chi tiết sau) |
 | PUT | `/assets/{aid}` | `{fields}` | sửa; các trường ghi là của Creator (AI giữ khi lập lại danh sách); tài sản rời danh sách đã duyệt |
 | DELETE | `/assets/{aid}` | | xoá (xem `asset_in_use`) |
-| POST | `/assets/{aid}/draw`, `/redraw` | `redraw`: `{note}` | rendering vẽ bằng bộ vẽ AI hệ thống, với kit và `ref_id` của phong cách bước 8. Không có chế độ AI ngoài. `draw` chưa có chi tiết → `409` mã `asset_no_detail` (visual-service chặn trước khi gọi rendering) |
+| POST | `/assets/{aid}/draw`, `/redraw` | `redraw`: `{note}` | rendering vẽ bằng bộ vẽ AI hệ thống, với kit và `ref_id` của phong cách bước 8. Không có chế độ AI ngoài. `draw` chưa có chi tiết → `409` mã `asset_no_detail`; `draw` hay `redraw` khi danh sách tài sản chưa duyệt → `409` mã `asset_list_not_approved` (visual-service chặn cả hai trước khi gọi rendering) |
 | POST | `/assets/{aid}/approve` | tuỳ chọn `{project_name}` | duyệt tài sản đã vẽ ở rendering, gửi kèm `ref_id` và `project_name` (tên dự án, để mô tả hình trong thư viện ghi tên dự án). Không có thân vẫn chạy |
 | POST | `/assets/{aid}/unapprove` | | bỏ duyệt |
 | GET | `/assets/{aid}/preview` | | PNG bản vẽ hiện tại của tài sản, đọc qua rendering `GET /internal/v1/projects/{pid}/assets/{aid}/preview` (`image/png`, `Cache-Control: private, no-cache`); `404` khi chưa có ảnh |
-| POST | `/assets/approve`, `/assets/unapprove` | | duyệt hay mở lại **danh sách** tài sản (cờ của Creator, không chặn bước nào; rendering vẫn tự giữ trạng thái `approved` của từng tài sản) |
+| POST | `/assets/approve`, `/assets/unapprove` | | duyệt hay mở lại **danh sách** tài sản. Duyệt cần mọi tài sản có chi tiết (thiếu → `409` mã `asset_no_detail`, nêu các mã tài sản). Danh sách đã duyệt mới cho vẽ và vẽ lại tài sản; thêm, sửa, viết lại chi tiết hay lập lại danh sách đưa danh sách về chờ duyệt. Rendering vẫn tự giữ trạng thái `approved` của từng tài sản |
 | POST | `/generate` | `{note}` | viết mọi unit chưa có shot, lần lượt theo thứ tự chuỗi, mỗi unit một lượt AI và đọc shot của unit trước. Lỗi một unit dừng lượt, các unit đã viết giữ |
 | POST | `/units/{vp}/generate` | `{note}` + `X-External-AI` | một lượt AI viết các shot của unit, vai `storyboard_unit`; ghép bằng `MergeShots` (giữ mã shot và trường Creator; bỏ mất shot Creator đã sửa → `502`), rồi dựng khung từng shot |
 | POST | `/units/{vp}/shots` | `{fields}` | thêm shot cuối unit, mã `SH-nnn` kế tiếp của dự án |

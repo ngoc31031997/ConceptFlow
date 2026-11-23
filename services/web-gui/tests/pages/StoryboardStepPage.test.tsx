@@ -232,7 +232,7 @@ function renderPage() {
 }
 
 async function openShotsTab() {
-  fireEvent.click(await screen.findByTestId("sb-tab-shots"));
+  await screen.findByTestId("sb-section-shots");
 }
 
 describe("StoryboardStepPage", () => {
@@ -246,19 +246,62 @@ describe("StoryboardStepPage", () => {
     expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/visual-sequence");
   });
 
-  it("is step 11: inputs, run card and three tabs with their counts", async () => {
+  it("is step 11: inputs, then four numbered sections top to bottom with their counts", async () => {
     renderPage();
     expect(await screen.findByTestId("sb-head-card")).toBeInTheDocument();
     expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Hình ảnh · Bước 11/23");
     expect(screen.getByTestId("rail-step-11")).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("sb-input")).toHaveTextContent("Chuỗi hình v1 · 4 unit");
     expect(screen.getByTestId("sb-input")).toHaveTextContent("Kit R12");
-    const order = ["sb-head-card", "sb-run"].map((id) => screen.getByTestId(id));
-    expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByTestId("sb-tab-assets")).toHaveTextContent("1/3 đã duyệt");
-    expect(screen.getByTestId("sb-tab-shots")).toHaveTextContent("2/4 đã duyệt");
-    expect(screen.getByTestId("sb-tab-review")).toHaveTextContent("2 vấn đề");
-    expect(screen.getByTestId("sb-blockers-banner")).toHaveTextContent("1 tài sản chưa duyệt (AST-1)");
+    const order = [
+      "sb-head-card",
+      "sb-section-assets",
+      "sb-section-draw",
+      "sb-section-shots",
+      "sb-run",
+      "sb-section-review",
+    ].map((id) => screen.getByTestId(id));
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(screen.getByTestId("sb-chip-assets")).toHaveTextContent("3/3 có chi tiết");
+    expect(screen.getByTestId("sb-chip-draw")).toHaveTextContent("1/3 đã duyệt");
+    expect(screen.getByTestId("sb-chip-shots")).toHaveTextContent("2/4 đã duyệt · 1 unit trống");
+    expect(screen.getByTestId("sb-chip-review")).toHaveTextContent("2 vấn đề");
+    expect(screen.getByTestId("sb-section-assets")).toHaveAttribute("data-state", "current");
+    expect(screen.getByTestId("sb-section-draw-note")).toHaveTextContent("chờ duyệt lại");
+  });
+
+  it("locks the sections below until the one above is done, and folds a done section", async () => {
+    state = baseState({
+      assets: { approved: false, items: [], approved_count: 0, with_detail: 0, without_detail: 0 },
+      beats: [],
+      shots_approved: 0,
+      shots_total: 0,
+      review: { ...baseState().review, reviewed: false, rounds: 0, findings: [], open_count: 0 },
+    });
+    renderPage();
+    expect(await screen.findByTestId("sb-section-assets")).toHaveAttribute("data-state", "current");
+    expect(screen.getByTestId("sb-assets-empty")).toBeInTheDocument();
+    for (const id of ["sb-section-draw", "sb-section-shots", "sb-section-review"]) {
+      expect(screen.getByTestId(id)).toHaveAttribute("data-state", "locked");
+    }
+    expect(screen.getByTestId("sb-section-draw-note")).toHaveTextContent("Mở khi danh sách tài sản ở khối 1 đã duyệt");
+    expect(screen.queryByTestId("sb-asset-grid")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sb-run")).not.toBeInTheDocument();
+  });
+
+  it("folds the approved asset list and opens the drawing as the current section", async () => {
+    state = baseState();
+    state.assets = { ...state.assets, approved: true };
+    renderPage();
+    expect(await screen.findByTestId("sb-section-assets")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("sb-chip-assets")).toHaveTextContent("Đã duyệt · 3 tài sản");
+    expect(screen.queryByTestId("sb-asset-list")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sb-section-draw")).toHaveAttribute("data-state", "current");
+    fireEvent.click(screen.getByTestId("sb-section-assets-toggle"));
+    expect(await screen.findByTestId("sb-asset-list")).toBeInTheDocument();
+    expect(screen.getByTestId("sb-assets-unapprove")).toBeInTheDocument();
   });
 
   it("holds the AI writing shots until every asset is approved", async () => {
@@ -377,6 +420,7 @@ describe("StoryboardStepPage", () => {
     });
 
     it("draws an asset not drawn yet and redraws a drawn one with a note", async () => {
+      state.assets = { ...state.assets, approved: true };
       const draw = vi.spyOn(apiClient, "drawStoryboardAsset").mockResolvedValue(state);
       const redraw = vi.spyOn(apiClient, "redrawStoryboardAsset").mockResolvedValue(state);
       renderPage();
@@ -620,9 +664,33 @@ describe("StoryboardStepPage", () => {
       );
     });
 
-    it("approves the list only when every asset is approved", async () => {
+    it("holds drawing until the asset list is approved and says why", async () => {
       renderPage();
+      const draw = await screen.findByTestId("sb-asset-AST-DISK-001-draw");
+      expect(draw).toBeDisabled();
+      expect(draw).toHaveAttribute("title", "Duyệt danh sách tài sản ở khối 1 trước khi vẽ");
+      expect(screen.getByTestId("sb-asset-AST-OBSERVER-001-redraw")).toBeDisabled();
+    });
+
+    it("approves the list once every asset has its detail, whether drawn or not", async () => {
+      const approve = vi.spyOn(apiClient, "approveStoryboardAssetList").mockResolvedValue(state);
+      state = baseState();
+      state.assets = {
+        ...state.assets,
+        items: state.assets.items.map((a, i) => (i === 2 ? { ...a, has_detail: false, portrayal: "" } : a)),
+      };
+      const { unmount } = renderPage();
       expect(await screen.findByTestId("sb-assets-approve")).toBeDisabled();
+      expect(screen.getByTestId("sb-assets-approve-blocker")).toHaveTextContent(
+        `Viết chi tiết trước khi duyệt danh sách: ${state.assets.items[2].asset_id}`,
+      );
+      unmount();
+      state = baseState();
+      renderPage();
+      const button = await screen.findByTestId("sb-assets-approve");
+      expect(button).toBeEnabled();
+      fireEvent.click(button);
+      await waitFor(() => expect(approve).toHaveBeenCalledWith("p1"));
     });
   });
 
@@ -866,19 +934,13 @@ describe("StoryboardStepPage", () => {
   describe("many lock blockers", () => {
     const many = Array.from({ length: 67 }, (_, i) => `Điều kiện số ${i + 1} chưa đạt`);
 
-    it("keeps the bottom bar compact, the banner to three lines and the review tab complete", async () => {
+    it("keeps the bottom bar compact and the review section complete", async () => {
       state = baseState({ blockers: many });
       renderPage();
-      const banner = await screen.findByTestId("sb-blockers-banner");
-      expect(banner.querySelectorAll("li")).toHaveLength(3);
-      expect(banner).toHaveTextContent("Điều kiện số 3 chưa đạt");
-      expect(banner).not.toHaveTextContent("Điều kiện số 4 chưa đạt");
-      expect(screen.getByTestId("sb-blockers-more")).toHaveTextContent("và 64 điều kiện khác");
-      const hint = screen.getByTestId("sb-hint-blockers");
+      const hint = await screen.findByTestId("sb-hint-blockers");
       expect(hint).toHaveTextContent("Chưa chốt được: 67 điều kiện chưa đạt");
       expect(hint).not.toHaveTextContent("Điều kiện số 1 ");
       expect(hint.getAttribute("title")?.split("\n")).toHaveLength(67);
-      fireEvent.click(screen.getByTestId("sb-tab-review"));
       const items = (await screen.findByTestId("sb-blockers")).querySelectorAll("li");
       expect(items).toHaveLength(67);
       expect(items[66]).toHaveTextContent("Điều kiện số 67 chưa đạt");
@@ -887,8 +949,12 @@ describe("StoryboardStepPage", () => {
 
 
   describe("tab Rà soát và chốt", () => {
+    /** Shows the review section's body; a locked storyboard folds it, so it is opened. */
     async function openReview() {
-      fireEvent.click(await screen.findByTestId("sb-tab-review"));
+      const section = await screen.findByTestId("sb-section-review");
+      if (section.getAttribute("data-state") === "done") {
+        fireEvent.click(screen.getByTestId("sb-section-review-toggle"));
+      }
     }
 
     it("keeps the lock closed and says why", async () => {

@@ -477,6 +477,14 @@ func (f *sbFixture) listedAssets() {
 	f.llm.calls = nil
 }
 
+// approveListWithDetail gives the listed backdrop its detail by hand and
+// approves the asset list, which opens the drawing.
+func (f *sbFixture) approveListWithDetail() {
+	f.t.Helper()
+	f.must(f.desk.EditAsset(f.ctx, project, "AST-SPACE-001", jfields(f.t, map[string]any{"portrayal": "vũ trụ"})))
+	f.must(f.desk.ApproveAssets(f.ctx, project))
+}
+
 func TestStoryboardAI_AnAssetWithoutDetailCannotBeDrawn(t *testing.T) {
 	f := newSbFixture(t)
 	f.listedAssets()
@@ -488,6 +496,7 @@ func TestStoryboardAI_AnAssetWithoutDetailCannotBeDrawn(t *testing.T) {
 	}
 	f.queue(domain.PromptRoleStoryboardAssetDetail, detailReply("nhỏ bé", "ink"))
 	f.must(f.desk.GenerateAssetDetail(f.ctx, project, "AST-ASTRO-001", ""))
+	f.approveListWithDetail()
 	st := f.must(f.desk.DrawAsset(f.ctx, project, "AST-ASTRO-001"))
 	if got := st.Assets.Items[0]; got.Status != domain.AssetDrawn || !got.HasDetail {
 		t.Errorf("an asset with detail is drawn: %+v", got)
@@ -557,6 +566,7 @@ func TestStoryboardAI_RewritingADetailKeepsTheFieldsTheCreatorWroteAndReopensADr
 	f.listedAssets()
 	f.queue(domain.PromptRoleStoryboardAssetDetail, detailReply("của AI", "ink"))
 	f.must(f.desk.GenerateAssetDetail(f.ctx, project, "AST-ASTRO-001", ""))
+	f.approveListWithDetail()
 	f.must(f.desk.DrawAsset(f.ctx, project, "AST-ASTRO-001"))
 	f.must(f.desk.EditAsset(f.ctx, project, "AST-ASTRO-001", jfields(t, map[string]any{"expressions": []string{"của Creator"}})))
 	f.queue(domain.PromptRoleStoryboardAssetDetail, detailReply("AI viết lại", "ink"))

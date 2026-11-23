@@ -16,6 +16,9 @@ var (
 	ErrAssetsMissing = errors.New("tài sản của video chưa đủ hoặc chưa duyệt hết")
 	// ErrAssetNoDetail: an asset is drawn only once it has its detail (a portrayal).
 	ErrAssetNoDetail = errors.New("tài sản chưa có chi tiết, viết chi tiết trước khi vẽ")
+	// ErrAssetListNotApproved: assets are drawn only once the Creator approved
+	// the asset list as it stands.
+	ErrAssetListNotApproved = errors.New("duyệt danh sách tài sản trước khi vẽ")
 	// ErrUnknownAsset: the video has no asset with the id.
 	ErrUnknownAsset = errors.New("không có tài sản này")
 	// ErrUnknownShot: no shot of the unit has the id.

@@ -519,11 +519,15 @@ func (d *StoryboardDesk) DeleteAsset(ctx context.Context, projectID, assetID str
 	return d.State(ctx, projectID)
 }
 
-// drawRequest is what rendering draws an asset with; a video with no kit cannot
-// draw.
+// drawRequest is what rendering draws an asset with. A video with no kit cannot
+// draw, and nothing is drawn before the Creator approved the asset list, so the
+// drawings follow a list the Creator agreed to.
 func (data *storyboardData) drawRequest(note string) (AssetDrawRequest, error) {
 	if err := data.needKit(); err != nil {
 		return AssetDrawRequest{}, err
+	}
+	if !data.list.AllApproved() {
+		return AssetDrawRequest{}, domain.ErrAssetListNotApproved
 	}
 	return AssetDrawRequest{Kit: data.kit, RefID: data.refID, Note: strings.TrimSpace(note)}, nil
 }
@@ -544,8 +548,8 @@ func (d *StoryboardDesk) assetAction(ctx context.Context, projectID, assetID str
 }
 
 // DrawAsset has rendering draw an asset from its description. It runs on the
-// system's drawing AI; there is no AI-outside mode. An asset without its detail
-// is not drawn.
+// system's drawing AI; there is no AI-outside mode. An asset without its detail,
+// or of a list the Creator has not approved, is not drawn.
 func (d *StoryboardDesk) DrawAsset(ctx context.Context, projectID, assetID string) (*StoryboardScreen, error) {
 	return d.assetAction(ctx, projectID, assetID, func(data *storyboardData) (ProjectAsset, error) {
 		if cur, _ := data.findAsset(assetID); !cur.HasDetail() {
@@ -560,7 +564,7 @@ func (d *StoryboardDesk) DrawAsset(ctx context.Context, projectID, assetID strin
 }
 
 // RedrawAsset has rendering draw an asset again from the code it has, with the
-// Creator's note. The shots that use it have an old frame until they are drawn
+// Creator's note, once the asset list is approved. The shots that use it have an old frame until they are drawn
 // again.
 func (d *StoryboardDesk) RedrawAsset(ctx context.Context, projectID, assetID, note string) (*StoryboardScreen, error) {
 	return d.assetAction(ctx, projectID, assetID, func(data *storyboardData) (ProjectAsset, error) {
@@ -595,7 +599,9 @@ func (d *StoryboardDesk) UnapproveAsset(ctx context.Context, projectID, assetID 
 	})
 }
 
-// ApproveAssets approves the asset list as it is.
+// ApproveAssets approves the asset list as it is. Every asset must have its
+// detail, since approving the list opens the drawing of each one; it fails with
+// ErrAssetNoDetail naming the assets that wait for it.
 func (d *StoryboardDesk) ApproveAssets(ctx context.Context, projectID string) (*StoryboardScreen, error) {
 	data, err := d.load(ctx, projectID)
 	if err != nil {
@@ -603,6 +609,15 @@ func (d *StoryboardDesk) ApproveAssets(ctx context.Context, projectID string) (*
 	}
 	if len(data.assets) == 0 {
 		return nil, fmt.Errorf("%w: chưa có tài sản nào", domain.ErrUnitNotWritten)
+	}
+	var noDetail []string
+	for _, a := range data.assets {
+		if !a.HasDetail() {
+			noDetail = append(noDetail, a.AssetID)
+		}
+	}
+	if len(noDetail) > 0 {
+		return nil, fmt.Errorf("%w: %s", domain.ErrAssetNoDetail, strings.Join(noDetail, ", "))
 	}
 	entries := make([]domain.AssetEntry, 0, len(data.assets))
 	for _, a := range data.assets {

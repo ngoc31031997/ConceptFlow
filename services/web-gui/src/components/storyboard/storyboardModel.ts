@@ -86,11 +86,36 @@ export function assetsWithoutDetail(state: StoryboardState): StoryboardAsset[] {
   return state.assets.items.filter((a) => !a.has_detail);
 }
 
-/** Why an asset cannot be drawn yet; "" when it can. */
+/** Why an asset cannot be drawn or redrawn yet; "" when it can. */
 export function drawBlocker(asset: StoryboardAsset, state: StoryboardState): string {
   if (state.kit.missing) return state.kit.message || "Dự án chưa có kit vẽ";
   if (!asset.has_detail) return "Viết chi tiết cho tài sản này trước khi vẽ";
+  if (!state.assets.approved) return "Duyệt danh sách tài sản ở khối 1 trước khi vẽ";
   return "";
+}
+
+/** Why the asset list cannot be approved yet; "" when it can. */
+export function listApproveBlocker(state: StoryboardState): string {
+  if (state.assets.items.length === 0) return "Chưa có tài sản nào";
+  const missing = assetsWithoutDetail(state);
+  if (missing.length > 0) {
+    return `Viết chi tiết trước khi duyệt danh sách: ${missing.map((a) => a.asset_id).join(", ")}`;
+  }
+  return "";
+}
+
+/** The assets of the approved list not drawn yet: what "Vẽ tất cả" draws, in list order. */
+export function assetsToDraw(state: StoryboardState): StoryboardAsset[] {
+  return state.assets.items.filter((a) => a.status === "planned" && drawBlocker(a, state) === "");
+}
+
+/** Whether every unit has shots and every shot is approved. */
+export function shotsDone(state: StoryboardState): boolean {
+  return (
+    state.shots_total > 0 &&
+    state.empty_units.length === 0 &&
+    state.shots_approved === state.shots_total
+  );
 }
 
 /** The assets that are not approved yet. */

@@ -83,6 +83,7 @@ func TestStoryboardDesk_DrawingNeedsAKitAndApprovalNeedsADrawing(t *testing.T) {
 func TestStoryboardDesk_DrawRedrawApproveReachRenderingWithTheStyleOfStep8(t *testing.T) {
 	f := newSbFixture(t)
 	f.must(f.desk.AddAsset(f.ctx, project, jfields(t, map[string]any{"concept_id": "astro", "name": "Astro", "portrayal": "p"})))
+	f.must(f.desk.ApproveAssets(f.ctx, project))
 	f.must(f.desk.DrawAsset(f.ctx, project, "AST-ASTRO-001"))
 	st := f.must(f.desk.RedrawAsset(f.ctx, project, "AST-ASTRO-001", "to hơn"))
 	st = f.must(f.desk.ApproveAsset(f.ctx, project, "AST-ASTRO-001", "Hố đen"))
@@ -119,6 +120,28 @@ func TestStoryboardDesk_TheAssetListIsApprovedAsAWholeAndAnEditReopensIt(t *test
 	empty := newSbFixture(t)
 	if _, err := empty.desk.ApproveAssets(empty.ctx, project); !errors.Is(err, domain.ErrUnitNotWritten) {
 		t.Errorf("an empty list: want ErrUnitNotWritten, got %v", err)
+	}
+}
+
+func TestStoryboardDesk_AssetsAreDrawnOnlyOnceTheListWithEveryDetailIsApproved(t *testing.T) {
+	f := newSbFixture(t)
+	f.must(f.desk.AddAsset(f.ctx, project, jfields(t, map[string]any{"concept_id": "astro", "name": "Astro", "portrayal": "phi hành gia"})))
+	f.must(f.desk.AddAsset(f.ctx, project, jfields(t, map[string]any{"name": "Space", "kind": "backdrop"})))
+	if _, err := f.desk.DrawAsset(f.ctx, project, "AST-ASTRO-001"); !errors.Is(err, domain.ErrAssetListNotApproved) {
+		t.Fatalf("drawing before the list is approved: want ErrAssetListNotApproved, got %v", err)
+	}
+	if _, err := f.desk.ApproveAssets(f.ctx, project); !errors.Is(err, domain.ErrAssetNoDetail) || !strings.Contains(err.Error(), "AST-SPACE-001") {
+		t.Fatalf("approving a list with an asset without detail: want ErrAssetNoDetail naming it, got %v", err)
+	}
+	f.must(f.desk.EditAsset(f.ctx, project, "AST-SPACE-001", jfields(t, map[string]any{"portrayal": "vũ trụ"})))
+	f.must(f.desk.ApproveAssets(f.ctx, project))
+	f.must(f.desk.DrawAsset(f.ctx, project, "AST-ASTRO-001"))
+	f.must(f.desk.EditAsset(f.ctx, project, "AST-ASTRO-001", jfields(t, map[string]any{"portrayal": "người leo núi"})))
+	if _, err := f.desk.RedrawAsset(f.ctx, project, "AST-ASTRO-001", ""); !errors.Is(err, domain.ErrAssetListNotApproved) {
+		t.Errorf("an edit reopens the list, so redrawing waits for it: got %v", err)
+	}
+	if len(f.rendering.draws) != 1 {
+		t.Errorf("only the draw after the list approval reaches rendering, got %d", len(f.rendering.draws))
 	}
 }
 
@@ -236,6 +259,7 @@ func TestStoryboardDesk_RedrawingAnAssetMakesTheFramesOfItsShotsStale(t *testing
 	f.approvedAssets()
 	f.writeUnit1()
 	f.must(f.desk.ApproveShot(f.ctx, project, "VP-001", "SH-001"))
+	f.must(f.desk.ApproveAssets(f.ctx, project))
 	f.must(f.desk.RedrawAsset(f.ctx, project, "AST-ASTRO-001", ""))
 	f.must(f.desk.ApproveAsset(f.ctx, project, "AST-ASTRO-001", "Hố đen"))
 	st := f.must(f.desk.State(f.ctx, project))
