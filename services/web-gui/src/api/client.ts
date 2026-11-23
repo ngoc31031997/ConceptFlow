@@ -4502,3 +4502,120 @@ export function lockStoryboard(projectId: string, note: string): Promise<Storybo
 export function getStoryboardVersion(projectId: string, version: number): Promise<StoryboardVersion> {
   return apiFetch<StoryboardVersion>(`${storyboardPath(projectId)}/versions/${version}`);
 }
+
+/** Where an AI turn's reply comes from: the system's model, the AI Bridge extension, or a paste. */
+export type AiChannel = "api" | "extension" | "manual";
+
+/** The AI turns of step 11 that run with a preview. */
+export type AiRunTask = "assets" | "asset_detail" | "unit" | "review";
+
+/** Where an AI run stands (docs/contracts/storyboard-v1.md, "Lượt chạy AI"). */
+export type AiRunStatus = "waiting" | "running" | "ready" | "unreadable" | "failed" | "applied" | "cancelled";
+
+/** One AI turn of step 11 run with a preview: the reply is read and shown before it is stored. */
+export interface AiRun {
+  id: string;
+  project_id: string;
+  task: AiRunTask;
+  /** The asset or plan unit the turn writes; empty for the asset list and the review. */
+  target: string;
+  note: string;
+  channel: AiChannel;
+  status: AiRunStatus;
+  prompt: string;
+  reply: string;
+  /** What applying stores, once the reply was read: shots, asset drafts, a detail or review findings. */
+  preview: unknown;
+  error: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function aiRunsPath(projectId: string): string {
+  return `${storyboardPath(projectId)}/ai-runs`;
+}
+
+/** Starts a run: builds its prompt now; on "api" the system's model is asked in the background. */
+export function startAiRun(
+  projectId: string,
+  run: { task: AiRunTask; target?: string; note: string; channel: AiChannel },
+): Promise<AiRun> {
+  return apiFetch<AiRun>(aiRunsPath(projectId), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ task: run.task, target: run.target ?? "", note: run.note, channel: run.channel }),
+  });
+}
+
+/** The newest run of every task and target of the video. */
+export async function listAiRuns(projectId: string): Promise<AiRun[]> {
+  return (await apiFetch<{ runs: AiRun[] }>(aiRunsPath(projectId))).runs ?? [];
+}
+
+/** Hands a reply to a run; the answer says whether it could be read (`ready`) or not (`unreadable`). */
+export function replyAiRun(projectId: string, runId: string, raw: string): Promise<AiRun> {
+  return apiFetch<AiRun>(`${aiRunsPath(projectId)}/${runId}/reply`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ raw }),
+  });
+}
+
+/** Stores a ready run's reply into the storyboard. */
+export function applyAiRun(projectId: string, runId: string): Promise<{ run: AiRun; state: StoryboardState }> {
+  return apiFetch<{ run: AiRun; state: StoryboardState }>(`${aiRunsPath(projectId)}/${runId}/apply`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: "{}",
+  });
+}
+
+/** Drops a run that was not applied. */
+export function cancelAiRun(projectId: string, runId: string): Promise<AiRun> {
+  return apiFetch<AiRun>(`${aiRunsPath(projectId)}/${runId}/cancel`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: "{}",
+  });
+}
+
+/** The request the AI Bridge extension posts a fixed-prompt item's answer to, as `{raw}`. */
+export function aiRunReplyRequest(projectId: string, runId: string): ExternalRequest {
+  return { gateway: GATEWAY_URL, method: "POST", path: `${aiRunsPath(projectId)}/${runId}/reply` };
+}
+
+/** The default AI channel for all steps and each step's own choice. */
+export interface AiChannelSetting {
+  defaultChannel: AiChannel;
+  /** Steps with their own channel; a step not listed follows `defaultChannel`. */
+  stepChannels: Record<string, AiChannel>;
+  /** The channel each step runs on now. */
+  effective: Record<string, AiChannel>;
+}
+
+export async function getAiChannelSetting(): Promise<AiChannelSetting> {
+  const wire = await apiFetch<{
+    default: AiChannel;
+    step_channels: Record<string, AiChannel>;
+    effective: Record<string, AiChannel>;
+  }>("/v1/settings/ai-channel");
+  return { defaultChannel: wire.default, stepChannels: wire.step_channels ?? {}, effective: wire.effective ?? {} };
+}
+
+/** Sets the channel every step without its own runs on. */
+export async function setAiChannelDefault(channel: AiChannel): Promise<void> {
+  await apiFetch<undefined>("/v1/settings/ai-channel", {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ channel }),
+  });
+}
+
+/** Sets a step's own channel; "" makes it follow the default again. */
+export async function setAiChannelStep(step: string, channel: AiChannel | ""): Promise<void> {
+  await apiFetch<undefined>(`/v1/settings/ai-channel/steps/${encodeURIComponent(step)}`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ channel }),
+  });
+}

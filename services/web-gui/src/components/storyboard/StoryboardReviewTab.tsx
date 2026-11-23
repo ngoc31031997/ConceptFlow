@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   getStoryboardVersion,
-  reviewStoryboard,
   type StoryboardState,
 } from "../../api/client";
 import { visualErrorText } from "../../hooks/useVisualConcept";
@@ -9,7 +8,7 @@ import type { StoryboardControls } from "../../hooks/useStoryboard";
 import lockStyles from "../lock/lock.module.css";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, CopyBox, Dialog, FormField, TextInput } from "../ui";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import visualStyles from "../visual/visual.module.css";
 import { ACCEPTABLE_CHECKS, allShots, blockersTooltip, keyTarget, storyboardCriteria } from "./storyboardModel";
 import styles from "./storyboard.module.css";
@@ -84,6 +83,7 @@ export function StoryboardReviewTab({
             >
               {state.review.reviewed ? "Rà soát lại" : "Rà soát bằng AI"}
             </Button>
+            <AiRunPill task="review" onOpen={() => setReviewOpen(true)} testId="sb-review-ai-run" />
           </div>
           {!state.review.reviewed && failing.length === 0 && (
             <p className={researchStyles.hint} data-testid="sb-review-none">
@@ -279,21 +279,19 @@ export function StoryboardReviewTab({
         </div>
       </Card>
 
-      <ConceptAiDialog
+      <AiRunDialog
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
+        projectId={projectId}
         title={state.review.reviewed ? "Rà soát lại storyboard" : "Rà soát storyboard"}
+        task="review"
         impact={
           <p className={researchStyles.hint}>
             AI so storyboard hiện tại với các vấn đề cũ: vấn đề đã hết thì đánh dấu đã sửa, vấn đề
             mới thì thêm vào. Vấn đề trỏ tới một shot, một unit hoặc một tài sản.
           </p>
         }
-        onSystem={(note) => void storyboard.review(note)}
-        external={{
-          run: (note, external) => reviewStoryboard(projectId, note, { external }),
-          onDone: storyboard.reload,
-        }}
+        onApplied={storyboard.reload}
         testId="sb-review-dialog"
       />
 

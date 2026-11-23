@@ -29,6 +29,9 @@ const { proxyHandler } = require('../handlers/proxyHandler');
  *
  * `GET /v1/settings/ai-model`, `PUT /v1/settings/ai-model/steps/:step` — the
  * default model of each step (llm-service).
+ * `GET /v1/settings/ai-channel`, `PUT /v1/settings/ai-channel`,
+ * `PUT /v1/settings/ai-channel/steps/:step` — the default AI channel (system
+ * model, extension or copy-and-paste) for all steps and per step (llm-service).
  *
  * @param {import('../clients/httpClient').HttpClient} authoringClient
  * @param {import('../clients/httpClient').HttpClient} llmClient
@@ -45,6 +48,10 @@ function promptsRouter(authoringClient, llmClient) {
   // Model AI mặc định của từng bước (Cài đặt): đọc cả bảng, đổi từng bước. llm-service giữ.
   router.get('/v1/settings/ai-model', proxyHandler(llmClient, 'llm-service'));
   router.put('/v1/settings/ai-model/steps/:step', proxyHandler(llmClient, 'llm-service'));
+  // Kênh chạy AI mặc định (API, extension, thủ công): chung và riêng từng bước. llm-service giữ.
+  router.get('/v1/settings/ai-channel', proxyHandler(llmClient, 'llm-service'));
+  router.put('/v1/settings/ai-channel', proxyHandler(llmClient, 'llm-service'));
+  router.put('/v1/settings/ai-channel/steps/:step', proxyHandler(llmClient, 'llm-service'));
   router.get('/v1/admin/prompts', proxyHandler(llmClient, 'llm-service'));
   router.post('/v1/admin/prompts', proxyHandler(llmClient, 'llm-service'));
   router.post('/v1/admin/prompts/:id/copy', proxyHandler(llmClient, 'llm-service'));

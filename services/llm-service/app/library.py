@@ -1,4 +1,4 @@
-"""The prompt library and the default model of each step, in llm-service's own database.
+"""The prompt library, the default model and the default AI channel of each step, in llm-service's own database.
 
 Every service that calls an AI keeps its system prompts next to the code that fills
 them, and pushes them here at start-up (`replace_system`); the Creator's own
@@ -35,7 +35,18 @@ CREATE TABLE IF NOT EXISTS step_default_models (
     model      TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS ai_channel_defaults (
+    scope      TEXT PRIMARY KEY,
+    channel    TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
+
+#: How a step's AI turn runs: on the system's model, through the AI Bridge extension,
+#: or by the Creator copying the prompt and pasting the reply.
+AI_CHANNELS: tuple[str, ...] = ("api", "extension", "manual")
+#: The row of `ai_channel_defaults` that holds the default of every step without its own.
+ALL_STEPS_SCOPE = "*"
 
 _COLUMNS = "id, role, name, template_text, is_system, is_active, created_at, updated_at"
 
@@ -113,6 +124,11 @@ class LibraryStore(Protocol):
     async def saved_step_models(self) -> dict[str, str]: ...
 
     async def save_step_models(self, models: dict[str, str]) -> None: ...
+
+    async def saved_channels(self) -> dict[str, str]: ...
+
+    async def save_channel(self, scope: str, channel: str | None) -> None:
+        """Saves the channel of scope; None removes the row."""
 
 
 class PromptLibrary:
@@ -215,6 +231,32 @@ class PromptLibrary:
             if model == "" or not modelcatalog.valid_model(model):
                 raise PromptInvalid(f"model {model!r} không có trong danh sách")
         await self._store.save_step_models(models)
+
+    async def ai_channels(self) -> dict:
+        """The default channel of every step (its own, else the one for all steps, else "api")."""
+        saved = await self._store.saved_channels()
+        default = saved.get(ALL_STEPS_SCOPE) or AI_CHANNELS[0]
+        own = {k: v for k, v in saved.items() if k != ALL_STEPS_SCOPE and modelcatalog.valid_step(k)}
+        return {
+            "default": default,
+            "step_channels": own,
+            "effective": {step: own.get(step, default) for step in modelcatalog.STEPS},
+            "channels": list(AI_CHANNELS),
+            "steps": list(modelcatalog.STEPS),
+        }
+
+    async def set_default_channel(self, channel: str) -> None:
+        if channel not in AI_CHANNELS:
+            raise PromptInvalid(f"kênh {channel!r} không có; chọn {', '.join(AI_CHANNELS)}")
+        await self._store.save_channel(ALL_STEPS_SCOPE, channel)
+
+    async def set_step_channel(self, step: str, channel: str) -> None:
+        """An empty channel removes the step's own choice, so it follows the default again."""
+        if not modelcatalog.valid_step(step):
+            raise PromptInvalid(f"bước {step!r} không cấu hình được kênh AI")
+        if channel != "" and channel not in AI_CHANNELS:
+            raise PromptInvalid(f"kênh {channel!r} không có; chọn {', '.join(AI_CHANNELS)}")
+        await self._store.save_channel(step, channel or None)
 
 
 def _valid_name_and_text(name: str, template_text: str) -> str:
@@ -344,3 +386,16 @@ class PgLibraryStore:
                     """INSERT INTO step_default_models (step, model) VALUES ($1, $2)
                        ON CONFLICT (step) DO UPDATE SET model = EXCLUDED.model, updated_at = now()""",
                     step, model)
+
+    async def saved_channels(self) -> dict[str, str]:
+        rows = await self.pool.fetch("SELECT scope, channel FROM ai_channel_defaults")
+        return {r["scope"]: r["channel"] for r in rows}
+
+    async def save_channel(self, scope: str, channel: str | None) -> None:
+        if channel is None:
+            await self.pool.execute("DELETE FROM ai_channel_defaults WHERE scope = $1", scope)
+            return
+        await self.pool.execute(
+            """INSERT INTO ai_channel_defaults (scope, channel) VALUES ($1, $2)
+               ON CONFLICT (scope) DO UPDATE SET channel = EXCLUDED.channel, updated_at = now()""",
+            scope, channel)

@@ -19,6 +19,9 @@ Hình dạng giữ nguyên như khi còn ở authoring-service. Lỗi trả `{"e
 | `DELETE /v1/admin/prompts/{id}` | 204; xoá bản đang dùng thì role quay về bản hệ thống | 403 bản hệ thống; 404 |
 | `GET /v1/settings/ai-model` | `{"step_models": {bước: model}, "steps": [bước…]}`; bước chưa lưu lấy model đầu danh mục | |
 | `PUT /v1/settings/ai-model/steps/{step}` | thân `{"model"}`; 204 | 400 bước lạ hoặc model ngoài danh mục |
+| `GET /v1/settings/ai-channel` | `{"default", "step_channels": {bước: kênh}, "effective": {bước: kênh}, "channels": ["api","extension","manual"], "steps": [bước…]}`; chưa lưu thì mặc định `api` (ADR-0052) | |
+| `PUT /v1/settings/ai-channel` | thân `{"channel"}`: kênh mặc định của mọi bước; 204 | 400 kênh lạ |
+| `PUT /v1/settings/ai-channel/steps/{step}` | thân `{"channel"}`; `""` bỏ kênh riêng để bước theo mặc định; 204 | 400 bước lạ hoặc kênh lạ |
 
 Một prompt: `{id, role, name, template_text, is_system, is_active, created_at, updated_at}` (thời gian RFC 3339).
 

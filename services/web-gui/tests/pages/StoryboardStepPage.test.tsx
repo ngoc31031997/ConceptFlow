@@ -20,8 +20,10 @@ let queueAvailable = true;
 vi.mock("../../src/hooks/useAiQueue", () => ({
   useAiQueue: () => ({
     available: queueAvailable,
+    outdated: false,
     counts: { waiting: 2, running: 1, done: 0, failed: 0, paused: false },
     add: queueAdd,
+    items: {},
   }),
 }));
 
@@ -206,8 +208,33 @@ beforeEach(() => {
     { id: "nhan-vat", name: "Nhân vật", description: "", position: 3, is_system: false },
   ]);
   vi.spyOn(apiClient, "listIllustrations").mockResolvedValue([]);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { visual_storyboard: "api" },
+  });
   Element.prototype.scrollIntoView = vi.fn();
 });
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    task: "unit",
+    target: "VP-004",
+    note: "",
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT UNIT",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -308,7 +335,7 @@ describe("StoryboardStepPage", () => {
     renderPage();
     expect(await screen.findByTestId("sb-generate")).toBeDisabled();
     expect(screen.getByTestId("sb-run-blocker")).toHaveTextContent("AST-OBSERVER-001");
-    expect(screen.getByTestId("sb-queue")).toBeDisabled();
+    expect(screen.getByTestId("sb-generate-more")).toBeDisabled();
   });
 
   it("writes every empty unit with the Creator's note once the assets are approved", async () => {
@@ -337,9 +364,9 @@ describe("StoryboardStepPage", () => {
     queueAdd.mockResolvedValue({ ok: true, added: true });
     renderPage();
     expect(await screen.findByTestId("sb-queue-counts")).toHaveTextContent("1 đang chạy · 2 chờ · 0 lỗi");
-    const button = screen.getByTestId("sb-queue");
-    expect(button).toHaveTextContent("Chạy tất cả qua hàng đợi AI (3)");
-    fireEvent.click(button);
+    expect(screen.getByTestId("sb-generate")).toHaveTextContent("(API)");
+    fireEvent.click(screen.getByTestId("sb-generate-more"));
+    fireEvent.click(screen.getByTestId("sb-generate-extension"));
     await waitFor(() => expect(queueAdd).toHaveBeenCalledTimes(3));
     expect(queueAdd.mock.calls.map((c) => c[0].label)).toEqual([
       "Storyboard · VP-002",
@@ -360,16 +387,20 @@ describe("StoryboardStepPage", () => {
     );
     queueAdd.mockResolvedValueOnce({ ok: true, added: true }).mockResolvedValueOnce({ ok: false, message: "Extension không phản hồi" });
     renderPage();
-    fireEvent.click(await screen.findByTestId("sb-queue"));
+    fireEvent.click(await screen.findByTestId("sb-generate-more"));
+    fireEvent.click(screen.getByTestId("sb-generate-extension"));
     expect(await screen.findByTestId("sb-queue-note")).toHaveTextContent("Dừng ở unit 2/3: Extension không phản hồi");
     expect(queueAdd).toHaveBeenCalledTimes(2);
   });
 
-  it("hides the AI queue button when the extension has no queue", async () => {
+  it("cannot pick the extension or a manual batch when there is no extension", async () => {
     queueAvailable = false;
+    state = baseState({ assets: allApprovedAssets() });
     renderPage();
-    await screen.findByTestId("sb-run");
-    expect(screen.queryByTestId("sb-queue")).toBeNull();
+    fireEvent.click(await screen.findByTestId("sb-generate-more"));
+    expect(screen.getByTestId("sb-generate-extension")).toBeDisabled();
+    expect(screen.getByTestId("sb-generate-manual")).toBeDisabled();
+    expect(screen.getByTestId("sb-generate-manual")).toHaveTextContent("chạy thủ công ở từng unit");
   });
 
   describe("tab Tài sản", () => {
@@ -506,18 +537,18 @@ describe("StoryboardStepPage", () => {
       await waitFor(() => expect(del).toHaveBeenCalledWith("p1", "AST-DISK-001"));
     });
 
-    it("lists the assets with the AI, on the system's AI or one outside", async () => {
-      const gen = vi.spyOn(apiClient, "generateStoryboardAssets").mockResolvedValue(state);
+    it("lists the assets with the AI on the step's channel, and shows the run while it goes", async () => {
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ task: "assets", target: "" }));
       renderPage();
       fireEvent.click(await screen.findByTestId("sb-assets-generate"));
       expect(await screen.findByTestId("sb-assets-dialog")).toHaveTextContent("Danh sách về “Chờ duyệt”");
-      fireEvent.click(screen.getByTestId("sb-assets-dialog-send"));
-      await waitFor(() => expect(gen).toHaveBeenCalledWith("p1", "", expect.objectContaining({ id: expect.any(String) })));
-      fireEvent.click(await screen.findByTestId("sb-assets-generate"));
-      gen.mockRejectedValue(new apiClient.ExternalPromptReady("PROMPT TÀI SẢN"));
-      fireEvent.click(await screen.findByTestId("sb-assets-dialog-external"));
-      expect(await screen.findByTestId("sb-assets-dialog-external-dialog-prompt")).toHaveTextContent("PROMPT TÀI SẢN");
-      expect(gen).toHaveBeenLastCalledWith("p1", "", { external: { mode: "prompt" } });
+      fireEvent.click(screen.getByTestId("sb-assets-dialog-run"));
+      await waitFor(() =>
+        expect(start).toHaveBeenCalledWith("p1", { task: "assets", target: "", note: "", channel: "api" }),
+      );
+      expect(await screen.findByTestId("sb-assets-dialog-status")).toHaveTextContent("Đang gọi API");
+      fireEvent.click(screen.getByTestId("sb-assets-dialog-done"));
+      expect(await screen.findByTestId("sb-assets-run")).toHaveTextContent("Đang gọi API… · API");
     });
 
     it("shows the units and the detail state of each asset, and holds the draw until it has detail", async () => {
@@ -542,22 +573,18 @@ describe("StoryboardStepPage", () => {
       expect(draw).not.toHaveBeenCalled();
     });
 
-    it("writes one asset's detail on the system's AI or through an AI outside, from its card", async () => {
-      const gen = vi.spyOn(apiClient, "generateStoryboardAssetDetail").mockResolvedValue(state);
+    it("writes one asset's detail with the note, from its card", async () => {
+      const start = vi
+        .spyOn(apiClient, "startAiRun")
+        .mockResolvedValue(aiRun({ task: "asset_detail", target: "AST-DISK-001", note: "dịu hơn" }));
       renderPage();
       fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-detail"));
       expect(await screen.findByTestId("sb-asset-AST-DISK-001-detail-dialog")).toHaveTextContent("chỉ đọc mục khái niệm");
-      expect(screen.getByTestId("sb-asset-AST-DISK-001-detail-dialog-external")).toBeInTheDocument();
       fireEvent.change(screen.getByTestId("sb-asset-AST-DISK-001-detail-dialog-note"), { target: { value: " dịu hơn " } });
-      fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-detail-dialog-send"));
+      fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-detail-dialog-run"));
       await waitFor(() =>
-        expect(gen).toHaveBeenCalledWith("p1", "AST-DISK-001", "dịu hơn", expect.objectContaining({ id: expect.any(String) })),
+        expect(start).toHaveBeenCalledWith("p1", { task: "asset_detail", target: "AST-DISK-001", note: "dịu hơn", channel: "api" }),
       );
-      fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-detail"));
-      gen.mockRejectedValue(new apiClient.ExternalPromptReady("PROMPT CHI TIẾT"));
-      fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-detail-dialog-external"));
-      expect(await screen.findByTestId("sb-asset-AST-DISK-001-detail-dialog-external-dialog-prompt")).toHaveTextContent("PROMPT CHI TIẾT");
-      expect(gen).toHaveBeenLastCalledWith("p1", "AST-DISK-001", "", { external: { mode: "prompt" } });
     });
 
     describe("run card of the asset detail", () => {
@@ -888,24 +915,81 @@ describe("StoryboardStepPage", () => {
       );
     });
 
-    it("writes one unit's shots on the system's AI, or through an outside AI", async () => {
-      state = baseState({
-        assets: allApprovedAssets(),
-      });
-      const gen = vi.spyOn(apiClient, "generateStoryboardUnit").mockResolvedValue(state);
+    it("writes one unit by hand: copy the prompt, paste the reply, see the shots, then apply", async () => {
+      state = baseState({ assets: allApprovedAssets() });
+      const start = vi
+        .spyOn(apiClient, "startAiRun")
+        .mockResolvedValue(aiRun({ channel: "manual", status: "waiting" }));
+      const preview = [{ shot_id: "SH-009", shot_purpose: "Mở đầu", action_summary: "Đĩa xoay", asset_refs: ["AST-DISK-001"] }];
+      const reply = vi
+        .spyOn(apiClient, "replyAiRun")
+        .mockResolvedValue(aiRun({ channel: "manual", status: "ready", reply: "{...}", preview }));
+      const apply = vi
+        .spyOn(apiClient, "applyAiRun")
+        .mockResolvedValue({ run: aiRun({ channel: "manual", status: "applied" }), state });
       renderPage();
       await openShotsTab();
       fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai"));
-      expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog")).toBeInTheDocument();
-      fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-send"));
+      fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai-dialog-run-more"));
+      fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-run-manual"));
       await waitFor(() =>
-        expect(gen).toHaveBeenCalledWith("p1", "VP-004", "", expect.objectContaining({ id: expect.any(String) })),
+        expect(start).toHaveBeenCalledWith("p1", { task: "unit", target: "VP-004", note: "", channel: "manual" }),
       );
+      expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog-prompt")).toHaveTextContent("PROMPT UNIT");
+      expect(screen.getByTestId("sb-unit-VP-004-ai-dialog-status")).toHaveTextContent("Chờ bạn dán câu trả lời");
+      fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-tab-reply"));
+      fireEvent.change(screen.getByTestId("sb-unit-VP-004-ai-dialog-reply"), { target: { value: "{...}" } });
+      fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-read"));
+      await waitFor(() => expect(reply).toHaveBeenCalledWith("p1", "r1", "{...}"));
+      expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("SH-009");
+      expect(apply).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-apply"));
+      await waitFor(() => expect(apply).toHaveBeenCalledWith("p1", "r1"));
+      await waitFor(() => expect(screen.queryByTestId("sb-unit-VP-004-ai-dialog")).toBeNull());
+    });
+
+    it("queues a unit's prompt on the extension, whose answer goes to the run", async () => {
+      state = baseState({ assets: allApprovedAssets() });
+      vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ channel: "extension", status: "waiting" }));
+      queueAdd.mockResolvedValue({ ok: true, added: true, itemId: "q1" });
+      renderPage();
+      await openShotsTab();
       fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai"));
-      gen.mockRejectedValue(new apiClient.ExternalPromptReady("PROMPT UNIT"));
-      fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai-dialog-external"));
-      expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog-external-dialog-prompt")).toHaveTextContent("PROMPT UNIT");
-      expect(gen).toHaveBeenLastCalledWith("p1", "VP-004", "", { external: { mode: "prompt" } });
+      fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai-dialog-run-more"));
+      fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-run-extension"));
+      await waitFor(() => expect(queueAdd).toHaveBeenCalledTimes(1));
+      const item = queueAdd.mock.calls[0][0];
+      expect(item.kind).toBe("prompt");
+      expect(item.prompt).toBe("PROMPT UNIT");
+      expect(item.request.path).toBe("/v1/projects/p1/storyboard/ai-runs/r1/reply");
+      expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog-status")).toHaveTextContent("Đang chờ extension");
+    });
+
+    it("says how to go on when the extension is missing, and offers the other channels", async () => {
+      state = baseState({ assets: allApprovedAssets() });
+      queueAvailable = false;
+      const start = vi.spyOn(apiClient, "startAiRun");
+      renderPage();
+      await openShotsTab();
+      fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai"));
+      fireEvent.click(await screen.findByTestId("sb-unit-VP-004-ai-dialog-run-more"));
+      fireEvent.click(screen.getByTestId("sb-unit-VP-004-ai-dialog-run-extension"));
+      expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog-error")).toHaveTextContent("Chưa thấy extension");
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it("reopens an open run from its pill next to the unit's button", async () => {
+      state = baseState({ assets: allApprovedAssets() });
+      vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([
+        aiRun({ status: "unreadable", reply: "lỗi", error: "Không đọc được JSON" }),
+      ]);
+      renderPage();
+      await openShotsTab();
+      const pill = await screen.findByTestId("sb-unit-VP-004-ai-run");
+      expect(pill).toHaveTextContent("Câu trả lời chưa dùng được");
+      fireEvent.click(pill);
+      expect(await screen.findByTestId("sb-unit-VP-004-ai-dialog-error")).toHaveTextContent("Không đọc được JSON");
+      expect(screen.getByTestId("sb-unit-VP-004-ai-dialog-reply")).toHaveValue("lỗi");
     });
 
     it("warns in the dialog that rewriting a unit sends its approved shots back", async () => {
@@ -989,13 +1073,15 @@ describe("StoryboardStepPage", () => {
       expect(await screen.findByTestId("sb-shot-SH-003")).toBeInTheDocument();
     });
 
-    it("runs the AI review, on the system's AI or through an outside AI", async () => {
-      const review = vi.spyOn(apiClient, "reviewStoryboard").mockResolvedValue(state);
+    it("runs the AI review on the step's channel", async () => {
+      const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ task: "review", target: "" }));
       renderPage();
       await openReview();
       fireEvent.click(await screen.findByTestId("sb-review-run"));
-      fireEvent.click(await screen.findByTestId("sb-review-dialog-send"));
-      await waitFor(() => expect(review).toHaveBeenCalledWith("p1", "", expect.objectContaining({ id: expect.any(String) })));
+      fireEvent.click(await screen.findByTestId("sb-review-dialog-run"));
+      await waitFor(() =>
+        expect(start).toHaveBeenCalledWith("p1", { task: "review", target: "", note: "", channel: "api" }),
+      );
     });
 
     it("locks v1 and tells what the lock writes", async () => {

@@ -222,6 +222,10 @@ class StepModelBody(BaseModel):
     model: str = ""
 
 
+class ChannelBody(BaseModel):
+    channel: str = ""
+
+
 class StepModelsBody(BaseModel):
     models: dict[str, str]
 
@@ -539,6 +543,25 @@ def create_app(
     async def ai_model_put(step: str, body: StepModelBody):
         async def work() -> Response:
             await library.set_step_model(step, body.model)
+            return Response(status_code=204)
+        return await _library_call(work)
+
+    @app.get("/v1/settings/ai-channel")
+    async def ai_channel_get():
+        """The default AI channel for all steps, each step's own, and the channels there are."""
+        return await library.ai_channels()
+
+    @app.put("/v1/settings/ai-channel")
+    async def ai_channel_put(body: ChannelBody):
+        async def work() -> Response:
+            await library.set_default_channel(body.channel)
+            return Response(status_code=204)
+        return await _library_call(work)
+
+    @app.put("/v1/settings/ai-channel/steps/{step}")
+    async def ai_channel_step_put(step: str, body: ChannelBody):
+        async def work() -> Response:
+            await library.set_step_channel(step, body.channel)
             return Response(status_code=204)
         return await _library_call(work)
 

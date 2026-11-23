@@ -118,6 +118,12 @@ func writeConceptError(w http.ResponseWriter, err error) {
 		status, code = http.StatusConflict, "last_shot"
 	case errors.Is(err, domain.ErrUnknownAsset), errors.Is(err, domain.ErrUnknownShot):
 		status = http.StatusNotFound
+	case errors.Is(err, application.ErrUnknownAIRun):
+		status = http.StatusNotFound
+	case errors.Is(err, application.ErrAIRunState):
+		status, code = http.StatusConflict, "ai_run_state"
+	case errors.Is(err, application.ErrBadAIRun):
+		status = http.StatusBadRequest
 	case errors.Is(err, application.ErrExternalAIPromptBuilt):
 		// The external-AI middleware answers with the prompt.
 		status = http.StatusOK

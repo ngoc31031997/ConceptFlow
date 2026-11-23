@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  generateStoryboardUnit,
   storyboardFrameUrl,
   type StoryboardBeat,
   type StoryboardShot,
@@ -11,7 +10,7 @@ import type { StoryboardControls } from "../../hooks/useStoryboard";
 import researchStyles from "../research/research.module.css";
 import { Button, Card } from "../ui";
 import { UnitStatusChip } from "../units/UnitStatusChip";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import { FormDialog } from "../visualplan/PlanDialogs";
 import { Foldable } from "./Foldable";
 import { ShotDialog } from "./ShotDialog";
@@ -397,6 +396,7 @@ function UnitBlock({ projectId, state, unit, storyboard, readOnly, expanded, onT
             >
               {unit.written ? "AI viết lại unit" : "Viết shot unit này"}
             </Button>
+            <AiRunPill task="unit" target={unit.unit_id} onOpen={() => setAiOpen(true)} testId={`${testId}-ai-run`} />
             <Button
               variant="ghost"
               onClick={() => setAdding(true)}
@@ -436,14 +436,17 @@ function UnitBlock({ projectId, state, unit, storyboard, readOnly, expanded, onT
             />
           ))}
         </div>
-        <ConceptAiDialog
+        <AiRunDialog
           open={aiOpen}
           onClose={() => setAiOpen(false)}
+          projectId={projectId}
           title={
             unit.written
               ? `Viết lại shot của ${unit.unit_id} kèm ghi chú`
               : `Viết shot cho ${unit.unit_id}`
           }
+          task="unit"
+          target={unit.unit_id}
           impact={
             <p className={researchStyles.hint} data-testid={`${testId}-ai-impact`}>
               AI viết riêng {unit.unit_id} trong một lượt, đọc shot của unit liền trước, rồi dựng
@@ -454,12 +457,7 @@ function UnitBlock({ projectId, state, unit, storyboard, readOnly, expanded, onT
               Các unit khác giữ nguyên.
             </p>
           }
-          onSystem={(note) => void storyboard.generateUnit(unit.unit_id, note)}
-          external={{
-            run: (note, external) =>
-              generateStoryboardUnit(projectId, unit.unit_id, note, { external }),
-            onDone: storyboard.reload,
-          }}
+          onApplied={storyboard.reload}
           testId={`${testId}-ai-dialog`}
         />
         <ShotDialog

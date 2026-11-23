@@ -55,6 +55,16 @@ function visualStoryboardRouter(visualClient, visualAiClient) {
   router.post(`${base}/findings/:finding/accept`, plain);
   router.post(`${base}/lock`, plain);
   router.get(`${base}/versions/:version`, plain);
+
+  // AI runs with a preview: start builds the prompt (and, on the API channel,
+  // asks the model in the background inside visual-service); reply reads a
+  // pasted or extension reply; apply stores it and redraws frames.
+  router.post(`${base}/ai-runs`, ai);
+  router.get(`${base}/ai-runs`, plain);
+  router.get(`${base}/ai-runs/:run`, plain);
+  router.post(`${base}/ai-runs/:run/reply`, ai);
+  router.post(`${base}/ai-runs/:run/apply`, ai);
+  router.post(`${base}/ai-runs/:run/cancel`, plain);
   return router;
 }
 

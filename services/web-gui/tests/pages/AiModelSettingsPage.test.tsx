@@ -15,6 +15,11 @@ function setting(over: Record<string, string> = {}): apiClient.AiModelSetting {
 
 function renderPage() {
   vi.spyOn(apiClient, "listProjects").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({
+    defaultChannel: "api",
+    stepChannels: {},
+    effective: { visual_storyboard: "api" },
+  });
   vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({
     enabled: true,
     provider: "hive",
@@ -96,5 +101,20 @@ describe("AiModelSettingsPage", () => {
     fireEvent.click(await screen.findByTestId("ai-step-model-brief-option-zai-org/glm-5.3-flash"));
     fireEvent.click(screen.getByTestId("ai-default-model-save"));
     expect(await screen.findByRole("alert")).toHaveTextContent("model không hợp lệ");
+  });
+
+  it("sets the default AI channel and step 11's own channel", async () => {
+    vi.spyOn(apiClient, "getAiModelSetting").mockResolvedValue(setting());
+    const setDefault = vi.spyOn(apiClient, "setAiChannelDefault").mockResolvedValue();
+    const setStep = vi.spyOn(apiClient, "setAiChannelStep").mockResolvedValue();
+    renderPage();
+    expect(await screen.findByTestId("ai-channel-default")).toHaveTextContent("API");
+    fireEvent.click(screen.getByTestId("ai-channel-default"));
+    fireEvent.click(await screen.findByTestId("ai-channel-default-option-manual"));
+    await waitFor(() => expect(setDefault).toHaveBeenCalledWith("manual"));
+    fireEvent.click(screen.getByTestId("ai-channel-step-visual_storyboard"));
+    fireEvent.click(await screen.findByTestId("ai-channel-step-visual_storyboard-option-extension"));
+    await waitFor(() => expect(setStep).toHaveBeenCalledWith("visual_storyboard", "extension"));
+    expect(await screen.findByTestId("ai-channel-saved")).toHaveTextContent("Bước 11");
   });
 });

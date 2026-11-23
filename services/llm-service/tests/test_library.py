@@ -26,6 +26,7 @@ class MemoryStore:
         self.rows: dict[str, Prompt] = {}
         self.owners: dict[str, str] = {}
         self.models: dict[str, str] = {}
+        self.channels: dict[str, str] = {}
 
     def _now(self) -> datetime:
         return datetime.now(UTC)
@@ -103,6 +104,15 @@ class MemoryStore:
 
     async def save_step_models(self, models):
         self.models.update(models)
+
+    async def saved_channels(self):
+        return dict(self.channels)
+
+    async def save_channel(self, scope, channel):
+        if channel is None:
+            self.channels.pop(scope, None)
+        else:
+            self.channels[scope] = channel
 
 
 def sys(role, text="T"):
@@ -280,3 +290,29 @@ async def test_the_visual_sequence_step_has_a_default_model(lib):
     assert "visual_sequence" in (await lib.step_models())["step_models"]
     await lib.set_step_model("visual_sequence", "zai-org/glm-5.3-flash")
     assert (await lib.step_models())["step_models"]["visual_sequence"] == "zai-org/glm-5.3-flash"
+
+
+async def test_ai_channels_default_to_api_and_a_step_can_follow_its_own(lib):
+    first = await lib.ai_channels()
+    assert first["default"] == "api" and first["effective"]["visual_storyboard"] == "api"
+    await lib.set_default_channel("extension")
+    await lib.set_step_channel("visual_storyboard", "manual")
+    got = await lib.ai_channels()
+    assert got["effective"]["visual_storyboard"] == "manual" and got["effective"]["brief"] == "extension"
+    assert got["step_channels"] == {"visual_storyboard": "manual"}
+    await lib.set_step_channel("visual_storyboard", "")
+    assert (await lib.ai_channels())["effective"]["visual_storyboard"] == "extension"
+    for bad in (lambda: lib.set_default_channel("fax"), lambda: lib.set_step_channel("nope", "api"),
+                lambda: lib.set_step_channel("brief", "fax")):
+        with pytest.raises(PromptInvalid):
+            await bad()
+
+
+async def test_ai_channel_routes_read_and_change_the_defaults(client):
+    assert (await client.get("/v1/settings/ai-channel")).json()["channels"] == ["api", "extension", "manual"]
+    assert (await client.put("/v1/settings/ai-channel", json={"channel": "manual"})).status_code == 204
+    assert (await client.put("/v1/settings/ai-channel/steps/visual_storyboard", json={"channel": "extension"})).status_code == 204
+    body = (await client.get("/v1/settings/ai-channel")).json()
+    assert body["default"] == "manual" and body["effective"]["visual_storyboard"] == "extension"
+    bad = await client.put("/v1/settings/ai-channel", json={"channel": "fax"})
+    assert bad.status_code == 400 and "fax" in bad.json()["error"]

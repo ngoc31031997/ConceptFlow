@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AiChannelSettingsCard } from "../components/airun/AiChannelSettingsCard";
 import { AppShell } from "../components/AppShell";
 import { Button, Card, Dropdown, FormField } from "../components/ui";
 import { LOCAL_CODE_MODEL_WARNING } from "../components/localModelWarning";
@@ -133,6 +134,7 @@ export function AiModelSettingsPage() {
           </div>
         )}
       </Card>
+      <AiChannelSettingsCard />
     </AppShell>
   );
 }

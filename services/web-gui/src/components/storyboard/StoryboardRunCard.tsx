@@ -7,6 +7,8 @@ import {
   type StoryboardUnit,
 } from "../../api/client";
 import { useAiQueue } from "../../hooks/useAiQueue";
+import { ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
 import type { StoryboardControls } from "../../hooks/useStoryboard";
 import researchStyles from "../research/research.module.css";
 import { Button, Card, Dialog, Dropdown, FormField, TextArea } from "../ui";
@@ -31,10 +33,13 @@ interface StoryboardRunCardProps {
 }
 
 /**
- * "Chạy AI" of step 11: the model the step runs on, the run that writes the
- * shots of every unit with none in sequence order on the system's AI, and the
- * same work queued on DeepSeek, Gemini or Grok through the extension, one item per unit not
- * approved yet. Drawing assets and frames runs on the system and is not queued.
+ * "Chạy AI" of step 11: the model the step runs on, and one button that writes
+ * the shots of every unit with none, on the step's channel from Settings (▾ for
+ * the other): on the API the system's AI writes them in sequence order; on the
+ * extension one queue item per unit not approved yet runs on DeepSeek, Gemini or
+ * Grok. This run stores each unit as it is written, with no preview, because each
+ * unit reads the stored shots of the unit before it; a single unit's dialog
+ * previews before it stores. Drawing assets and frames runs on the system.
  */
 export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: StoryboardRunCardProps) {
   const [open, setOpen] = useState(false);
@@ -44,6 +49,7 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
   const queue = useAiQueue((path) => {
     if (path.startsWith(`/v1/projects/${projectId}/storyboard`)) void storyboard.reload();
   });
+  const ai = useAiRuns();
   const toWrite = unitsToWrite(state);
   const empty = state.empty_units;
   const blocker = writeBlocker(state);
@@ -101,7 +107,9 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
         <div className={researchStyles.head}>
           <h3>Chạy AI</h3>
           <span className={researchStyles.hint}>
-            AI viết từng unit, mỗi unit một lượt, đọc shot của unit liền trước để giữ nhất quán
+            AI viết từng unit, mỗi unit một lượt, đọc shot của unit liền trước để giữ nhất quán.
+            Chạy hàng loạt lưu luôn từng unit, không dừng để xem trước; muốn xem trước thì chạy từng
+            unit ở phần dưới.
           </span>
         </div>
         <div className={researchStyles.actions}>
@@ -113,28 +121,17 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
             disabled={disabled}
             data-testid="sb-model"
           />
-          <Button
-            variant="run"
-            onClick={() => setOpen(true)}
-            disabled={disabled || blocker !== "" || empty.length === 0}
-            title={blocker || undefined}
-            data-testid="sb-generate"
-          >
-            {empty.length > 0
-              ? `Viết shot cho ${empty.length} unit còn trống`
-              : "Mọi unit đã có shot"}
-          </Button>
-          {queue.available && toWrite.length > 0 && (
-            <Button
-              variant="run"
-              onClick={() => void queueAll()}
-              disabled={disabled || queueing || blocker !== ""}
-              title={blocker || undefined}
-              data-testid="sb-queue"
-            >
-              Chạy tất cả qua hàng đợi AI ({toWrite.length})
-            </Button>
-          )}
+          <ChannelButton
+            channel={ai.defaultChannel}
+            label={empty.length > 0 ? `Viết shot cho ${empty.length} unit còn trống` : "Mọi unit đã có shot"}
+            onRun={(c) => (c === "api" ? setOpen(true) : void queueAll())}
+            disabled={disabled || queueing || blocker !== "" || empty.length === 0}
+            unavailable={{
+              manual: "Chạy hàng loạt không làm thủ công được; chạy thủ công ở từng unit bên dưới",
+              ...(queue.available ? {} : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }),
+            }}
+            testId="sb-generate"
+          />
         </div>
         {queueNote && (
           <p

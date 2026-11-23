@@ -24,6 +24,7 @@ type Router struct {
 	plan             planDesk
 	sequence         sequenceDesk
 	storyboard       storyboardDesk
+	aiRuns           storyboardAIRuns
 	referenceLibrary referenceLibraryUseCase
 }
 

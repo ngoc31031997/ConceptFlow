@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   EXEMPLAR_FOLDER_ID,
-  generateStoryboardAssetDetail,
-  generateStoryboardAssets,
   listIllustrationFolders,
   storyboardAssetPreviewUrl,
   type IllustrationFolder,
@@ -12,7 +10,7 @@ import {
 import type { StoryboardControls } from "../../hooks/useStoryboard";
 import researchStyles from "../research/research.module.css";
 import { Button, Dialog, FormField, Select, TextArea } from "../ui";
-import { ConceptAiDialog } from "../visual/ConceptAiDialog";
+import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
 import { FormDialog } from "../visualplan/PlanDialogs";
 import { AssetDialog } from "./AssetDialog";
 import { Foldable } from "./Foldable";
@@ -131,6 +129,7 @@ function AssetRow({ projectId, asset, storyboard, readOnly, onEdit, onDelete }: 
           >
             {asset.has_detail ? "AI viết lại chi tiết" : "AI viết chi tiết"}
           </Button>
+          <AiRunPill task="asset_detail" target={id} onOpen={() => setDetailing(true)} testId={`${testId}-detail-run`} />
           <Button
             variant="dangerGhost"
             onClick={onDelete}
@@ -141,14 +140,17 @@ function AssetRow({ projectId, asset, storyboard, readOnly, onEdit, onDelete }: 
             Xoá
           </Button>
         </div>
-        <ConceptAiDialog
+        <AiRunDialog
           open={detailing}
           onClose={() => setDetailing(false)}
+          projectId={projectId}
           title={
             asset.has_detail
               ? `Viết lại chi tiết của ${asset.name} kèm ghi chú`
               : `Viết chi tiết cho ${asset.name}`
           }
+          task="asset_detail"
+          target={id}
           impact={
             <p className={researchStyles.hint} data-testid={`${testId}-detail-impact`}>
               AI chỉ đọc mục khái niệm của tài sản, bảng màu, các unit nó xuất hiện (
@@ -160,11 +162,7 @@ function AssetRow({ projectId, asset, storyboard, readOnly, onEdit, onDelete }: 
                 : ""}
             </p>
           }
-          onSystem={(n) => void storyboard.generateAssetDetail(id, n)}
-          external={{
-            run: (n, external) => generateStoryboardAssetDetail(projectId, id, n, { external }),
-            onDone: storyboard.reload,
-          }}
+          onApplied={storyboard.reload}
           testId={`${testId}-detail-dialog`}
         />
       </td>
@@ -216,6 +214,7 @@ export function StoryboardAssetListSection({
         >
           {items.length > 0 ? "AI lập lại danh sách" : "AI lập danh sách"}
         </Button>
+        <AiRunPill task="assets" onOpen={() => setAiOpen(true)} testId="sb-assets-run" />
       </div>
       {items.length === 0 ? (
         <p className={researchStyles.hint} data-testid="sb-assets-empty">
@@ -318,10 +317,12 @@ export function StoryboardAssetListSection({
           Không khôi phục được. Mã {deleting?.asset_id} không được dùng lại.
         </p>
       </FormDialog>
-      <ConceptAiDialog
+      <AiRunDialog
         open={aiOpen}
         onClose={() => setAiOpen(false)}
+        projectId={projectId}
         title={items.length > 0 ? "AI lập lại danh sách tài sản" : "AI lập danh sách tài sản"}
+        task="assets"
         impact={
           <p className={researchStyles.hint}>
             AI đọc ngôn ngữ hình ảnh, kế hoạch và chuỗi hình đã chốt cùng hình đã duyệt của thư
@@ -331,11 +332,7 @@ export function StoryboardAssetListSection({
             phải vẽ lại.
           </p>
         }
-        onSystem={(note) => void storyboard.generateAssets(note)}
-        external={{
-          run: (note, external) => generateStoryboardAssets(projectId, note, { external }),
-          onDone: storyboard.reload,
-        }}
+        onApplied={storyboard.reload}
         testId="sb-assets-dialog"
       />
     </>

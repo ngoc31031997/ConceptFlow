@@ -1,6 +1,7 @@
 import { useCallback, useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { StoryboardState } from "../api/client";
+import { AiRunsProvider } from "../components/airun/AiRunsContext";
 import { AppShell } from "../components/AppShell";
 import researchStyles from "../components/research/research.module.css";
 import type { StepStripProps } from "../components/StepStrip";
@@ -343,18 +344,20 @@ export function StoryboardStepPage() {
                 )}
               </div>
             </Card>
-            <StoryboardSections
-              projectId={projectId}
-              projectName={projectName}
-              state={state}
-              storyboard={storyboard}
-              readOnly={readOnly}
-              expanded={expanded}
-              onToggle={toggle}
-              focusShot={focusShot}
-              onFocused={onFocused}
-              onOpen={open}
-            />
+            <AiRunsProvider projectId={projectId} step="visual_storyboard">
+              <StoryboardSections
+                projectId={projectId}
+                projectName={projectName}
+                state={state}
+                storyboard={storyboard}
+                readOnly={readOnly}
+                expanded={expanded}
+                onToggle={toggle}
+                focusShot={focusShot}
+                onFocused={onFocused}
+                onOpen={open}
+              />
+            </AiRunsProvider>
             {storyboard.actionError && (
               <p className={researchStyles.error} role="alert" data-testid="sb-error">
                 {storyboard.actionError}

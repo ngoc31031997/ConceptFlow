@@ -83,6 +83,25 @@ CREATE TABLE IF NOT EXISTS project_visual (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- One AI turn of step 11 run through the AI run dialog: the prompt, the reply
+-- once it is in (from the system's model, the AI Bridge extension or a paste),
+-- what reading it would store (preview), and whether it was applied.
+CREATE TABLE IF NOT EXISTS storyboard_ai_runs (
+    id         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    project_id TEXT NOT NULL,
+    task       TEXT NOT NULL,
+    target     TEXT NOT NULL DEFAULT '',
+    note       TEXT NOT NULL DEFAULT '',
+    channel    TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    prompt     TEXT NOT NULL DEFAULT '',
+    reply      TEXT NOT NULL DEFAULT '',
+    preview    JSONB,
+    error      TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS storyboard_ai_runs_by_project ON storyboard_ai_runs (project_id, task, target, created_at DESC);
 -- The reference library: text descriptions of a style, shared by every video.
 -- Ids are R01, R02... from seq and are never reused.
 CREATE SEQUENCE IF NOT EXISTS reference_styles_seq;

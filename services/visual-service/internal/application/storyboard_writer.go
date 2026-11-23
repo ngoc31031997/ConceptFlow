@@ -118,6 +118,9 @@ func (d *StoryboardDesk) GenerateAssets(ctx context.Context, projectID, note str
 	if err != nil {
 		return nil, err
 	}
+	if err := stopForPreview(ctx, drafts); err != nil {
+		return nil, err
+	}
 	if err := d.applyAssetDrafts(ctx, data, projectID, drafts); err != nil {
 		return nil, err
 	}
@@ -206,6 +209,9 @@ func (d *StoryboardDesk) writeAssetDetail(ctx context.Context, projectID string,
 	}
 	detail, err := domain.ParseAssetDetailReply(reply, domain.PaletteTokenSet(data.in.Seq.Concept.ColorSystem))
 	if err != nil {
+		return err
+	}
+	if err := stopForPreview(ctx, detail); err != nil {
 		return err
 	}
 	kept := map[string]bool{}
@@ -380,6 +386,9 @@ func (d *StoryboardDesk) writeUnit(ctx context.Context, projectID string, data *
 	if err != nil {
 		return err
 	}
+	if err := stopForPreview(ctx, merged.Shots); err != nil {
+		return err
+	}
 	merged.Frames = map[string]domain.DrawnFrame{}
 	for _, sh := range merged.Shots {
 		if fr, ok := old.Frames[sh.ShotID]; ok {
@@ -511,6 +520,9 @@ func (d *StoryboardDesk) Review(ctx context.Context, projectID, note string) (*S
 	}
 	parsed, err := domain.ParseStoryboardReviewReply(reply, data.review, shotIDs, unitIDs, assetIDs)
 	if err != nil {
+		return nil, err
+	}
+	if err := stopForPreview(ctx, parsed); err != nil {
 		return nil, err
 	}
 	data.review = domain.MergeReview(data.review, parsed)

@@ -65,9 +65,17 @@ func main() {
 		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
 	router.WithSequence(application.NewSequenceDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewSequenceRepository(pool)).
 		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
-	router.WithStoryboard(application.NewStoryboardDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewStoryboardRepository(pool),
+	storyboardDesk := application.NewStoryboardDesk(authoring.NewClient(cfg.AuthoringServiceURL, 30*time.Second), postgres.NewStoryboardRepository(pool),
 		storyboardRendering, referenceLibrary).
-		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens))
+		WithAI(application.NewExternalAIProvider(llmClient, llmClient), llmClient, llmClient, cfg.MaxOutputTokens)
+	router.WithStoryboard(storyboardDesk)
+	aiRunRepo := postgres.NewAIRunRepository(pool)
+	if n, err := aiRunRepo.FailRunningAIRuns(ctx, application.AIRunInterrupted); err != nil {
+		logger.Error("mark interrupted AI runs", "err", err)
+	} else if n > 0 {
+		logger.Info("marked interrupted AI runs as failed", "count", n)
+	}
+	router.WithStoryboardAIRuns(application.NewStoryboardAIRuns(storyboardDesk, aiRunRepo))
 	go pushSystemPrompts(ctx, logger, llmClient)
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler(), ReadHeaderTimeout: 10 * time.Second}
