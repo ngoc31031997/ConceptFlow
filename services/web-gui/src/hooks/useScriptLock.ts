@@ -15,8 +15,6 @@ import {
   handoffBeatUnit,
   isRequestCancelled,
   lockScript,
-  redoUnit,
-  reviewScript,
   unapproveUnit,
   type OperationCall,
   type ScriptLockState,
@@ -38,11 +36,7 @@ export interface ScriptLockControls {
   /** An action other than an AI run is in flight. */
   busy: boolean;
   actionError: string | null;
-  /** The note of the AI redo that failed, so its dialog starts from it. */
-  failedNote: string;
-  review: () => Promise<boolean>;
   generate: (beat: string) => Promise<boolean>;
-  redo: (beat: string, note: string) => Promise<boolean>;
   /** Saves a hand edit of sections of a beat's note; throws so the dialog can show why it failed. */
   edit: (beat: string, fields: Record<string, string>) => Promise<void>;
   approve: (beat: string) => Promise<boolean>;
@@ -74,7 +68,6 @@ export function useScriptLock(projectId: string, enabled: boolean): ScriptLockCo
   const [running, setRunning] = useState<LockRunning>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [failedNote, setFailedNote] = useState("");
   // Only the newest load may land: an older answer must not overwrite a newer one.
   const loadSeq = useRef(0);
 
@@ -121,19 +114,17 @@ export function useScriptLock(projectId: string, enabled: boolean): ScriptLockCo
   );
 
   const runAI = useCallback(
-    async (what: Exclude<LockRunning, null>, note: string, call: (operation: OperationCall) => Promise<unknown>) => {
+    async (what: Exclude<LockRunning, null>, call: (operation: OperationCall) => Promise<unknown>) => {
       setRunning(what);
       setActionError(null);
       try {
         await call(run.begin());
-        setFailedNote("");
         run.end();
         await load();
         return true;
       } catch (err) {
         if (isRequestCancelled(err)) return false;
         setActionError(messageOf(err));
-        setFailedNote(note);
         await load();
         return false;
       } finally {
@@ -150,10 +141,7 @@ export function useScriptLock(projectId: string, enabled: boolean): ScriptLockCo
     run,
     busy,
     actionError,
-    failedNote,
-    review: () => runAI("review", "", (op) => reviewScript(projectId, op)),
-    generate: (beat) => runAI(beat ? { beat } : "handoff", "", (op) => generateHandoff(projectId, beat, op)),
-    redo: (beat, note) => runAI({ beat }, note, (op) => redoUnit(projectId, handoffBeatUnit(beat), note, op)),
+    generate: (beat) => runAI(beat ? { beat } : "handoff", (op) => generateHandoff(projectId, beat, op)),
     edit: async (beat, fields) => {
       setActionError(null);
       try {

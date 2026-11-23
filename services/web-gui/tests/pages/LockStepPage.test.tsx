@@ -118,7 +118,29 @@ beforeEach(() => {
   vi.spyOn(apiClient, "getResearch").mockRejectedValue(new Error("no"));
   vi.spyOn(apiClient, "getScriptLock").mockImplementation(async () => state);
   vi.spyOn(apiClient, "getUnitImpact").mockResolvedValue([]);
+  vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getAiChannelSetting").mockResolvedValue({ defaultChannel: "api", stepChannels: {}, effective: { lock: "api" } });
 });
+
+function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+  return {
+    id: "r1",
+    project_id: "p1",
+    label: "Rà soát",
+    method: "POST",
+    path: "/v1/projects/p1/script-lock/review",
+    body: "",
+    channel: "api",
+    status: "running",
+    prompt: "PROMPT",
+    reply: "",
+    preview: null,
+    error: "",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:00:00Z",
+    ...over,
+  };
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -156,7 +178,7 @@ describe("LockStepPage", () => {
     expect(screen.getByTestId("finding-m-must")).toHaveAttribute("data-state", "ok");
     expect(screen.getByTestId("finding-r1")).toHaveAttribute("data-state", "open");
     expect(screen.getByTestId("lock-tab-review")).toHaveTextContent("4 cần xử lý");
-    expect(screen.getByTestId("lock-review-run")).toHaveTextContent("AI rà soát");
+    expect(screen.getByTestId("lock-review-run")).toHaveTextContent("Rà soát bằng AI");
   });
 
   it("says the step is closed until every beat's dialogue is approved", async () => {
@@ -199,18 +221,43 @@ describe("LockStepPage", () => {
     expect(screen.queryByTestId("lock-accept")).not.toBeInTheDocument();
   });
 
-  it("starts the AI review, then calls it a re-review once the script was reviewed", async () => {
-    const review = vi.spyOn(apiClient, "reviewScript").mockImplementation(async () => state);
+  it("runs the AI review on the step's channel", async () => {
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun());
+    await ready();
+    expect(screen.getByTestId("lock-review-run")).toHaveTextContent("Rà soát bằng AI");
+    fireEvent.click(screen.getByTestId("lock-review-run"));
+    fireEvent.click(await screen.findByTestId("lock-review-dialog-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path: "/v1/projects/p1/script-lock/review" }),
+        channel: "api",
+      }),
+    );
+  });
+
+  it("calls the review a re-review once the script was reviewed", async () => {
+    state = baseState({ reviewed: true });
+    await ready();
+    expect(screen.getByTestId("lock-review-run")).toHaveTextContent("Rà soát lại");
+  });
+
+  it("previews the review's findings before applying them", async () => {
+    vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "waiting" }));
+    const preview = { findings: [{ id: "r1", title: "Chuyển đột ngột", detail: "d", line: "b2.1", fix: "Câu mới." }], ai_notes: ["Nhịp ổn."] };
+    vi.spyOn(apiClient, "replyAiRun").mockResolvedValue(aiRun({ channel: "manual", status: "ready", reply: "{...}", preview }));
+    const apply = vi.spyOn(apiClient, "applyAiRun").mockResolvedValue({ run: aiRun({ status: "applied" }), state });
     await ready();
     fireEvent.click(screen.getByTestId("lock-review-run"));
-    await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByTestId("lock-review-run")).toBeEnabled());
-    state = baseState({ reviewed: true, findings: [finding("m-review", { source: "machine", state: "ok", title: "AI đã rà soát" }), finding("r1")] });
-    fireEvent.click(screen.getByTestId("lock-tab-handoff"));
-    fireEvent.click(screen.getByTestId("lock-tab-review"));
-    // The tab switch does not reload; a reload from the server brings the new state in.
-    fireEvent.click(screen.getByTestId("lock-review-run"));
-    await waitFor(() => expect(screen.getByTestId("lock-review-run")).toHaveTextContent("Rà soát lại"));
+    fireEvent.click(await screen.findByTestId("lock-review-dialog-run-more"));
+    fireEvent.click(screen.getByTestId("lock-review-dialog-run-manual"));
+    fireEvent.click(await screen.findByTestId("lock-review-dialog-tab-reply"));
+    fireEvent.change(screen.getByTestId("lock-review-dialog-reply"), { target: { value: "{...}" } });
+    fireEvent.click(screen.getByTestId("lock-review-dialog-read"));
+    expect(await screen.findByTestId("ai-run-preview")).toHaveTextContent("Chuyển đột ngột");
+    expect(apply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("lock-review-dialog-apply"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("authoring", "p1", "r1"));
   });
 
   it("links 'Mở câu đó' to the script screen at that line", async () => {
@@ -243,9 +290,10 @@ describe("LockStepPage", () => {
     const generate = vi.spyOn(apiClient, "generateHandoff");
     await ready();
     fireEvent.click(screen.getByTestId("lock-tab-handoff"));
-    const button = await screen.findByTestId("handoff-queue-all");
-    expect(button).toHaveTextContent("Thêm tất cả vào hàng đợi AI (1)");
-    fireEvent.click(button);
+    await waitFor(() => expect(screen.getByTestId("handoff-generate-more")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("handoff-generate-more"));
+    await waitFor(() => expect(screen.getByTestId("handoff-generate-extension")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("handoff-generate-extension"));
     await waitFor(() => expect(bridge.queued).toHaveLength(1));
     const request = bridge.queued[0].item.request as { path: string; body: string };
     expect(request.path).toBe("/v1/projects/p1/script-lock/handoff/generate");
@@ -255,6 +303,13 @@ describe("LockStepPage", () => {
     bridge.remove();
   });
 
+  it("does not offer the batch on the manual channel", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("lock-tab-handoff"));
+    fireEvent.click(await screen.findByTestId("handoff-generate-more"));
+    expect(screen.getByTestId("handoff-generate-manual")).toBeDisabled();
+  });
+
   it("has the AI write the missing notes and offers to approve the ones waiting", async () => {
     const gen = vi.spyOn(apiClient, "generateHandoff").mockImplementation(async () => state);
     await ready();
@@ -262,6 +317,47 @@ describe("LockStepPage", () => {
     fireEvent.click(await screen.findByTestId("handoff-generate"));
     await waitFor(() => expect(gen).toHaveBeenCalledWith("p1", "", expect.anything()));
     expect(screen.getByTestId("handoff-approve-all")).toBeEnabled();
+  });
+
+  it("writes one beat's note as a run and previews it with the glossary terms it adds", async () => {
+    const path = "/v1/projects/p1/units/handoff_beat/b3/redo";
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path, channel: "manual", status: "waiting" }));
+    const preview = { beat: "b3", note: { must: ["Sung là chùm hoa"], terms: [], exact: [], free: [], unsure: [] }, terms: [{ term: "ficin", say: "phi-xin", draw: "quầng", avoid: "" }] };
+    vi.spyOn(apiClient, "replyAiRun").mockResolvedValue(aiRun({ path, channel: "manual", status: "ready", reply: "{}", preview }));
+    await ready();
+    fireEvent.click(screen.getByTestId("lock-tab-handoff"));
+    fireEvent.click(await screen.findByTestId("handoff-write-b3"));
+    fireEvent.click(await screen.findByTestId("handoff-redo-b3-run-more"));
+    fireEvent.click(screen.getByTestId("handoff-redo-b3-run-manual"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ method: "POST", path }),
+        channel: "manual",
+      }),
+    );
+    fireEvent.click(await screen.findByTestId("handoff-redo-b3-tab-reply"));
+    fireEvent.change(screen.getByTestId("handoff-redo-b3-reply"), { target: { value: "{}" } });
+    fireEvent.click(screen.getByTestId("handoff-redo-b3-read"));
+    const shown = await screen.findByTestId("ai-run-preview");
+    expect(shown).toHaveTextContent("Sung là chùm hoa");
+    expect(shown).toHaveTextContent("ficin");
+  });
+
+  it("redoes a written note with the Creator's remark", async () => {
+    const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(aiRun({ path: "/v1/projects/p1/units/handoff_beat/b2/redo" }));
+    await ready();
+    fireEvent.click(screen.getByTestId("lock-tab-handoff"));
+    fireEvent.click(await screen.findByTestId("handoff-review-b2-redo"));
+    fireEvent.change(await screen.findByTestId("handoff-redo-b2-note"), { target: { value: " ngắn hơn " } });
+    fireEvent.click(screen.getByTestId("handoff-redo-b2-run"));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith("authoring", "p1", {
+        label: expect.any(String),
+        request: expect.objectContaining({ path: "/v1/projects/p1/units/handoff_beat/b2/redo", body: JSON.stringify({ note: "ngắn hơn" }) }),
+        channel: "api",
+      }),
+    );
   });
 
   it("asks the Creator to keep or redo a note whose dialogue changed", async () => {

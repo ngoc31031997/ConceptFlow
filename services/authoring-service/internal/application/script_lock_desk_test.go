@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -531,5 +532,85 @@ func TestReviewAsksAgainWhenTheReplyIsUnusableAndGivesUpAfterThreeTries(t *testi
 	}
 	if always.calls != maxReplyAttempts {
 		t.Errorf("%d calls, want %d", always.calls, maxReplyAttempts)
+	}
+}
+
+func previewCtx() (context.Context, *ExternalAIRun) {
+	run := NewExternalAIRun(ExternalAIPreview, "")
+	return WithExternalAI(context.Background(), run), run
+}
+
+func TestReviewInPreviewModeStopsBeforeStoring(t *testing.T) {
+	f := newLockFixture(t)
+	f.llm.replies[reviewMarker] = f.reviewReply(`{"group":"logic","title":"Chuyển đột ngột","detail":"d","line":"b2.1","fix":"Câu thay thế."}`)
+	ctx, run := previewCtx()
+	if err := f.uc2.Review(ctx, "p1"); !errors.Is(err, ErrExternalAIPreviewReady) {
+		t.Fatalf("err = %v, want ErrExternalAIPreviewReady", err)
+	}
+	p, ok := run.Preview()
+	if !ok || !strings.Contains(string(p), "Chuyển đột ngột") {
+		t.Fatalf("preview = %s", p)
+	}
+	st, _ := f.uc2.State(context.Background(), "p1")
+	if slices.Contains(openFindingIDs(st), "r1") || len(st.AINotes) != 0 {
+		t.Errorf("preview stored a review: %v %v", openFindingIDs(st), st.AINotes)
+	}
+	paste := WithExternalAI(context.Background(), NewExternalAIRun(ExternalAIPaste, ""))
+	if err := f.uc2.Review(paste, "p1"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ = f.uc2.State(context.Background(), "p1")
+	if !slices.Contains(openFindingIDs(st), "r1") {
+		t.Errorf("paste mode did not store: %v", openFindingIDs(st))
+	}
+}
+
+func TestHandoffForOneBeatInPreviewModeStopsBeforeStoring(t *testing.T) {
+	f := newLockFixture(t)
+	f.llm.replies[handoffMarker] = handoffReply
+	ctx, run := previewCtx()
+	if err := f.uc2.GenerateHandoff(ctx, "p1", "b1"); !errors.Is(err, ErrExternalAIPreviewReady) {
+		t.Fatalf("err = %v, want ErrExternalAIPreviewReady", err)
+	}
+	p, ok := run.Preview()
+	if !ok || !strings.Contains(string(p), "Sung là chùm hoa (F01)") || !strings.Contains(string(p), "ficin") || !strings.Contains(string(p), `"beat":"b1"`) {
+		t.Fatalf("preview = %s", p)
+	}
+	st, _ := f.uc2.State(context.Background(), "p1")
+	if len(st.Glossary) != 0 {
+		t.Errorf("preview stored glossary %+v", st.Glossary)
+	}
+	notes, _ := f.uc2.handoffs(context.Background(), "p1")
+	if len(notes) != 0 {
+		t.Errorf("preview stored %d notes", len(notes))
+	}
+	paste := WithExternalAI(context.Background(), NewExternalAIRun(ExternalAIPaste, ""))
+	if err := f.uc2.GenerateHandoff(paste, "p1", "b1"); err != nil {
+		t.Fatal(err)
+	}
+	notes, _ = f.uc2.handoffs(context.Background(), "p1")
+	if len(notes) != 1 {
+		t.Errorf("paste mode stored %d notes, want 1", len(notes))
+	}
+}
+
+func TestHandoffRedoInPreviewModeStopsBeforeStoring(t *testing.T) {
+	f := newLockFixture(t)
+	f.llm.replies[handoffMarker] = handoffReply
+	if err := f.uc2.GenerateHandoff(context.Background(), "p1", "b1"); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := f.uc2.handoffs(context.Background(), "p1")
+	ctx, run := previewCtx()
+	_, err := f.uc2.HandoffUnitKind().Redo(ctx, "p1", "b1", "ngắn hơn")
+	if !errors.Is(err, ErrExternalAIPreviewReady) {
+		t.Fatalf("err = %v, want ErrExternalAIPreviewReady", err)
+	}
+	if _, ok := run.Preview(); !ok {
+		t.Fatal("no preview")
+	}
+	after, _ := f.uc2.handoffs(context.Background(), "p1")
+	if after["b1"].unit.RedoCount != before["b1"].unit.RedoCount {
+		t.Errorf("redo count changed in preview")
 	}
 }
