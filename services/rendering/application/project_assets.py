@@ -1,4 +1,7 @@
-"""Tài sản của dự án ở bước Storyboard: lập, sửa, vẽ bằng bộ vẽ AI, duyệt và đưa vào thư viện hình.
+"""Tài sản của dự án ở bước Storyboard: lập, sửa, vẽ, duyệt và đưa vào thư viện hình.
+
+Vẽ tài sản là ba bước rời: dựng prompt, kiểm và dựng thử câu trả lời của AI, áp dụng code đã kiểm.
+Rendering không gọi model cho tài sản; visual-service giữ việc gọi AI qua lượt chạy.
 
 Rendering không biết shot nào dùng tài sản: việc từ chối xoá tài sản đang được shot dùng thuộc về
 visual-service, nơi giữ các shot.
@@ -10,17 +13,23 @@ import asyncio
 import re
 from typing import Protocol
 
-from application.illustration_drawer import CodeDrawRequest, IllustrationDrawer
+from application.illustration_drawer import (
+    CheckedDrawing,
+    CodeCheckRequest,
+    CodePromptRequest,
+    IllustrationDrawer,
+)
 from application.illustration_library import IllustrationLibrary
 from application.illustration_ports import RenderedIllustration
 from domain.illustration import (
-    DrawerDisabledError,
+    DrawCheckError,
     FolderTakenError,
     Illustration,
     IllustrationError,
     IllustrationFolder,
     IllustrationKind,
     IllustrationStatus,
+    RefStyleRequiredError,
     detail_for_tier,
     normalize_tags,
     rename_export,
@@ -76,7 +85,7 @@ def _short_project_id(project_id: str) -> str:
 class ProjectAssets:
     def __init__(
         self, repo: ProjectAssetRepoPort, files: ProjectAssetFilesPort, library: IllustrationLibrary,
-        drawer: IllustrationDrawer | None,
+        drawer: IllustrationDrawer,
     ) -> None:
         self._repo = repo
         self._files = files
@@ -124,41 +133,67 @@ class ProjectAssets:
 
     # --- vẽ ---
 
-    async def draw(
-        self, project_id: str, asset_id: str, kit: object, ref_id: str, model: str,
-    ) -> ProjectAsset:
-        """Vẽ tài sản từ mô tả ghép của nó, với kit của dự án; xong thành `drawn` và tăng phiên bản."""
-        return await self._draw(project_id, asset_id, kit, ref_id, model, note="", redraw=False)
+    async def draw_prompt(
+        self, project_id: str, asset_id: str, kit: object, ref_id: str, *, note: str = "",
+        redraw: bool = False, fix_code: str = "", fix_error: DrawCheckError | None = None,
+    ) -> tuple[str, str]:
+        """Prompt hệ thống và lượt người dùng để vẽ tài sản; không gọi model, không ghi gì.
 
-    async def redraw(
-        self, project_id: str, asset_id: str, kit: object, ref_id: str, model: str, note: str,
-    ) -> ProjectAsset:
-        """Vẽ lại từ code đang có theo ghi chú của Creator; tăng phiên bản, trạng thái về `drawn`."""
-        return await self._draw(project_id, asset_id, kit, ref_id, model, note=note, redraw=True)
-
-    async def _draw(
-        self, project_id: str, asset_id: str, kit: object, ref_id: str, model: str, *, note: str,
-        redraw: bool,
-    ) -> ProjectAsset:
-        if self._drawer is None:
-            raise DrawerDisabledError()
-        asset = await self.get(project_id, asset_id)
+        Vẽ lần đầu cần chi tiết (AssetNoDetailError); vẽ lại cần code đang có (AssetStateError) và đưa
+        code đó cùng `note` vào prompt. `fix_error` nối code hỏng `fix_code` và lỗi của nó vào prompt,
+        cho cả lần vẽ đầu và vẽ lại.
+        """
+        asset, _ = await self._drawing_inputs(project_id, asset_id, kit, ref_id)
         if redraw and not asset.code.strip():
             raise AssetStateError("tài sản chưa có hình để vẽ lại — hãy vẽ trước")
         if not redraw:
             ensure_can_draw(asset)
-        valid_kit = validate_kit(kit)
         base_code, base_label = await self._base_reference(asset)
-        reply, out = await self._drawer.draw_code(CodeDrawRequest(
-            description=describe_for_drawing(asset), name=asset.name, ref_id=ref_id, kit=valid_kit,
-            kind=IllustrationKind(asset.kind), tier=asset.tier, model=model,
+        return await self._drawer.code_prompt(CodePromptRequest(
+            description=describe_for_drawing(asset), name=asset.name, ref_id=ref_id,
+            kind=IllustrationKind(asset.kind), tier=asset.tier,
             current_code=asset.code if redraw else "", note=note, base_code=base_code,
-            base_label=base_label))
+            base_label=base_label, fix_code=fix_code, fix_error=fix_error))
+
+    async def draw_check(
+        self, project_id: str, asset_id: str, kit: object, ref_id: str, reply: str,
+    ) -> CheckedDrawing:
+        """Rút code khỏi câu trả lời của AI, kiểm và dựng thử; không ghi gì. Lỗi là DrawCheckError."""
+        asset, valid_kit = await self._drawing_inputs(project_id, asset_id, kit, ref_id)
+        return await self._drawer.check_reply(reply, self._check_request(asset, valid_kit))
+
+    async def draw_apply(
+        self, project_id: str, asset_id: str, kit: object, ref_id: str, code: str,
+    ) -> ProjectAsset:
+        """Kiểm và dựng lại `code`, lưu ảnh của phiên bản mới, tăng `version`, tài sản về `drawn`.
+
+        Không tin kết quả kiểm trước đó; code không qua là DrawCheckError và không ghi gì. Lần vẽ đầu
+        (tài sản chưa có code) vẫn cần chi tiết.
+        """
+        asset, valid_kit = await self._drawing_inputs(project_id, asset_id, kit, ref_id)
+        if not asset.code.strip():
+            ensure_can_draw(asset)
+        checked = await self._drawer.check_code(code, self._check_request(asset, valid_kit))
         version = asset.version + 1
-        path = await asyncio.to_thread(self._files.save, project_id, asset_id, version, out.png)
+        path = await asyncio.to_thread(
+            self._files.save, project_id, asset_id, version, checked.rendered.png)
         return await self._repo.update_asset(asset.with_(
-            code=reply.code, version=version, preview_path=path, status=AssetStatus.DRAWN,
-            warnings=tuple(out.warnings)))
+            code=checked.code, version=version, preview_path=path, status=AssetStatus.DRAWN,
+            warnings=tuple(checked.rendered.warnings)))
+
+    async def _drawing_inputs(
+        self, project_id: str, asset_id: str, kit: object, ref_id: str,
+    ) -> tuple[ProjectAsset, dict]:
+        """Tài sản, kit đã kiểm và phong cách tham chiếu bắt buộc, chung cho ba bước vẽ."""
+        asset = await self.get(project_id, asset_id)
+        valid_kit = validate_kit(kit)
+        if not ref_id:
+            raise RefStyleRequiredError()
+        return asset, valid_kit
+
+    @staticmethod
+    def _check_request(asset: ProjectAsset, kit: dict) -> CodeCheckRequest:
+        return CodeCheckRequest(name=asset.name, kit=kit, kind=IllustrationKind(asset.kind), tier=asset.tier)
 
     async def _check_base(self, asset: ProjectAsset) -> None:
         """Hình gốc phải có trong thư viện và cùng loại với tài sản."""

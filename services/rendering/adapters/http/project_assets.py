@@ -1,11 +1,13 @@
 """Route nội bộ của tài sản dự án: `/internal/v1/projects/{project_id}/assets…` (visual-service gọi).
 
-Thân yêu cầu và trả về là JSON; lỗi là `{"error": "<thông báo>"}` với mã như route thư viện hình.
+Thân yêu cầu và trả về là JSON; lỗi là `{"error": "<thông báo>"}` với mã như route thư viện hình,
+riêng code vẽ không qua kiểm là `422 {"error", "detail": {kind, message, line, snippet}}`.
 Hợp đồng ở `docs/contracts/storyboard-v1.md`.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from typing import Any
@@ -16,7 +18,7 @@ from pydantic import BaseModel, ValidationError
 
 from adapters.http.illustrations import illustration_error
 from application.project_assets import ProjectAssets
-from domain.illustration import IllustrationError
+from domain.illustration import DrawCheckError, DrawErrorKind, IllustrationError
 from domain.kit import InvalidKitError
 from domain.project_asset import AssetNoDetailError, AssetNotFoundError, AssetStateError, ProjectAsset
 
@@ -43,12 +45,38 @@ class AssetBody(_Body):
 
 
 class DrawBody(_Body):
-    #: Kit của dự án; visual-service gửi kèm mỗi lần vẽ.
+    #: Kit của dự án; visual-service gửi kèm mỗi lần.
     kit: dict | None = None
     #: Phong cách tham chiếu của dự án: luật vẽ của nó vào prompt của bộ vẽ.
     ref_id: str = ""
-    model: str = ""
+
+
+class DrawErrorBody(_Body):
+    kind: str = ""
+    message: str = ""
+    line: int | None = None
+    snippet: str | None = None
+
+
+class FixErrorBody(_Body):
+    #: Code hỏng vừa nhận; rỗng khi câu trả lời không có code.
+    code: str = ""
+    error: DrawErrorBody | None = None
+
+
+class DrawPromptBody(DrawBody):
     note: str = ""
+    redraw: bool = False
+    fix_error: FixErrorBody | None = None
+
+
+class DrawCheckBody(DrawBody):
+    #: Nguyên văn câu trả lời của AI.
+    reply: str = ""
+
+
+class DrawApplyBody(DrawBody):
+    code: str = ""
 
 
 class ApproveBody(_Body):
@@ -62,6 +90,8 @@ def _error(status: int, message: str) -> JSONResponse:
 
 def _failure(exc: Exception) -> JSONResponse:
     """Lỗi nghiệp vụ thành mã HTTP; lỗi không lường trước được ghi log và trả 500, không nuốt."""
+    if isinstance(exc, DrawCheckError):
+        return JSONResponse({"error": exc.message, "detail": exc.to_json()}, status_code=422)
     if isinstance(exc, AssetNotFoundError):
         return _error(404, str(exc))
     if isinstance(exc, AssetNoDetailError):
@@ -88,6 +118,18 @@ def _asset_from(project_id: str, body: AssetBody) -> ProjectAsset:
         palette_tokens=tuple(body.palette_tokens or ()), expressions=tuple(body.expressions or ()),
         base_illustration_id=body.base_illustration_id, units=tuple(body.units or ()),
         to_library=body.to_library, library_folder_id=body.library_folder_id)
+
+
+def _fix_error(body: FixErrorBody | None) -> tuple[str, DrawCheckError | None]:
+    """Code hỏng và lỗi có cấu trúc của "gửi lại kèm lỗi"; lỗi thiếu loại hợp lệ hay thông báo là 400."""
+    if body is None:
+        return "", None
+    err = body.error
+    kinds = {k.value for k in DrawErrorKind}
+    if err is None or err.kind not in kinds or not err.message.strip():
+        raise IllustrationError(
+            "fix_error cần error có kind (" + ", ".join(sorted(kinds)) + ") và message")
+    return body.code, DrawCheckError(DrawErrorKind(err.kind), err.message, err.line, err.snippet)
 
 
 def create_project_asset_router(assets: ProjectAssets) -> APIRouter:
@@ -146,24 +188,43 @@ def create_project_asset_router(assets: ProjectAssets) -> APIRouter:
             return _failure(exc)
         return Response(status_code=204)
 
-    @router.post(base + "/{asset_id}/draw")
-    async def draw_asset(project_id: str, asset_id: str, request: Request):
-        body = await _decode(request, DrawBody)
+    @router.post(base + "/{asset_id}/draw-prompt")
+    async def draw_prompt(project_id: str, asset_id: str, request: Request):
+        body = await _decode(request, DrawPromptBody)
         if body is None:
             return bad_json
         try:
-            return (await assets.draw(project_id, asset_id, body.kit, body.ref_id, body.model)).to_json()
+            fix_code, fix_error = _fix_error(body.fix_error)
+            system, user = await assets.draw_prompt(
+                project_id, asset_id, body.kit, body.ref_id, note=body.note, redraw=body.redraw,
+                fix_code=fix_code, fix_error=fix_error)
         except Exception as exc:
             return _failure(exc)
+        return {"system": system, "user": user}
 
-    @router.post(base + "/{asset_id}/redraw")
-    async def redraw_asset(project_id: str, asset_id: str, request: Request):
-        body = await _decode(request, DrawBody)
+    @router.post(base + "/{asset_id}/draw-check")
+    async def draw_check(project_id: str, asset_id: str, request: Request):
+        body = await _decode(request, DrawCheckBody)
         if body is None:
             return bad_json
         try:
-            return (await assets.redraw(
-                project_id, asset_id, body.kit, body.ref_id, body.model, body.note)).to_json()
+            checked = await assets.draw_check(project_id, asset_id, body.kit, body.ref_id, body.reply)
+        except Exception as exc:
+            return _failure(exc)
+        return {
+            "code": checked.code,
+            "png_base64": base64.b64encode(checked.rendered.png).decode("ascii"),
+            "warnings": [w.to_json() for w in checked.rendered.warnings],
+        }
+
+    @router.post(base + "/{asset_id}/draw-apply")
+    async def draw_apply(project_id: str, asset_id: str, request: Request):
+        body = await _decode(request, DrawApplyBody)
+        if body is None:
+            return bad_json
+        try:
+            return (await assets.draw_apply(
+                project_id, asset_id, body.kit, body.ref_id, body.code)).to_json()
         except Exception as exc:
             return _failure(exc)
 

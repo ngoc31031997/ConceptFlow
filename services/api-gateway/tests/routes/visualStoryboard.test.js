@@ -59,6 +59,7 @@ describe('storyboard routing', () => {
     ['post', `${base}/assets/AST-HERO-001/detail`],
     ['post', `${base}/assets/AST-HERO-001/draw`],
     ['post', `${base}/assets/AST-HERO-001/redraw`],
+    ['post', `${base}/assets/AST-HERO-001/fix`],
     ['post', `${base}/generate`],
     ['post', `${base}/units/VP-002/generate`],
     ['post', `${base}/units/VP-002/shots`],
@@ -107,6 +108,31 @@ describe('storyboard routing', () => {
     expect(res.headers['content-type']).toBe('image/png');
     expect(res.headers['cache-control']).toBe('private, no-cache');
     expect(Buffer.compare(res.body, png)).toBe(0);
+  });
+
+  test('a 422 with an error and detail body from visual-service passes through unchanged', async () => {
+    const body = {
+      error: 'Mã vẽ lỗi',
+      detail: { kind: 'runtime', message: 'NameError', line: 4, snippet: 'x = y' },
+    };
+    const ai = {
+      request: jest.fn().mockResolvedValue({ status: 422, headers: new Map(), body }),
+    };
+    const path = `${base}/assets/AST-HERO-001/fix`;
+    const res = await request(buildApp(ok(), ai))
+      .post(path)
+      .set('X-External-AI', 'paste')
+      .send({ code: 'x = y', error: { kind: 'runtime', message: 'NameError', line: 4, snippet: 'x = y' }, redraw: true });
+    expect(res.status).toBe(422);
+    expect(res.body).toEqual(body);
+    expect(ai.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        path,
+        body: expect.objectContaining({ code: 'x = y', redraw: true }),
+        headers: expect.objectContaining({ 'x-external-ai': 'paste' }),
+      }),
+    );
   });
 
   test('the answer of visual-service is mirrored with its code', async () => {

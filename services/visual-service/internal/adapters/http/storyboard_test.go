@@ -56,6 +56,13 @@ func (f *fakeStoryboard) DrawAsset(_ context.Context, _ string, id string) (*app
 func (f *fakeStoryboard) RedrawAsset(_ context.Context, _ string, id, note string) (*application.StoryboardScreen, error) {
 	return f.ret("redraw:" + id + ":" + note)
 }
+func (f *fakeStoryboard) FixAsset(_ context.Context, _ string, id string, fix application.AssetDrawFix, redraw bool) (*application.StoryboardScreen, error) {
+	line := "-"
+	if fix.Error.Line != nil {
+		line = fmt.Sprint(*fix.Error.Line)
+	}
+	return f.ret(fmt.Sprintf("fix:%s:%s:%s:%s:%s:%v", id, fix.Code, fix.Error.Kind, fix.Error.Message, line, redraw))
+}
 func (f *fakeStoryboard) ApproveAsset(_ context.Context, _ string, id, name string) (*application.StoryboardScreen, error) {
 	return f.ret("approve-asset:" + id + ":" + name)
 }
@@ -146,6 +153,7 @@ func TestStoryboardRoutesReachTheDesk(t *testing.T) {
 		{"DELETE", base + "/assets/AST-ASTRO-001", "", "delete-asset:AST-ASTRO-001"},
 		{"POST", base + "/assets/AST-ASTRO-001/draw", "", "draw:AST-ASTRO-001"},
 		{"POST", base + "/assets/AST-ASTRO-001/redraw", `{"note":"to hơn"}`, "redraw:AST-ASTRO-001:to hơn"},
+		{"POST", base + "/assets/AST-ASTRO-001/fix", `{"code":"c","error":{"kind":"syntax","message":"m","line":3,"snippet":"s"},"redraw":true}`, "fix:AST-ASTRO-001:c:syntax:m:3:true"},
 		{"POST", base + "/assets/AST-ASTRO-001/approve", "", "approve-asset:AST-ASTRO-001:"},
 		{"POST", base + "/assets/AST-ASTRO-001/approve", `{"project_name":"Hố đen"}`, "approve-asset:AST-ASTRO-001:Hố đen"},
 		{"GET", base + "/assets/AST-ASTRO-001/preview", "", "preview:AST-ASTRO-001"},
@@ -272,7 +280,8 @@ func TestStoryboardRoutesPassARenderingRefusalOnWithItsStatusAndKeys(t *testing.
 
 func TestStoryboardAIRoutesTakeTheExternalAIHeader(t *testing.T) {
 	const base = "/v1/projects/p1/storyboard"
-	for _, path := range []string{"/assets/generate", "/assets/AST-A-001/detail", "/units/VP-001/generate", "/review"} {
+	for _, path := range []string{"/assets/generate", "/assets/AST-A-001/detail", "/units/VP-001/generate", "/review",
+		"/assets/AST-A-001/draw", "/assets/AST-A-001/redraw", "/assets/AST-A-001/fix"} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("POST", base+path, strings.NewReader(`{}`))
 		req.Header.Set("X-External-AI", "nope")
@@ -281,14 +290,14 @@ func TestStoryboardAIRoutesTakeTheExternalAIHeader(t *testing.T) {
 			t.Errorf("%s with a bad X-External-AI: want 400, got %d", path, rec.Code)
 		}
 	}
-	// Asset drawing and frame drawing are the system's: the header changes nothing.
+	// Frame drawing is the system's: the header changes nothing.
 	f := &fakeStoryboard{}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", base+"/assets/AST-A-001/draw", strings.NewReader(`{}`))
+	req := httptest.NewRequest("POST", base+"/units/VP-001/shots/SH-001/frame", strings.NewReader(`{}`))
 	req.Header.Set("X-External-AI", "nope")
 	NewRouter(&fakeDelete{}).WithStoryboard(f).Handler().ServeHTTP(rec, req)
-	if rec.Code != 200 || f.last != "draw:AST-A-001" {
-		t.Errorf("drawing has no external mode: %d %q", rec.Code, f.last)
+	if rec.Code != 200 || f.last == "" {
+		t.Errorf("drawing a frame has no external mode: %d %q", rec.Code, f.last)
 	}
 	// Writing every detail at once is the system's too: one external prompt cannot answer many turns.
 	f = &fakeStoryboard{}
@@ -298,5 +307,38 @@ func TestStoryboardAIRoutesTakeTheExternalAIHeader(t *testing.T) {
 	NewRouter(&fakeDelete{}).WithStoryboard(f).Handler().ServeHTTP(rec, req)
 	if rec.Code != 200 || f.last != "details " {
 		t.Errorf("writing every detail has no external mode: %d %q", rec.Code, f.last)
+	}
+}
+
+func TestStoryboardAssetDrawRoutesAnswerRefusedCodeWithTheStructuredError(t *testing.T) {
+	const base = "/v1/projects/p1/storyboard/assets/AST-A-001"
+	line, snippet := 12, "12: > <g>"
+	f := &fakeStoryboard{err: &application.AssetDrawCheckError{Detail: application.AssetDrawError{Kind: "syntax", Message: "Thiếu dấu đóng thẻ <g>.", Line: &line, Snippet: &snippet}}}
+	for _, c := range []struct{ path, body string }{{"/draw", `{}`}, {"/redraw", `{"note":"n"}`}, {"/fix", `{"code":"c","error":{"kind":"syntax","message":"m"}}`}} {
+		rec := storyboardRequest(f, "POST", base+c.path, c.body)
+		if rec.Code != 422 {
+			t.Fatalf("%s: want 422, got %d %s", c.path, rec.Code, rec.Body)
+		}
+		var got struct {
+			Error  string                     `json:"error"`
+			Detail application.AssetDrawError `json:"detail"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.Error != "Thiếu dấu đóng thẻ <g>." || got.Detail.Kind != "syntax" || *got.Detail.Line != 12 || *got.Detail.Snippet != snippet {
+			t.Errorf("%s: %s", c.path, rec.Body)
+		}
+	}
+	f = &fakeStoryboard{err: &application.AssetDrawCheckError{Detail: application.AssetDrawError{Kind: "no_code", Message: "Không có code."}}}
+	rec := storyboardRequest(f, "POST", base+"/draw", `{}`)
+	if !strings.Contains(rec.Body.String(), `"line":null`) || !strings.Contains(rec.Body.String(), `"snippet":null`) {
+		t.Errorf("a fault with no line answers null line and snippet: %s", rec.Body)
+	}
+	for _, body := range []string{`{"code":"c"}`, `{"code":"c","error":"m"}`, `not json`} {
+		f := &fakeStoryboard{}
+		if rec := storyboardRequest(f, "POST", base+"/fix", body); rec.Code != 400 || f.last != "" {
+			t.Errorf("fix with %s: want 400 before the desk, got %d %q", body, rec.Code, f.last)
+		}
 	}
 }

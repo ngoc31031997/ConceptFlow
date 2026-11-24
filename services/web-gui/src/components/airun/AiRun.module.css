@@ -219,3 +219,23 @@
   color: var(--ink-faint);
   font-size: 0.85rem;
 }
+
+.drawImage {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin: 0 auto 8px;
+  border: 1px solid var(--line, currentColor);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.snippet {
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+}

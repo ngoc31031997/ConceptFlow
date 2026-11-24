@@ -39,7 +39,7 @@ interface StoryboardRunCardProps {
  * extension one queue item per unit not approved yet runs on DeepSeek, Gemini or
  * Grok. This run stores each unit as it is written, with no preview, because each
  * unit reads the stored shots of the unit before it; a single unit's dialog
- * previews before it stores. Drawing assets and frames runs on the system.
+ * previews before it stores. Frames are drawn on the system, not on an AI channel.
  */
 export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: StoryboardRunCardProps) {
   const [open, setOpen] = useState(false);
@@ -156,8 +156,8 @@ export function StoryboardRunCard({ projectId, state, storyboard, readOnly }: St
           </p>
         )}
         <p className={researchStyles.hint}>
-          Vẽ tài sản và dựng khung chạy trên hệ thống (bộ vẽ AI và Remotion), không đi qua AI ngoài.
-          Chỉ các lượt AI viết chữ (lập tài sản, viết shot, rà soát) dùng được AI ngoài và hàng đợi AI.
+          Vẽ tài sản ở khối 2 chạy qua kênh AI của bước (API, Extension hoặc Thủ công) và cho xem hình
+          trước khi lưu. Dựng khung của shot chạy trên hệ thống (Remotion), không đi qua kênh AI.
         </p>
       </div>
 

@@ -1,5 +1,8 @@
-"""Bộ vẽ AI: mỗi hình một lượt gọi model, theo luật của phong cách tham chiếu, bộ dựng kiểm tra, và
-nếu chưa qua thì gửi lại kèm lỗi có số dòng, tối đa `MAX_DRAW_ATTEMPTS` lượt.
+"""Bộ vẽ AI theo luật của phong cách tham chiếu.
+
+Hình của thư viện: mỗi hình một lượt gọi model, bộ dựng kiểm tra, và nếu chưa qua thì gửi lại kèm lỗi
+có số dòng, tối đa `MAX_DRAW_ATTEMPTS` lượt. Tài sản của dự án: bộ vẽ chỉ dựng prompt (`code_prompt`)
+và kiểm câu trả lời người gọi mang về (`check_reply`, `check_code`); không gọi model, không tự sửa.
 """
 
 from __future__ import annotations
@@ -19,6 +22,8 @@ from domain import drawer_prompts
 from domain.illustration import (
     EXEMPLAR_FOLDER_ID,
     MAX_EXEMPLARS,
+    DrawCheckError,
+    DrawErrorKind,
     Illustration,
     IllustrationError,
     IllustrationFilter,
@@ -27,7 +32,9 @@ from domain.illustration import (
     IllustrationStatus,
     InvalidIllustrationError,
     RefStyleRequiredError,
+    code_snippet,
     detail_for_tier,
+    draw_check_error,
     kind_or_figure,
     tier_for_detail,
     tier_or_support,
@@ -40,6 +47,7 @@ MAX_DRAW_ATTEMPTS = 3
 #: Số hình đã duyệt của Creator cùng thư mục được nối sau Hình mẫu trong prompt.
 MAX_OWN_REFERENCES = 2
 DRAW_TEMPERATURE = 0.5
+_NO_CODE_MESSAGE = "Câu trả lời không có khối code tsx."
 NO_REFERENCES_TEXT = "(Chưa có hình tham chiếu — dựng đúng theo luật style và linh kiện ở trên.)"
 
 _REPLY_FIELD_RE = re.compile(r"^(TÊN|TÊN HIỂN THỊ|THẺ|MÔ TẢ|CÁCH GỌI):\s*(.+)$", re.M)
@@ -60,22 +68,41 @@ class DrawRequest:
 
 
 @dataclass
-class CodeDrawRequest:
-    """Một lượt vẽ lấy code, không lưu vào thư viện: người gọi giữ kết quả (tài sản của dự án)."""
+class CodePromptRequest:
+    """Prompt vẽ một component cho người gọi giữ kết quả (tài sản của dự án), không lưu vào thư viện."""
 
     description: str
     name: str  # tên component bắt buộc
     ref_id: str  # phong cách tham chiếu: luật vẽ của nó vào prompt
-    kit: dict  # bộ thông số của dự án, người gọi gửi kèm
     kind: IllustrationKind = IllustrationKind.FIGURE
     tier: str = "support"
-    model: str = ""
     #: Code đang có khi vẽ lại; AI giữ tên và prop của nó.
     current_code: str = ""
     note: str = ""
     #: Code của hình gốc làm Hình mẫu để AI chỉnh.
     base_code: str = ""
     base_label: str = ""
+    #: Gửi lại kèm lỗi: code hỏng vừa nhận (có thể rỗng khi câu trả lời không có code) và lỗi của nó.
+    fix_code: str = ""
+    fix_error: DrawCheckError | None = None
+
+
+@dataclass
+class CodeCheckRequest:
+    """Kiểm một component với kit của người gọi; component phải mang đúng tên `name`."""
+
+    name: str
+    kit: dict
+    kind: IllustrationKind = IllustrationKind.FIGURE
+    tier: str = "support"
+
+
+@dataclass
+class CheckedDrawing:
+    """Code đã qua kiểm và kết quả dựng thử của nó (PNG, cảnh báo style)."""
+
+    code: str
+    rendered: RenderedIllustration
 
 
 @dataclass
@@ -86,6 +113,19 @@ class DrawnReply:
     description: str
     usage: str
     code: str
+
+
+def malformed_turn(user: str, error: str) -> str:
+    """Lượt kế khi câu trả lời trước sai khuôn (không có code dùng được)."""
+    return f"{user}\n\nLần trước câu trả lời sai khuôn: {error}. Trả lời lại đúng khuôn."
+
+
+def failed_code_turn(user: str, code: str, error: str) -> str:
+    """Lượt kế khi code trước chưa qua kiểm: kèm code đó và lỗi có số dòng tính trong code đó."""
+    return (
+        f"{user}\n\nCode lần trước của bạn:\n```tsx\n{code}```\n\n"
+        f"Chưa qua kiểm tra: {error}\nSửa đúng các lỗi đó (số dòng tính trong code trên), "
+        "giữ nguyên ý hình, trả lời lại đầy đủ theo khuôn.")
 
 
 def parse_drawn_reply(text: str) -> DrawnReply:
@@ -180,16 +220,13 @@ class IllustrationDrawer:
                 validate_illustration_name(reply.name)
             except IllustrationError as exc:
                 last_err = exc
-                turn = f"{user}\n\nLần trước câu trả lời sai khuôn: {exc}. Trả lời lại đúng khuôn."
+                turn = malformed_turn(user, str(exc))
                 continue
             try:
                 out = await self._library.render(ref_id, reply.name, reply.code, kind, tier, kit=kit)
             except InvalidIllustrationError as exc:
                 last_err = exc
-                turn = (
-                    f"{user}\n\nCode lần trước của bạn:\n```tsx\n{reply.code}```\n\n"
-                    f"Chưa qua kiểm tra: {exc}\nSửa đúng các lỗi đó (số dòng tính trong code trên), "
-                    "giữ nguyên ý hình, trả lời lại đầy đủ theo khuôn.")
+                turn = failed_code_turn(user, reply.code, str(exc))
                 continue
             return reply, out
         prefix = f"AI vẽ {MAX_DRAW_ATTEMPTS} lần vẫn chưa qua kiểm tra: "
@@ -254,9 +291,13 @@ class IllustrationDrawer:
         await self._library.save_preview(illustration_id, saved.version, out)
         return saved.with_(has_preview=True)
 
-    async def draw_code(self, req: CodeDrawRequest) -> tuple[DrawnReply, RenderedIllustration]:
-        """Vẽ (hoặc vẽ lại, khi có `current_code`) một component với kit của người gọi và trả code cùng
-        kết quả dựng; không ghi gì vào thư viện. Component phải mang đúng tên `req.name`."""
+    async def code_prompt(self, req: CodePromptRequest) -> tuple[str, str]:
+        """Prompt hệ thống và lượt người dùng để vẽ (hoặc vẽ lại, khi có `current_code`) một component
+        với tên bắt buộc `req.name`; không gọi model, không ghi gì.
+
+        Có `fix_error` thì lượt người dùng nối thêm code hỏng và lỗi của nó, cùng lời như vòng tự sửa
+        của thư viện hình.
+        """
         description = req.description.strip()
         if not description:
             raise IllustrationError("mô tả hình cần vẽ là bắt buộc")
@@ -273,6 +314,8 @@ class IllustrationDrawer:
                 "\nCreator chưa ưng hình này: vẽ một phiên bản khác, đúng luật style hơn.")
         else:
             user = f"Vẽ hình: {description}\nTên component bắt buộc: {req.name}"
+        if req.fix_error is not None:
+            user = _fix_turn(user, req.fix_code, req.fix_error)
         base = ""
         if req.base_code.strip():
             label = req.base_label or "hình gốc"
@@ -280,9 +323,49 @@ class IllustrationDrawer:
                 f"### {label} (hình gốc của tài sản: chỉnh từ hình này thay vì vẽ lại từ đầu)\n"
                 f"```tsx\n{req.base_code}```\n\n")
         style = await self._references.get_style(req.ref_id)
-        system, role = await self._system_prompt("", "", kind, style, tier, base)
-        reply, out = await self._draw(system, role, user, req.model, req.ref_id, req.kit, kind, tier)
-        if reply.name != req.name:
-            raise IllustrationError(
-                f"AI đặt tên component là {reply.name} — phải giữ tên {req.name}")
-        return reply, out
+        system, _ = await self._system_prompt("", "", kind, style, tier, base)
+        return system, user
+
+    async def check_reply(self, reply_text: str, req: CodeCheckRequest) -> CheckedDrawing:
+        """Rút khối code khỏi câu trả lời của AI rồi kiểm như `check_code`. Không có khối code dùng được
+        là DrawCheckError `no_code`."""
+        try:
+            code = parse_drawn_reply(reply_text).code
+        except IllustrationError as exc:
+            raise DrawCheckError(DrawErrorKind.NO_CODE, _NO_CODE_MESSAGE) from exc
+        return await self.check_code(code, req)
+
+    async def check_code(self, code: str, req: CodeCheckRequest) -> CheckedDrawing:
+        """Kiểm tên component rồi dựng thử `code` với kit của người gọi; không ghi gì, không thử lại.
+
+        Lỗi là DrawCheckError: `wrong_name` khi hàm export không mang đúng `req.name`, còn lại theo
+        chẩn đoán của bộ dựng (`syntax`, `render`, `kit`) kèm dòng và đoạn code quanh dòng.
+        """
+        if not code.strip():
+            raise DrawCheckError(DrawErrorKind.NO_CODE, _NO_CODE_MESSAGE)
+        exported = _EXPORT_NAME_RE.search(code)
+        if exported is None:
+            raise DrawCheckError(
+                DrawErrorKind.WRONG_NAME, f"Code không có 'export function {req.name}(' ở đầu dòng.")
+        if exported.group(1) != req.name:
+            line = code.count("\n", 0, exported.start()) + 1
+            raise DrawCheckError(
+                DrawErrorKind.WRONG_NAME,
+                f"AI đặt tên component là {exported.group(1)} — phải giữ tên {req.name}.",
+                line, code_snippet(code, line))
+        try:
+            out = await self._library.render(
+                "", req.name, code, kind_or_figure(req.kind), tier_or_support(req.tier), kit=req.kit)
+        except InvalidIllustrationError as exc:
+            raise draw_check_error(code, exc.diagnostics) from exc
+        return CheckedDrawing(code=code, rendered=out)
+
+
+def _fix_turn(user: str, code: str, error: DrawCheckError) -> str:
+    """Lượt "gửi lại kèm lỗi": code hỏng và lỗi có số dòng, như một lượt của vòng tự sửa."""
+    text = error.message
+    if error.line is not None and f"dòng {error.line}" not in text:
+        text = f"dòng {error.line}: {text}"
+    if error.kind == DrawErrorKind.NO_CODE or not code.strip():
+        return malformed_turn(user, text)
+    return failed_code_turn(user, code, text)

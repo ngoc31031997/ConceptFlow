@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"visual/internal/domain"
@@ -84,12 +85,92 @@ func nonNilList(l []string) []string {
 	return l
 }
 
-// AssetDrawRequest is what rendering draws or redraws an asset from: the video's
-// kit and the reference style it belongs to. Note only counts on a redraw.
-type AssetDrawRequest struct {
+// AssetDrawContext is what every drawing call of an asset carries: the video's
+// kit and the reference style of step 8, whose drawing rules rendering reads.
+type AssetDrawContext struct {
 	Kit   json.RawMessage `json:"kit"`
 	RefID string          `json:"ref_id"`
-	Note  string          `json:"note,omitempty"`
+}
+
+// The kinds of AssetDrawError, as rendering names them.
+const (
+	AssetDrawNoCode    = "no_code"
+	AssetDrawWrongName = "wrong_name"
+	AssetDrawSyntax    = "syntax"
+	AssetDrawRender    = "render"
+	AssetDrawKit       = "kit"
+)
+
+// AssetDrawError is why rendering refused the code an AI drew for an asset:
+// the kind, a message for the Creator, and the line of the code with a few
+// lines around it when the fault has one (nil otherwise).
+type AssetDrawError struct {
+	Kind    string  `json:"kind"`
+	Message string  `json:"message"`
+	Line    *int    `json:"line"`
+	Snippet *string `json:"snippet"`
+}
+
+// Valid reports whether e names one of the known kinds and has a message.
+func (e AssetDrawError) Valid() bool {
+	switch e.Kind {
+	case AssetDrawNoCode, AssetDrawWrongName, AssetDrawSyntax, AssetDrawRender, AssetDrawKit:
+		return strings.TrimSpace(e.Message) != ""
+	}
+	return false
+}
+
+// AssetDrawCheckError is rendering's refusal of drawn code (its 422 answer). The
+// step answers with the same structured detail and never asks the model again.
+type AssetDrawCheckError struct {
+	Detail AssetDrawError
+}
+
+func (e *AssetDrawCheckError) Error() string { return e.Detail.Message }
+
+// AssetDrawFix is a drawing sent back with its error: the code the AI returned
+// ("" when the reply had none) and why rendering refused it.
+type AssetDrawFix struct {
+	Code  string         `json:"code"`
+	Error AssetDrawError `json:"error"`
+}
+
+// AssetDrawPromptRequest asks rendering for the prompt of one drawing. Redraw
+// draws again from the asset's current code with Note; FixError sends broken
+// code back with its error, on a first drawing or (with Redraw) a redraw.
+type AssetDrawPromptRequest struct {
+	AssetDrawContext
+	Note     string        `json:"note,omitempty"`
+	Redraw   bool          `json:"redraw,omitempty"`
+	FixError *AssetDrawFix `json:"fix_error,omitempty"`
+}
+
+// AssetDrawPrompt is the prompt rendering built for one drawing.
+type AssetDrawPrompt struct {
+	System string `json:"system"`
+	User   string `json:"user"`
+}
+
+// AssetDrawCheckRequest hands rendering the AI's reply to check and render
+// without storing anything.
+type AssetDrawCheckRequest struct {
+	AssetDrawContext
+	Reply string `json:"reply"`
+}
+
+// AssetDrawPreview is a checked drawing that is not stored yet: the code taken
+// from the reply, the test render as base64 PNG and the builder's warnings.
+type AssetDrawPreview struct {
+	Code      string         `json:"code"`
+	PNGBase64 string         `json:"png_base64"`
+	Warnings  []AssetWarning `json:"warnings"`
+}
+
+// AssetDrawApplyRequest has rendering check and render Code again and store it
+// as the asset's next version.
+type AssetDrawApplyRequest struct {
+	AssetDrawContext
+	Code string `json:"code"`
 }
 
 // AssetApproveRequest names the reference style an approved asset is added to
@@ -158,8 +239,14 @@ type StoryboardRenderingPort interface {
 	CreateAsset(ctx context.Context, projectID string, in AssetInput) (ProjectAsset, error)
 	UpdateAsset(ctx context.Context, projectID, assetID string, in AssetInput) (ProjectAsset, error)
 	DeleteAsset(ctx context.Context, projectID, assetID string) error
-	DrawAsset(ctx context.Context, projectID, assetID string, req AssetDrawRequest) (ProjectAsset, error)
-	RedrawAsset(ctx context.Context, projectID, assetID string, req AssetDrawRequest) (ProjectAsset, error)
+	// AssetDrawPrompt builds the prompt of one drawing; it asks no model and stores nothing.
+	AssetDrawPrompt(ctx context.Context, projectID, assetID string, req AssetDrawPromptRequest) (AssetDrawPrompt, error)
+	// AssetDrawCheck reads, checks and renders an AI's reply without storing
+	// it; code rendering refuses is an *AssetDrawCheckError.
+	AssetDrawCheck(ctx context.Context, projectID, assetID string, req AssetDrawCheckRequest) (AssetDrawPreview, error)
+	// AssetDrawApply checks and renders code again and stores it as the asset's
+	// next version; code rendering refuses is an *AssetDrawCheckError.
+	AssetDrawApply(ctx context.Context, projectID, assetID string, req AssetDrawApplyRequest) (ProjectAsset, error)
 	ApproveAsset(ctx context.Context, projectID, assetID string, req AssetApproveRequest) (ProjectAsset, error)
 	UnapproveAsset(ctx context.Context, projectID, assetID string) (ProjectAsset, error)
 	// AssetPreview returns the PNG of an asset's current drawing.

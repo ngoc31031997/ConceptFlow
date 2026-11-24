@@ -23,20 +23,23 @@ func NewAIRunRepository(pool *pgxpool.Pool) *AIRunRepository {
 	return &AIRunRepository{pool: pool}
 }
 
-const aiRunColumns = `id, project_id, label, channel, status, method, path, body, prompt, reply, preview, error, created_at, updated_at`
+const aiRunColumns = `id, project_id, label, channel, status, method, path, body, prompt, reply, preview, error, error_detail, created_at, updated_at`
 
 func scanAIRun(row pgx.Row) (application.AIRun, error) {
 	var r application.AIRun
-	var preview []byte
+	var preview, detail []byte
 	err := row.Scan(&r.ID, &r.ProjectID, &r.Label, &r.Channel, &r.Status, &r.Method, &r.Path, &r.Body, &r.Prompt, &r.Reply,
-		&preview, &r.Error, &r.CreatedAt, &r.UpdatedAt)
+		&preview, &r.Error, &detail, &r.CreatedAt, &r.UpdatedAt)
 	if len(preview) > 0 {
 		r.Preview = preview
+	}
+	if len(detail) > 0 {
+		r.ErrorDetail = detail
 	}
 	return r, err
 }
 
-// nullJSON is the preview to write: NULL when there is none.
+// nullJSON is the JSON value to write (preview, error detail): NULL when there is none.
 func nullJSON(b []byte) any {
 	if len(b) == 0 {
 		return nil
@@ -47,11 +50,11 @@ func nullJSON(b []byte) any {
 // CreateAIRun stores a new run and returns it with its id and times.
 func (r *AIRunRepository) CreateAIRun(ctx context.Context, run application.AIRun) (application.AIRun, error) {
 	got, err := scanAIRun(r.pool.QueryRow(ctx, `
-		INSERT INTO ai_runs (project_id, label, channel, status, method, path, body, prompt, reply, preview, error)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
+		INSERT INTO ai_runs (project_id, label, channel, status, method, path, body, prompt, reply, preview, error, error_detail)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb)
 		RETURNING `+aiRunColumns,
 		run.ProjectID, run.Label, run.Channel, run.Status, run.Method, run.Path, run.Body, run.Prompt, run.Reply,
-		nullJSON(run.Preview), run.Error))
+		nullJSON(run.Preview), run.Error, nullJSON(run.ErrorDetail)))
 	if err != nil {
 		return application.AIRun{}, fmt.Errorf("create AI run: %w", err)
 	}
@@ -71,12 +74,12 @@ func (r *AIRunRepository) AIRun(ctx context.Context, projectID, id string) (appl
 	return got, nil
 }
 
-// SaveAIRun writes the run's status, reply, preview and error.
+// SaveAIRun writes the run's status, reply, preview, error and error detail.
 func (r *AIRunRepository) SaveAIRun(ctx context.Context, run application.AIRun) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE ai_runs SET status = $3, reply = $4, preview = $5::jsonb, error = $6, updated_at = now()
+		UPDATE ai_runs SET status = $3, reply = $4, preview = $5::jsonb, error = $6, error_detail = $7::jsonb, updated_at = now()
 		WHERE project_id = $1 AND id = $2`,
-		run.ProjectID, run.ID, run.Status, run.Reply, nullJSON(run.Preview), run.Error)
+		run.ProjectID, run.ID, run.Status, run.Reply, nullJSON(run.Preview), run.Error, nullJSON(run.ErrorDetail))
 	if err != nil {
 		return fmt.Errorf("save AI run: %w", err)
 	}

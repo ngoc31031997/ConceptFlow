@@ -95,6 +95,12 @@ type fakeRendering struct {
 	purgeErr error
 	draws    []string
 	approves []AssetApproveRequest
+	// drawPrompts, drawChecks and drawApplies record the drawing calls of assets.
+	drawPrompts []AssetDrawPromptRequest
+	drawChecks  []string
+	drawApplies []AssetDrawApplyRequest
+	// refuseApply makes draw-apply refuse any code, as when the asset changed since the check.
+	refuseApply bool
 }
 
 func newFakeRendering() *fakeRendering { return &fakeRendering{nextNum: map[string]int{}} }
@@ -161,10 +167,53 @@ func (r *fakeRendering) draw(id string) (ProjectAsset, error) {
 	return r.assets[i], nil
 }
 
-func (r *fakeRendering) DrawAsset(_ context.Context, _ string, id string, _ AssetDrawRequest) (ProjectAsset, error) {
-	return r.draw(id)
+// brokenCode marks a fake AI reply whose code the fake rendering refuses.
+const brokenCode = "BROKEN"
+
+// goodDrawing is a fake AI reply the fake rendering accepts.
+const goodDrawing = "```tsx\nexport function Astro() { return <svg/>; }\n```"
+
+// brokenDrawError is the fake rendering's refusal of a reply with brokenCode.
+func brokenDrawError() *AssetDrawCheckError {
+	line, snippet := 2, "1:   const a = 1;\n2: > BROKEN\n3:   return <svg/>;"
+	return &AssetDrawCheckError{Detail: AssetDrawError{Kind: AssetDrawSyntax, Message: "Thiếu dấu đóng thẻ <g>.", Line: &line, Snippet: &snippet}}
 }
-func (r *fakeRendering) RedrawAsset(_ context.Context, _ string, id string, _ AssetDrawRequest) (ProjectAsset, error) {
+
+func (r *fakeRendering) AssetDrawPrompt(_ context.Context, _ string, id string, req AssetDrawPromptRequest) (AssetDrawPrompt, error) {
+	i, err := r.find(id)
+	if err != nil {
+		return AssetDrawPrompt{}, err
+	}
+	if req.Redraw && r.assets[i].Version == 0 {
+		return AssetDrawPrompt{}, &RenderingError{Status: 409, Message: "tài sản chưa có hình để vẽ lại"}
+	}
+	r.drawPrompts = append(r.drawPrompts, req)
+	user := "Vẽ hình " + r.assets[i].Name
+	if req.Redraw {
+		user = "Vẽ lại " + r.assets[i].Name + ": " + req.Note
+	}
+	if req.FixError != nil {
+		user += "\nCode hỏng:\n" + req.FixError.Code + "\nLỗi: " + req.FixError.Error.Message
+	}
+	return AssetDrawPrompt{System: "SYSTEM vẽ " + id, User: user}, nil
+}
+
+func (r *fakeRendering) AssetDrawCheck(_ context.Context, _ string, id string, req AssetDrawCheckRequest) (AssetDrawPreview, error) {
+	if _, err := r.find(id); err != nil {
+		return AssetDrawPreview{}, err
+	}
+	r.drawChecks = append(r.drawChecks, req.Reply)
+	if strings.Contains(req.Reply, brokenCode) {
+		return AssetDrawPreview{}, brokenDrawError()
+	}
+	return AssetDrawPreview{Code: strings.Trim(req.Reply, "`tsx\n"), PNGBase64: "UE5H"}, nil
+}
+
+func (r *fakeRendering) AssetDrawApply(_ context.Context, _ string, id string, req AssetDrawApplyRequest) (ProjectAsset, error) {
+	if strings.Contains(req.Code, brokenCode) || r.refuseApply {
+		return ProjectAsset{}, brokenDrawError()
+	}
+	r.drawApplies = append(r.drawApplies, req)
 	return r.draw(id)
 }
 func (r *fakeRendering) ApproveAsset(_ context.Context, _ string, id string, req AssetApproveRequest) (ProjectAsset, error) {
@@ -298,7 +347,7 @@ func newSbFixtureWith(t *testing.T, kits ProjectKitPort) *sbFixture {
 		plans:     []PlanVersionRecord{{Version: 1, ScriptVersion: 2, ConceptVersion: 1, Document: seqPlanDoc(t, "mở")}},
 		sequences: []SequenceVersionRecord{{Version: 1, PlanVersion: 1, ConceptVersion: 1, ScriptVersion: 2, Document: sbSequenceDoc(t)}}}
 	rend := newFakeRendering()
-	llm := &fakeLLM{replies: map[string][]string{}}
+	llm := &fakeLLM{replies: map[string][]string{}, always: map[string]string{AssetDrawRole: goodDrawing}}
 	desk := NewStoryboardDesk(&fakeAuthoring{v: planScript(t, 2, "Không phải C")}, store, rend, kits).
 		WithAI(NewExternalAIProvider(llm, llm), seedPrompts{}, sbModels{}, 1000)
 	desk.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
@@ -329,7 +378,7 @@ func (f *sbFixture) approvedAssets() (figure, backdrop string) {
 		if err != nil {
 			f.t.Fatal(err)
 		}
-		if _, err := f.rendering.DrawAsset(f.ctx, project, a.AssetID, AssetDrawRequest{}); err != nil {
+		if _, err := f.rendering.draw(a.AssetID); err != nil {
 			f.t.Fatal(err)
 		}
 		if _, err := f.rendering.ApproveAsset(f.ctx, project, a.AssetID, AssetApproveRequest{}); err != nil {

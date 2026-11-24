@@ -519,17 +519,102 @@ func (d *StoryboardDesk) DeleteAsset(ctx context.Context, projectID, assetID str
 	return d.State(ctx, projectID)
 }
 
-// drawRequest is what rendering draws an asset with. A video with no kit cannot
+// AssetDrawRole is the role an asset drawing turn is logged under at llm-service.
+const AssetDrawRole = "storyboard_asset_draw"
+
+// assetDrawing is one drawing turn of an asset: a first drawing, a redraw from
+// the asset's code with the Creator's note, or either of them sent back with
+// the error of the code the AI returned.
+type assetDrawing struct {
+	note   string
+	redraw bool
+	fix    *AssetDrawFix
+}
+
+// drawContext is what rendering draws an asset with. A video with no kit cannot
 // draw, and nothing is drawn before the Creator approved the asset list, so the
-// drawings follow a list the Creator agreed to.
-func (data *storyboardData) drawRequest(note string) (AssetDrawRequest, error) {
+// drawings follow a list the Creator agreed to. A first drawing needs the
+// asset's detail, which its description is made of.
+func (data *storyboardData) drawContext(asset ProjectAsset, redraw bool) (AssetDrawContext, error) {
+	if !redraw && !asset.HasDetail() {
+		return AssetDrawContext{}, fmt.Errorf("%w: %s", domain.ErrAssetNoDetail, asset.AssetID)
+	}
 	if err := data.needKit(); err != nil {
-		return AssetDrawRequest{}, err
+		return AssetDrawContext{}, err
 	}
 	if !data.list.AllApproved() {
-		return AssetDrawRequest{}, domain.ErrAssetListNotApproved
+		return AssetDrawContext{}, domain.ErrAssetListNotApproved
 	}
-	return AssetDrawRequest{Kit: data.kit, RefID: data.refID, Note: strings.TrimSpace(note)}, nil
+	return AssetDrawContext{Kit: data.kit, RefID: data.refID}, nil
+}
+
+// drawAsset runs one drawing turn of an asset on the step's model: rendering
+// builds the prompt, the model answers once, rendering checks and renders the
+// reply, and only then is the drawing stored. Code rendering refuses stops the
+// turn with *AssetDrawCheckError; the model is never asked again here, the
+// Creator decides what comes next (fix with the error, redraw, drop). Under an
+// external-AI run the prompt or reply goes through the run, and the turn stops
+// at the preview {code, png_base64, warnings} before anything is stored.
+func (d *StoryboardDesk) drawAsset(ctx context.Context, projectID, assetID string, turn assetDrawing) (*StoryboardScreen, error) {
+	if err := d.aiReady(); err != nil {
+		return nil, err
+	}
+	data, err := d.load(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	cur, ok := data.findAsset(assetID)
+	if !ok {
+		return nil, domain.ErrUnknownAsset
+	}
+	draw, err := data.drawContext(cur, turn.redraw)
+	if err != nil {
+		return nil, err
+	}
+	if d.running.has(projectID, assetsRunKey) || d.running.has(projectID, assetID) {
+		return nil, domain.ErrUnitRunning
+	}
+	finish := d.running.start(projectID, assetID)
+	err = d.drawTurn(ctx, projectID, assetID, draw, turn)
+	finish()
+	if err != nil {
+		return nil, err
+	}
+	return d.State(ctx, projectID)
+}
+
+// drawTurn asks for the prompt, the one model reply, its check and, past the
+// preview point, its storing; see drawAsset.
+func (d *StoryboardDesk) drawTurn(ctx context.Context, projectID, assetID string, draw AssetDrawContext, turn assetDrawing) error {
+	model, err := d.modelFor(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	prompt, err := d.rendering.AssetDrawPrompt(ctx, projectID, assetID, AssetDrawPromptRequest{
+		AssetDrawContext: draw, Note: strings.TrimSpace(turn.note), Redraw: turn.redraw, FixError: turn.fix})
+	if err != nil {
+		return err
+	}
+	res, err := d.llm.Chat(ctx, ChatRequest{System: prompt.System, User: prompt.User, Model: model, MaxTokens: d.maxTokens,
+		ProjectID: projectID, Role: AssetDrawRole, Step: StoryboardStep})
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(res.Content) == "" {
+		return fmt.Errorf("%w: AI trả câu trả lời rỗng", ErrLLMFailed)
+	}
+	preview, err := d.rendering.AssetDrawCheck(ctx, projectID, assetID, AssetDrawCheckRequest{AssetDrawContext: draw, Reply: res.Content})
+	if err != nil {
+		return err
+	}
+	if preview.Warnings == nil {
+		preview.Warnings = []AssetWarning{}
+	}
+	if err := stopForPreview(ctx, preview); err != nil {
+		return err
+	}
+	_, err = d.rendering.AssetDrawApply(ctx, projectID, assetID, AssetDrawApplyRequest{AssetDrawContext: draw, Code: preview.Code})
+	return err
 }
 
 // assetAction runs one call on an existing asset and returns the screen.
@@ -547,33 +632,29 @@ func (d *StoryboardDesk) assetAction(ctx context.Context, projectID, assetID str
 	return d.State(ctx, projectID)
 }
 
-// DrawAsset has rendering draw an asset from its description. It runs on the
-// system's drawing AI; there is no AI-outside mode. An asset without its detail,
-// or of a list the Creator has not approved, is not drawn.
+// DrawAsset has the AI draw an asset from its description, in one model turn
+// (see drawAsset). An asset without its detail, or of a list the Creator has
+// not approved, is not drawn.
 func (d *StoryboardDesk) DrawAsset(ctx context.Context, projectID, assetID string) (*StoryboardScreen, error) {
-	return d.assetAction(ctx, projectID, assetID, func(data *storyboardData) (ProjectAsset, error) {
-		if cur, _ := data.findAsset(assetID); !cur.HasDetail() {
-			return ProjectAsset{}, fmt.Errorf("%w: %s", domain.ErrAssetNoDetail, assetID)
-		}
-		req, err := data.drawRequest("")
-		if err != nil {
-			return ProjectAsset{}, err
-		}
-		return d.rendering.DrawAsset(ctx, projectID, assetID, req)
-	})
+	return d.drawAsset(ctx, projectID, assetID, assetDrawing{})
 }
 
-// RedrawAsset has rendering draw an asset again from the code it has, with the
-// Creator's note, once the asset list is approved. The shots that use it have an old frame until they are drawn
-// again.
+// RedrawAsset has the AI draw an asset again from the code it has, with the
+// Creator's note, once the asset list is approved; rendering refuses an asset
+// that was never drawn. The shots that use it have an old frame until they are
+// drawn again.
 func (d *StoryboardDesk) RedrawAsset(ctx context.Context, projectID, assetID, note string) (*StoryboardScreen, error) {
-	return d.assetAction(ctx, projectID, assetID, func(data *storyboardData) (ProjectAsset, error) {
-		req, err := data.drawRequest(note)
-		if err != nil {
-			return ProjectAsset{}, err
-		}
-		return d.rendering.RedrawAsset(ctx, projectID, assetID, req)
-	})
+	return d.drawAsset(ctx, projectID, assetID, assetDrawing{note: note, redraw: true})
+}
+
+// FixAsset sends code the AI drew back to it with rendering's error, as a new
+// turn on the same preconditions as DrawAsset, or RedrawAsset when redraw is
+// set. An error with an unknown kind or no message is domain.ErrInvalidEdit.
+func (d *StoryboardDesk) FixAsset(ctx context.Context, projectID, assetID string, fix AssetDrawFix, redraw bool) (*StoryboardScreen, error) {
+	if !fix.Error.Valid() {
+		return nil, fmt.Errorf("%w: lỗi gửi kèm cần kind (no_code, wrong_name, syntax, render, kit) và message", domain.ErrInvalidEdit)
+	}
+	return d.drawAsset(ctx, projectID, assetID, assetDrawing{redraw: redraw, fix: &fix})
 }
 
 // ApproveAsset approves a drawn asset; rendering adds it to the library when the

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CR-121: Bước 11 vẽ tài sản qua kênh AI (API / extension / chép tay)</title>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--text:#1c1c1a;--muted:#6b6b66;--line:#e3e2dc;--accent:#2f5bd3;
+--d1:#2e8b57;--d2:#5a9e3a;--d3:#c98a12;--d4:#d2601a;--d5:#c0392b;--ok:#2e8b57;--bad:#c0392b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#20201e;--text:#ecebe6;--muted:#9c9b95;--line:#34342f;--accent:#7a9cff}}
+:root[data-theme="dark"]{--bg:#161615;--card:#20201e;--text:#ecebe6;--muted:#9c9b95;--line:#34342f;--accent:#7a9cff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,system-ui,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}
+.sum{color:var(--muted);margin:0 0 16px}
+.bar{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:16px}
+.bar .grow{flex:1;color:var(--muted);font-size:13px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.task{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.id{font-weight:700;color:var(--muted)}
+.title{font-weight:600;flex:1;min-width:200px}
+.pill{font-size:12px;border-radius:99px;padding:2px 8px;border:1px solid var(--line);color:var(--muted)}
+.diff{color:#fff;border:0}
+.st-done{color:var(--ok);border-color:var(--ok)}.st-failed{color:var(--bad);border-color:var(--bad)}
+.ctl{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;font-size:13px;color:var(--muted)}
+select{font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+select.changed{border-color:var(--accent);outline:1px solid var(--accent)}
+details{margin-top:8px}summary{cursor:pointer;color:var(--muted);font-size:13px}
+ul{margin:6px 0;padding-left:20px}code{font-size:12px;overflow-wrap:anywhere}
+.why{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1 id="h"></h1>
+<p class="sum" id="s"></p>
+<div class="bar">
+  <span class="grow" id="info"></span>
+  <button id="reset">Về model mặc định</button>
+  <button id="copy">Copy lựa chọn</button>
+  <button class="primary" id="save">Lưu file</button>
+</div>
+<div id="list"></div>
+</main>
+<script type="application/json" id="plan">
+{
+  "title": "CR-121: Bước 11 vẽ tài sản qua kênh AI (API / extension / chép tay)",
+  "summary": "Vẽ, Vẽ lại kèm ghi chú và Vẽ tất cả ở bước 11 chạy qua ▶ Chạy AI của kênh mặc định, xem trước ảnh rồi mới Áp dụng. Code lỗi thì mọi kênh dừng và báo lỗi có cấu trúc (loại, số dòng, đoạn code); không tự gửi lại.",
+  "branch": "feature/cr-121-asset-draw-ai-channels",
+  "created": "2026-11-24",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Contract: lượt chạy AI vẽ tài sản và API rendering mới",
+      "service": "docs",
+      "goal": "Contract mô tả 3 thao tác rendering (prompt / check / apply), lỗi có cấu trúc, preview PNG base64, và lượt chạy AI cho vẽ tài sản.",
+      "steps": [
+        "Cập nhật storyboard-v1.md: POST .../assets/{asset_id}/draw-prompt, /draw-check, /draw-apply; body (kit, ref_id, note, current_code, fix_error); shape lỗi {kind: no_code|wrong_name|syntax|render|kit, message, line, snippet}",
+        "Cập nhật ai-runs-v1.md: route vẽ / vẽ lại / gửi lại kèm lỗi chạy qua AI run; unreadable mang lỗi có cấu trúc; preview gồm code, png_base64, warnings",
+        "Ghi rõ luồng tài sản không còn tự sửa 3 lượt; Thư viện hình giữ nguyên"
+      ],
+      "files": [
+        "docs/contracts/storyboard-v1.md",
+        "docs/contracts/ai-runs-v1.md"
+      ],
+      "acceptance": [
+        "Đủ request/response và mã lỗi cho 3 endpoint",
+        "Lỗi có cấu trúc có ví dụ JSON cho từng kind"
+      ],
+      "depends_on": [],
+      "difficulty": 3,
+      "reason": "Định nghĩa contract giữa 2 service, các task sau bám theo",
+      "model": "sonnet",
+      "effort": "medium",
+      "default_model": "sonnet",
+      "status": "done"
+    },
+    {
+      "id": "T2",
+      "title": "rendering: tách vẽ tài sản thành prompt / check / apply",
+      "service": "rendering",
+      "goal": "Rendering dựng prompt vẽ tài sản, kiểm tra + dựng thử một câu trả lời không lưu gì (trả ảnh hoặc lỗi có cấu trúc), và áp dụng code đã kiểm tra; luồng tài sản không gọi model.",
+      "steps": [
+        "illustration_drawer.py: tách phần dựng system/user prompt của draw_code thành hàm build; thêm hàm check(reply) tách code, kiểm tra tên và kit, dựng thử, phân loại lỗi kèm số dòng + đoạn code",
+        "Prompt 'gửi lại kèm lỗi': code lỗi + lỗi có số dòng (cùng cách vòng tự sửa đang làm)",
+        "project_assets.py: draw_prompt, draw_check, draw_apply (apply dựng lại, lưu file, tăng version, status drawn); giữ ensure_can_draw và kiểm tra hình gốc",
+        "adapters/http/project_assets.py: 3 route mới, lỗi có cấu trúc trả 422; bỏ route draw/redraw cũ của tài sản",
+        "Không đổi luồng Thư viện hình (vẫn 3 lượt)",
+        "Unit test với câu trả lời AI giả: dựng được, từng loại lỗi, apply"
+      ],
+      "files": [
+        "services/rendering/application/illustration_drawer.py",
+        "services/rendering/application/project_assets.py",
+        "services/rendering/adapters/http/project_assets.py",
+        "services/rendering/domain/illustration.py",
+        "services/rendering/tests/"
+      ],
+      "acceptance": [
+        "check không ghi DB/file",
+        "Mỗi kind lỗi có test và có line/snippet khi xác định được",
+        "Test thư viện hình cũ vẫn qua",
+        "pytest rendering xanh"
+      ],
+      "depends_on": [
+        "T1"
+      ],
+      "difficulty": 4,
+      "reason": "Tách logic AI prompt + phân loại lỗi dựng, giữ nguyên luồng thư viện",
+      "model": "opus",
+      "effort": "medium",
+      "default_model": "opus",
+      "status": "done"
+    },
+    {
+      "id": "T3",
+      "title": "visual-service: vẽ tài sản chạy qua AI run",
+      "service": "visual-service",
+      "goal": "Vẽ / vẽ lại / gửi lại kèm lỗi là request AI run: prompt lấy từ rendering, kênh API gọi model hệ thống đúng 1 lượt, câu trả lời đi qua draw-check (preview hoặc unreadable kèm lỗi có cấu trúc), paste gọi draw-apply.",
+      "steps": [
+        "adapters/rendering/storyboard.go: client cho draw-prompt/check/apply, đọc lỗi có cấu trúc",
+        "storyboard_actions.go: DrawAsset/RedrawAsset dùng provider external AI (prompt/capture/preview/paste) + stopForPreview; thêm hành động gửi lại kèm lỗi; giữ kiểm tra kit, danh sách đã duyệt, có chi tiết",
+        "ai_runs.go: lượt unreadable mang lỗi có cấu trúc; không retry",
+        "router storyboard.go: gắn externalAI cho các route vẽ, route mới cho gửi lại kèm lỗi",
+        "Test với rendering giả và AI giả"
+      ],
+      "files": [
+        "services/visual-service/internal/application/storyboard_actions.go",
+        "services/visual-service/internal/application/ai_runs.go",
+        "services/visual-service/internal/application/external_ai.go",
+        "services/visual-service/internal/adapters/rendering/storyboard.go",
+        "services/visual-service/internal/adapters/http/storyboard.go",
+        "services/visual-service/internal/application/*_test.go",
+        "services/visual-service/internal/adapters/http/*_test.go"
+      ],
+      "acceptance": [
+        "Kênh API: lỗi dựng → run unreadable, không gọi model lần 2",
+        "Không gì được lưu trước khi Áp dụng",
+        "go test ./... xanh"
+      ],
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "difficulty": 4,
+      "reason": "Nối khung AI run với service khác, trạng thái lượt chạy",
+      "model": "opus",
+      "effort": "medium",
+      "default_model": "opus",
+      "status": "done"
+    },
+    {
+      "id": "T4",
+      "title": "api-gateway: định tuyến route vẽ tài sản mới",
+      "service": "api-gateway",
+      "goal": "Gateway chuyển các route vẽ / gửi lại kèm lỗi và header X-External-AI tới visual-service.",
+      "steps": [
+        "Thêm/đổi route trong routes cho storyboard assets",
+        "Cập nhật test routing"
+      ],
+      "files": [
+        "services/api-gateway/src/routes/",
+        "services/api-gateway/tests/routes/"
+      ],
+      "acceptance": [
+        "Test routing xanh"
+      ],
+      "depends_on": [
+        "T3"
+      ],
+      "difficulty": 2,
+      "reason": "Theo mẫu route có sẵn",
+      "model": "haiku",
+      "effort": "low",
+      "default_model": "haiku",
+      "status": "done"
+    },
+    {
+      "id": "T5",
+      "title": "web-gui: nút Chạy AI, xem trước ảnh, lỗi và Vẽ tất cả",
+      "service": "web-gui",
+      "goal": "Khối vẽ tài sản dùng ChannelButton/AiRunDialog; xem trước hiện PNG + cảnh báo với Áp dụng/Bỏ; lỗi hiện loại, thông báo, số dòng, đoạn code với Gửi lại kèm lỗi / Vẽ lại kèm ghi chú / Bỏ; Vẽ tất cả mở lượt kế khi lượt trước Áp dụng hoặc Bỏ.",
+      "steps": [
+        "Đọc docs/ux-ui-design-rules.md (rule 10)",
+        "client.ts + useStoryboard.ts: gọi route mới qua AI run",
+        "StoryboardRunPreview.tsx: hiển thị preview ảnh và lỗi có cấu trúc",
+        "StoryboardAssetSections.tsx: thay nút Vẽ/Vẽ lại/Vẽ tất cả; hàng đợi Vẽ tất cả",
+        "StoryboardRunCard.tsx / StoryboardRunningBanner.tsx: bỏ câu 'không đi qua AI ngoài'",
+        "Test component với API giả"
+      ],
+      "files": [
+        "services/web-gui/src/api/client.ts",
+        "services/web-gui/src/hooks/useStoryboard.ts",
+        "services/web-gui/src/components/storyboard/",
+        "services/web-gui/tests/"
+      ],
+      "acceptance": [
+        "Mọi kênh dừng ở lỗi, không tự gửi lại",
+        "Vẽ tất cả không mở lượt mới khi lượt trước chưa xử lý",
+        "npm test và typecheck xanh"
+      ],
+      "depends_on": [
+        "T3"
+      ],
+      "difficulty": 3,
+      "reason": "Màn hình một service, theo mẫu AI run có sẵn",
+      "model": "sonnet",
+      "effort": "medium",
+      "default_model": "sonnet",
+      "status": "done"
+    },
+    {
+      "id": "T6",
+      "title": "Smoke test end-to-end và rebuild",
+      "service": "all",
+      "goal": "Luồng vẽ → xem trước → Áp dụng, và luồng lỗi → Gửi lại kèm lỗi, chạy được trên stack local với câu trả lời AI giả; dữ liệu test được dọn.",
+      "steps": [
+        "Rebuild rendering, visual-service, api-gateway, web-gui qua scripts/worktree.sh rebuild",
+        "Chạy kênh thủ công với câu trả lời dán sẵn: một code đúng, một code lỗi",
+        "Xoá tài sản/lượt chạy/file preview test tạo ra"
+      ],
+      "files": [],
+      "acceptance": [
+        "Các service healthy",
+        "Báo cáo ghi rõ dữ liệu đã dọn"
+      ],
+      "depends_on": [
+        "T4",
+        "T5"
+      ],
+      "difficulty": 3,
+      "reason": "Kiểm tra liên service, không gọi model thật",
+      "model": "sonnet",
+      "effort": "medium",
+      "default_model": "sonnet",
+      "status": "running",
+      "note": "rebuild + migration OK; smoke A/B chưa chạy: không có dự án test ở bước 11"
+    }
+  ]
+}
+</script>
+<script>
+const MODELS=["haiku","sonnet","opus","fable"],EFFORTS=["low","medium","high","xhigh"];
+const plan=JSON.parse(document.getElementById("plan").textContent);
+const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+document.getElementById("h").textContent=plan.title||"Task plan";
+document.getElementById("s").textContent=plan.summary||"";
+function sel(opts,val,def,on){const s=el("select");opts.forEach(o=>{const op=el("option",null,o+(o===def?" (mặc định)":""));op.value=o;s.append(op)});s.value=val;
+  const mark=()=>s.classList.toggle("changed",def!=null&&s.value!==def);mark();s.onchange=()=>{on(s.value);mark();info()};return s}
+function render(){const L=document.getElementById("list");L.innerHTML="";
+ plan.tasks.forEach(t=>{const c=el("div","task"),h=el("div","head");
+  h.append(el("span","id",t.id),el("span","title",t.title));
+  const d=el("span","pill diff","Độ khó "+t.difficulty+"/5");d.style.background=`var(--d${t.difficulty})`;h.append(d);
+  h.append(el("span","pill st-"+t.status,t.status));c.append(h);
+  c.append(el("div",null,t.goal));
+  if(t.reason)c.append(el("div","why","Vì sao độ khó này: "+t.reason));
+  const ctl=el("div","ctl");ctl.append("Model");ctl.append(sel(MODELS,t.model,t.default_model,v=>t.model=v));
+  ctl.append("Effort");ctl.append(sel(EFFORTS,t.effort,null,v=>t.effort=v));
+  if(t.depends_on.length)ctl.append(el("span","pill","Chờ: "+t.depends_on.join(", ")));
+  if(t.service)ctl.append(el("span","pill",t.service));c.append(ctl);
+  const det=el("details");det.append(el("summary",null,"Chi tiết"));
+  if(t.steps&&t.steps.length){det.append(el("b",null,"Các bước"));const u=el("ul");t.steps.forEach(x=>u.append(el("li",null,x)));det.append(u)}
+  if(t.files.length){det.append(el("b",null,"File"));const u=el("ul");t.files.forEach(x=>{const li=el("li");li.append(el("code",null,x));u.append(li)});det.append(u)}
+  if(t.acceptance.length){det.append(el("b",null,"Tiêu chí hoàn thành"));const u=el("ul");t.acceptance.forEach(x=>u.append(el("li",null,x)));det.append(u)}
+  if(t.note)det.append(el("p","why","Ghi chú: "+t.note));
+  c.append(det);L.append(c)});info()}
+function info(){const n={};plan.tasks.forEach(t=>n[t.model]=(n[t.model]||0)+1);
+ document.getElementById("info").textContent=plan.tasks.length+" task · "+Object.entries(n).map(([m,k])=>k+" "+m).join(" · ")}
+function html(){const json=JSON.stringify(plan,null,2).replace(/<\//g,"<\\/");
+ const tag='<script type="application/json" id="plan">';const src=document.documentElement.outerHTML;
+ const a=src.indexOf(tag)+tag.length,b=src.indexOf("<\/script>",a);return"<!doctype html>\n"+src.slice(0,a)+"\n"+json+"\n"+src.slice(b)}
+document.getElementById("reset").onclick=()=>{plan.tasks.forEach(t=>t.model=t.default_model);render()};
+document.getElementById("copy").onclick=async()=>{const txt=plan.tasks.map(t=>`${t.id}=${t.model}/${t.effort}`).join(" ");
+ try{await navigator.clipboard.writeText(txt);alert("Đã copy:\n"+txt+"\nDán vào chat với /run-tasks.")}catch(e){prompt("Copy dòng này:",txt)}};
+document.getElementById("save").onclick=async()=>{const blob=new Blob([html()],{type:"text/html"});
+ if(window.showSaveFilePicker){try{const h=await showSaveFilePicker({suggestedName:"tasks.html",types:[{description:"HTML",accept:{"text/html":[".html"]}}]});
+  const w=await h.createWritable();await w.write(blob);await w.close();alert("Đã lưu. Chọn đè lên đúng file tasks.html của plan.");return}catch(e){if(e.name==="AbortError")return}}
+ const a=el("a");a.href=URL.createObjectURL(blob);a.download="tasks.html";a.click();
+ alert("Trình duyệt đã tải tasks.html về thư mục Downloads. Chép đè lên file của plan, hoặc đưa đường dẫn đó cho /run-tasks.")};
+render();
+</script>
+</body>
+</html>

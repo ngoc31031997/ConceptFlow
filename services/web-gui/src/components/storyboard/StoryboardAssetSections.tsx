@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   describeAiRequest,
+  type AiChannel,
   generateStoryboardAssetDetail,
   generateStoryboardAssets,
   EXEMPLAR_FOLDER_ID,
@@ -12,8 +13,10 @@ import {
 } from "../../api/client";
 import type { StoryboardControls } from "../../hooks/useStoryboard";
 import researchStyles from "../research/research.module.css";
-import { Button, Dialog, FormField, Select, TextArea } from "../ui";
-import { AiRunDialog, AiRunPill } from "../airun/AiRunDialog";
+import { Button, Select } from "../ui";
+import { AiRunDialog, AiRunPill, ChannelButton } from "../airun/AiRunDialog";
+import { useAiRuns } from "../airun/AiRunsContext";
+import { assetDrawRunPath, AssetDrawDialog, type AssetDrawKind } from "./StoryboardAssetDrawDialog";
 import { StoryboardRunPreview } from "./StoryboardRunPreview";
 import { FormDialog } from "../visualplan/PlanDialogs";
 import { AssetDialog } from "./AssetDialog";
@@ -50,11 +53,10 @@ function kindTier(asset: StoryboardAsset): string {
   return `${ASSET_KIND_LABELS[asset.kind] ?? asset.kind} · ${ASSET_TIER_LABELS[asset.tier] ?? asset.tier}`;
 }
 
-/** Whether the AI is busy on this asset: drawing it, or writing its detail. */
-function runningOn(storyboard: StoryboardControls, id: string): "draw" | "detail" | null {
+/** Whether the system's AI is busy writing this asset's detail. */
+function runningOn(storyboard: StoryboardControls, id: string): "detail" | null {
   const r = storyboard.running;
   if (typeof r !== "object" || r === null) return null;
-  if ("asset" in r && r.asset === id) return "draw";
   if ("detail" in r && r.detail === id) return "detail";
   return null;
 }
@@ -355,6 +357,8 @@ interface AssetCardProps {
   readOnly: boolean;
   expanded: boolean;
   onToggle: (open: boolean) => void;
+  /** Opens the drawing dialog of this asset on one of its three turns. */
+  onDraw: (kind: AssetDrawKind) => void;
 }
 
 /**
@@ -373,9 +377,8 @@ function AssetCard({
   readOnly,
   expanded,
   onToggle,
+  onDraw,
 }: AssetCardProps) {
-  const [redrawing, setRedrawing] = useState(false);
-  const [note, setNote] = useState("");
   const id = asset.asset_id;
   const testId = `sb-asset-${id}`;
   const approved = asset.status === "approved";
@@ -412,11 +415,7 @@ function AssetCard({
             <h4>{asset.name}</h4>
             <span className={styles.mono}>{id}</span>
           </div>
-          {busyOn === "draw" ? (
-            <span className={`${researchStyles.chip} ${researchStyles.chipRun}`}>● Đang vẽ</span>
-          ) : (
-            <AssetStatusChip status={asset.status} testId={`${testId}-status`} />
-          )}
+          <AssetStatusChip status={asset.status} testId={`${testId}-status`} />
         </div>
         {asset.preview_path !== "" ? (
           <img
@@ -494,7 +493,7 @@ function AssetCard({
           {asset.status === "planned" && (
             <Button
               variant="run"
-              onClick={() => void storyboard.drawAsset(id)}
+              onClick={() => onDraw("draw")}
               disabled={disabled || drawReason !== ""}
               title={drawReason || undefined}
               data-testid={`${testId}-draw`}
@@ -506,7 +505,7 @@ function AssetCard({
             <>
               <Button
                 variant="run"
-                onClick={() => setRedrawing(true)}
+                onClick={() => onDraw("redraw")}
                 disabled={disabled || drawReason !== ""}
                 title={drawReason || undefined}
                 data-testid={`${testId}-redraw`}
@@ -549,53 +548,19 @@ function AssetCard({
             </>
           )}
         </div>
+        {(["draw", "redraw", "fix"] as const).map((kind) => (
+          <AiRunPill
+            key={kind}
+            runPath={assetDrawRunPath(projectId, id, kind)}
+            onOpen={() => onDraw(kind)}
+            testId={`${testId}-${kind}-run`}
+          />
+        ))}
         {asset.status !== "approved" && drawReason !== "" && !state.kit.missing && (
           <p className={researchStyles.hint} data-testid={`${testId}-draw-reason`}>
             {drawReason}.
           </p>
         )}
-        <Dialog
-          open={redrawing}
-          onClose={() => setRedrawing(false)}
-          title={`Vẽ lại ${asset.name} kèm ghi chú`}
-          hasInput
-          testId={`${testId}-redraw-dialog`}
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setRedrawing(false)}>
-                Huỷ
-              </Button>
-              <Button
-                variant={inUse ? "impact" : "run"}
-                onClick={() => {
-                  const n = note.trim();
-                  setRedrawing(false);
-                  setNote("");
-                  void storyboard.redrawAsset(id, n);
-                }}
-                data-testid={`${testId}-redraw-confirm`}
-              >
-                Vẽ lại
-              </Button>
-            </>
-          }
-        >
-          <FormField label="Ghi chú cho bộ vẽ (không bắt buộc)">
-            <TextArea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="Viết điều chưa ổn và muốn đổi thế nào"
-              data-testid={`${testId}-redraw-note`}
-            />
-          </FormField>
-          <p className={researchStyles.hint}>
-            Bộ vẽ AI của hệ thống vẽ lại từ code đang có; phiên bản hình tăng một.
-            {inUse
-              ? ` Khung của các shot đang dùng (${asset.used_by.join(", ")}) cũ đi và phải vẽ lại.`
-              : " Chưa shot nào dùng tài sản này."}
-          </p>
-        </Dialog>
       </article>
     </Foldable>
   );
@@ -612,10 +577,22 @@ interface AssetDrawSectionProps {
   onToggle: (id: string, open: boolean) => void;
 }
 
+/** The drawing dialog that is open: one asset, one turn, and the assets the queue still has to draw after it. */
+interface DrawSession {
+  assetId: string;
+  kind: AssetDrawKind;
+  /** Set when "Vẽ tất cả" opened it: the channel the run starts on at once. */
+  channel?: AiChannel;
+  /** Ids the queue draws after this one, in list order. */
+  rest: string[];
+}
+
 /**
  * Section 2 of step 11: drawing each asset of the approved list with the
- * project's kit and approving each drawing. "Vẽ tất cả" draws the assets not
- * drawn yet one after another and stops at the first that fails.
+ * project's kit and approving each drawing. Every drawing runs through the AI run dialog on the
+ * step's channel and is previewed before it is stored. "Vẽ tất cả" opens one run per asset not
+ * drawn yet, in list order; the next opens only once the current one was applied or dropped,
+ * and closing the dialog ends the queue.
  */
 export function StoryboardAssetDrawSection({
   projectId,
@@ -626,11 +603,13 @@ export function StoryboardAssetDrawSection({
   expanded,
   onToggle,
 }: AssetDrawSectionProps) {
+  const ai = useAiRuns();
   const [folders, setFolders] = useState<IllustrationFolder[]>([]);
   const [foldersError, setFoldersError] = useState<string | null>(null);
-  const [drawingAll, setDrawingAll] = useState(false);
+  const [session, setSession] = useState<DrawSession | null>(null);
   const toDraw = assetsToDraw(state);
-  const disabled = readOnly || storyboard.busy || storyboard.running !== null || drawingAll;
+  const disabled = readOnly || storyboard.busy || storyboard.running !== null || session !== null;
+  const drawing = session ? state.assets.items.find((a) => a.asset_id === session.assetId) : undefined;
 
   useEffect(() => {
     let alive = true;
@@ -642,15 +621,22 @@ export function StoryboardAssetDrawSection({
     };
   }, []);
 
-  async function drawAll() {
-    setDrawingAll(true);
-    try {
-      for (const a of toDraw) {
-        if (!(await storyboard.drawAsset(a.asset_id))) return;
-      }
-    } finally {
-      setDrawingAll(false);
-    }
+  // An asset that left the list while its dialog was due to open ends the queue.
+  useEffect(() => {
+    if (session && !drawing) setSession(null);
+  }, [session, drawing]);
+
+  function drawAll(channel: AiChannel) {
+    const [first, ...rest] = toDraw.map((a) => a.asset_id);
+    if (first) setSession({ assetId: first, kind: "draw", channel, rest });
+  }
+
+  function settled() {
+    setSession((s) => {
+      if (!s || s.rest.length === 0) return null;
+      const [next, ...rest] = s.rest;
+      return { assetId: next, kind: "draw", channel: s.channel, rest };
+    });
   }
 
   return (
@@ -658,14 +644,14 @@ export function StoryboardAssetDrawSection({
       {toDraw.length > 0 && (
         <div className={researchStyles.actions}>
           <span className={researchStyles.grow} />
-          <Button
-            variant="run"
-            onClick={() => void drawAll()}
+          <ChannelButton
+            channel={ai.defaultChannel}
+            label={`Vẽ ${toDraw.length} tài sản chưa vẽ`}
+            onRun={drawAll}
             disabled={disabled}
-            data-testid="sb-assets-draw-all"
-          >
-            Vẽ {toDraw.length} tài sản chưa vẽ
-          </Button>
+            unavailable={ai.queue.available ? {} : { extension: "Chưa có extension AI Bridge trên trình duyệt này" }}
+            testId="sb-assets-draw-all"
+          />
         </div>
       )}
       <div className={styles.grid} data-testid="sb-asset-grid">
@@ -682,9 +668,23 @@ export function StoryboardAssetDrawSection({
             readOnly={readOnly}
             expanded={expanded.has(a.asset_id)}
             onToggle={(open) => onToggle(a.asset_id, open)}
+            onDraw={(kind) => setSession({ assetId: a.asset_id, kind, rest: [] })}
           />
         ))}
       </div>
+      {session && drawing && (
+        <AssetDrawDialog
+          key={session.assetId}
+          projectId={projectId}
+          asset={drawing}
+          initialKind={session.kind}
+          autoChannel={session.channel}
+          onApplied={storyboard.reload}
+          onClose={() => setSession(null)}
+          onSettled={session.channel ? settled : undefined}
+          testId={`sb-asset-${drawing.asset_id}-draw-dialog`}
+        />
+      )}
     </>
   );
 }

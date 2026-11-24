@@ -62,15 +62,7 @@ func TestStoryboardClient_AssetsGoToTheProjectsAssetRoutes(t *testing.T) {
 		t.Errorf("delete: %v %s", err, rec.method)
 	}
 	c, rec = fakeRendering(t, 200, asset)
-	if _, err := c.DrawAsset(ctx, "p1", "AST-ASTRO-001", application.AssetDrawRequest{Kit: json.RawMessage(`{"ink":"#000"}`), RefID: "R12"}); err != nil ||
-		rec.path != "/internal/v1/projects/p1/assets/AST-ASTRO-001/draw" || string(rec.body["ref_id"]) != `"R12"` || string(rec.body["kit"]) != `{"ink":"#000"}` {
-		t.Errorf("draw: %v %s %v", err, rec.path, rec.body)
-	}
 	for action, call := range map[string]func() error{
-		"redraw": func() error {
-			_, err := c.RedrawAsset(ctx, "p1", "AST-ASTRO-001", application.AssetDrawRequest{Note: "n"})
-			return err
-		},
 		"approve": func() error {
 			_, err := c.ApproveAsset(ctx, "p1", "AST-ASTRO-001", application.AssetApproveRequest{RefID: "R12"})
 			return err
@@ -79,6 +71,75 @@ func TestStoryboardClient_AssetsGoToTheProjectsAssetRoutes(t *testing.T) {
 	} {
 		if err := call(); err != nil || rec.path != "/internal/v1/projects/p1/assets/AST-ASTRO-001/"+action {
 			t.Errorf("%s: %v %s", action, err, rec.path)
+		}
+	}
+}
+
+func TestStoryboardClient_AnAssetIsDrawnInThreeCallsThatCarryTheKitAndStyle(t *testing.T) {
+	ctx := context.Background()
+	draw := application.AssetDrawContext{Kit: json.RawMessage(`{"ink":"#000"}`), RefID: "R12"}
+	base := "/internal/v1/projects/p1/assets/AST-ASTRO-001/"
+
+	c, rec := fakeRendering(t, 200, `{"system":"S","user":"U"}`)
+	line := 4
+	prompt, err := c.AssetDrawPrompt(ctx, "p1", "AST-ASTRO-001", application.AssetDrawPromptRequest{AssetDrawContext: draw, Redraw: true, Note: "to hơn",
+		FixError: &application.AssetDrawFix{Code: "x", Error: application.AssetDrawError{Kind: "syntax", Message: "m", Line: &line}}})
+	if err != nil || prompt.System != "S" || prompt.User != "U" || rec.method != "POST" || rec.path != base+"draw-prompt" {
+		t.Fatalf("draw-prompt: %+v %v %s %s", prompt, err, rec.method, rec.path)
+	}
+	if string(rec.body["kit"]) != `{"ink":"#000"}` || string(rec.body["ref_id"]) != `"R12"` || string(rec.body["redraw"]) != "true" || string(rec.body["note"]) != `"to hơn"` ||
+		string(rec.body["fix_error"]) != `{"code":"x","error":{"kind":"syntax","message":"m","line":4,"snippet":null}}` {
+		t.Errorf("draw-prompt body %v", rec.body)
+	}
+	c, rec = fakeRendering(t, 200, `{"system":"S","user":"U"}`)
+	if _, err := c.AssetDrawPrompt(ctx, "p1", "AST-ASTRO-001", application.AssetDrawPromptRequest{AssetDrawContext: draw}); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"note", "redraw", "fix_error"} {
+		if _, ok := rec.body[key]; ok {
+			t.Errorf("a first drawing sends no %q: %v", key, rec.body)
+		}
+	}
+
+	c, rec = fakeRendering(t, 200, `{"code":"export function Astro(){}","png_base64":"UE5H","warnings":[{"message":"w","line":2}]}`)
+	preview, err := c.AssetDrawCheck(ctx, "p1", "AST-ASTRO-001", application.AssetDrawCheckRequest{AssetDrawContext: draw, Reply: "reply"})
+	if err != nil || preview.Code != "export function Astro(){}" || preview.PNGBase64 != "UE5H" || len(preview.Warnings) != 1 || *preview.Warnings[0].Line != 2 {
+		t.Fatalf("draw-check: %+v %v", preview, err)
+	}
+	if rec.path != base+"draw-check" || string(rec.body["reply"]) != `"reply"` || string(rec.body["ref_id"]) != `"R12"` {
+		t.Errorf("draw-check: %s %v", rec.path, rec.body)
+	}
+
+	c, rec = fakeRendering(t, 200, `{"asset_id":"AST-ASTRO-001","version":3,"status":"drawn"}`)
+	asset, err := c.AssetDrawApply(ctx, "p1", "AST-ASTRO-001", application.AssetDrawApplyRequest{AssetDrawContext: draw, Code: "code"})
+	if err != nil || asset.Version != 3 || asset.Status != "drawn" || rec.path != base+"draw-apply" || string(rec.body["code"]) != `"code"` {
+		t.Fatalf("draw-apply: %+v %v %s %v", asset, err, rec.path, rec.body)
+	}
+}
+
+func TestStoryboardClient_RefusedDrawnCodeIsAStructuredError(t *testing.T) {
+	ctx := context.Background()
+	c, _ := fakeRendering(t, 422, `{"error":"Thiếu dấu đóng thẻ <g>.","detail":{"kind":"syntax","message":"Thiếu dấu đóng thẻ <g>.","line":12,"snippet":"12: > <g>"}}`)
+	_, err := c.AssetDrawCheck(ctx, "p1", "AST-ASTRO-001", application.AssetDrawCheckRequest{Reply: "r"})
+	var drawn *application.AssetDrawCheckError
+	if !errors.As(err, &drawn) || drawn.Detail.Kind != "syntax" || *drawn.Detail.Line != 12 || *drawn.Detail.Snippet != "12: > <g>" || err.Error() != "Thiếu dấu đóng thẻ <g>." {
+		t.Fatalf("draw-check 422: %v", err)
+	}
+	c, _ = fakeRendering(t, 422, `{"error":"x","detail":{"kind":"no_code","message":"Không có code.","line":null,"snippet":null}}`)
+	_, err = c.AssetDrawApply(ctx, "p1", "AST-ASTRO-001", application.AssetDrawApplyRequest{Code: "c"})
+	if !errors.As(err, &drawn) || drawn.Detail.Line != nil || drawn.Detail.Snippet != nil {
+		t.Fatalf("draw-apply 422: %v", err)
+	}
+	// A 422 without the structured detail, and the other refusals, stay rendering's refusal.
+	for status, body := range map[int]string{422: `{"error":"thư mục Hình mẫu"}`, 409: `{"error":"chưa có chi tiết","code":"asset_no_detail"}`, 503: `{"error":"bộ dựng không chạy"}`} {
+		c, _ = fakeRendering(t, status, body)
+		_, err := c.AssetDrawPrompt(ctx, "p1", "AST-ASTRO-001", application.AssetDrawPromptRequest{})
+		var re *application.RenderingError
+		if !errors.As(err, &re) || re.Status != status || errors.As(err, &drawn) {
+			t.Errorf("%d: want a RenderingError, got %v", status, err)
+		}
+		if status == 409 && string(re.Extra["code"]) != `"asset_no_detail"` {
+			t.Errorf("409 keeps rendering's code: %v", re.Extra)
 		}
 	}
 }

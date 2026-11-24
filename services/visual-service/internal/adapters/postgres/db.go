@@ -104,11 +104,50 @@ CREATE TABLE IF NOT EXISTS ai_runs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ai_runs_by_path ON ai_runs (project_id, path, created_at DESC);
--- The step 11 runs table that ai_runs replaces goes only while it is empty.
+-- error_detail is the structured error of a reply the step refused (an asset
+-- drawing's {kind, message, line, snippet}); NULL when there is none.
+ALTER TABLE ai_runs ADD COLUMN IF NOT EXISTS error_detail JSONB;
+-- The step 11 runs table that ai_runs replaces: its rows are copied into
+-- ai_runs as the request each task replays (same id, so a rerun copies
+-- nothing twice), then the table goes. The statements run through EXECUTE so
+-- they are only parsed when the table is there.
 DO $$
 BEGIN
-    IF to_regclass('storyboard_ai_runs') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM storyboard_ai_runs) THEN
-        DROP TABLE storyboard_ai_runs;
+    IF to_regclass('storyboard_ai_runs') IS NOT NULL THEN
+        EXECUTE $q$
+            DO $inner$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM storyboard_ai_runs
+                           WHERE task NOT IN ('assets', 'asset_detail', 'unit', 'review')) THEN
+                    RAISE EXCEPTION 'storyboard_ai_runs has a run of an unknown task; it is kept';
+                END IF;
+            END $inner$
+        $q$;
+        EXECUTE $q$
+            INSERT INTO ai_runs (id, project_id, label, channel, status, method, path, body,
+                                 prompt, reply, preview, error, created_at, updated_at)
+            SELECT r.id, r.project_id,
+                   CASE r.task
+                       WHEN 'assets' THEN 'Lập danh sách tài sản'
+                       WHEN 'asset_detail' THEN 'Viết chi tiết tài sản ' || r.target
+                       WHEN 'unit' THEN 'Viết shot cho ' || r.target
+                       ELSE 'Duyệt storyboard'
+                   END,
+                   r.channel, r.status, 'POST',
+                   '/v1/projects/' || r.project_id || '/storyboard' ||
+                   CASE r.task
+                       WHEN 'assets' THEN '/assets/generate'
+                       WHEN 'asset_detail' THEN '/assets/' || r.target || '/detail'
+                       WHEN 'unit' THEN '/units/' || r.target || '/generate'
+                       ELSE '/review'
+                   END,
+                   json_build_object('note', r.note)::text,
+                   r.prompt, r.reply, r.preview, r.error, r.created_at, r.updated_at
+            FROM storyboard_ai_runs r
+            WHERE r.task IN ('assets', 'asset_detail', 'unit', 'review')
+            ON CONFLICT (id) DO NOTHING
+        $q$;
+        EXECUTE 'DROP TABLE storyboard_ai_runs';
     END IF;
 END $$;
 -- The reference library: text descriptions of a style, shared by every video.

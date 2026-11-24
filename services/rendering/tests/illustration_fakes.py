@@ -160,6 +160,10 @@ class FakeRenderer:
         self.last: dict = {}
         self.fail = False
         self.unreachable = False
+        #: Chẩn đoán trả về cho code có chữ BROKEN (hay khi `fail`); mặc định một lỗi kiểu ở dòng 3.
+        self.findings = [CodeFinding("TS2304: Cannot find name", 3)]
+        #: Cảnh báo style kèm theo một lần dựng đạt.
+        self.warnings: list[CodeFinding] = []
 
     async def render(self, kit, name, code, kind, tier):
         self.calls.append(f"{name}|{code}")
@@ -167,8 +171,9 @@ class FakeRenderer:
         if self.unreachable:
             raise RendererUnavailableError("dựng xem trước: rendering unreachable")
         if self.fail or "BROKEN" in code:
-            return RenderedIllustration(False, [CodeFinding("TS2304: Cannot find name", 3)])
-        return RenderedIllustration(True, png=f"PNG:{name}{code}".encode(), gif=b"GIF")
+            return RenderedIllustration(False, list(self.findings))
+        return RenderedIllustration(
+            True, warnings=list(self.warnings), png=f"PNG:{name}{code}".encode(), gif=b"GIF")
 
 
 STYLE = {

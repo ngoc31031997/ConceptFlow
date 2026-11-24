@@ -162,6 +162,13 @@ interface AiRunDialogProps {
   renderPreview?: (preview: unknown) => ReactNode;
   /** The screen loads what an applied run stored; `state` is what the step's request answered. */
   onApplied: (state: unknown) => void | Promise<void>;
+  /** Called after the Creator dropped the run ("Bỏ lượt này") and the server cancelled it. */
+  onDropped?: () => void;
+  /**
+   * Shows a run's structured `error_detail`, with the actions that follow it, in place of the plain
+   * error text; a run without `error_detail` keeps the plain text.
+   */
+  renderError?: (run: AiRun) => ReactNode;
   testId: string;
 }
 
@@ -192,6 +199,8 @@ export function AiRunDialog({
   impact,
   renderPreview,
   onApplied,
+  onDropped,
+  renderError,
   testId,
 }: AiRunDialogProps) {
   const ai = useAiRuns();
@@ -221,6 +230,11 @@ export function AiRunDialog({
   useEffect(() => {
     if (current?.reply && current.status !== "waiting") setReply(current.reply);
   }, [current?.reply, current?.status]);
+
+  // A structured error the server reports for the run replaces a message the page showed on its own.
+  useEffect(() => {
+    if (current?.error_detail) setError(null);
+  }, [current?.error_detail]);
 
   async function run(channel: AiChannel) {
     setBusy(true);
@@ -275,6 +289,7 @@ export function AiRunDialog({
     try {
       ai.put(await cancelAiRun(ai.service, ai.projectId, current.id));
       setComposing(true);
+      onDropped?.();
     } catch (err) {
       setError(reasonOf(err));
     } finally {
@@ -379,7 +394,9 @@ export function AiRunDialog({
               </span>
             )}
           </div>
-          {(error || current.error || queueItem?.error) && (
+          {!error && current.error_detail && renderError ? (
+            renderError(current)
+          ) : (error || current.error || queueItem?.error) && (
             <div className={styles.alert} role="alert" data-testid={`${testId}-error`}>
               <span>{error || current.error || queueItem?.error}</span>
               {(current.status === "failed" || (queueItem?.state === "failed" && current.status === "waiting") || error) && (

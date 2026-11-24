@@ -11,7 +11,6 @@ import {
   approveStoryboardShot,
   deleteStoryboardAsset,
   deleteStoryboardShot,
-  drawStoryboardAsset,
   editStoryboardAsset,
   editStoryboardShot,
   generateStoryboard,
@@ -23,7 +22,6 @@ import {
   isRequestCancelled,
   lockStoryboard,
   newOperationId,
-  redrawStoryboardAsset,
   redrawStoryboardFrame,
   reviewStoryboard,
   setStoryboardModel,
@@ -36,8 +34,7 @@ import { visualErrorText } from "./useVisualConcept";
 
 /**
  * What the system's AI or drawer is doing now: every empty unit, the asset list, the detail of
- * every asset without one, the review, one unit's shots, one asset's detail, one asset's drawing,
- * or one shot's frame.
+ * every asset without one, the review, one unit's shots, one asset's detail, or one shot's frame.
  */
 export type StoryboardRunning =
   | "all"
@@ -46,7 +43,6 @@ export type StoryboardRunning =
   | "review"
   | { unit: string }
   | { detail: string }
-  | { asset: string }
   | { shot: string }
   | null;
 
@@ -81,8 +77,6 @@ export interface StoryboardControls {
   generateAssetDetails: (note: string) => Promise<boolean>;
   generateUnit: (unitId: string, note: string) => Promise<boolean>;
   review: (note: string) => Promise<boolean>;
-  drawAsset: (assetId: string) => Promise<boolean>;
-  redrawAsset: (assetId: string, note: string) => Promise<boolean>;
   redrawFrame: (unitId: string, shotId: string) => Promise<boolean>;
   /** Form and confirmation actions throw so the dialog can show why they failed. */
   addAsset: (fields: Record<string, unknown>) => Promise<void>;
@@ -216,9 +210,6 @@ export function useStoryboard(projectId: string): StoryboardControls {
     generateUnit: (unitId, note) =>
       runAi({ unit: unitId }, (op) => generateStoryboardUnit(projectId, unitId, note, op)),
     review: (note) => runAi("review", (op) => reviewStoryboard(projectId, note, op)),
-    drawAsset: (assetId) => runAi({ asset: assetId }, (op) => drawStoryboardAsset(projectId, assetId, op)),
-    redrawAsset: (assetId, note) =>
-      runAi({ asset: assetId }, (op) => redrawStoryboardAsset(projectId, assetId, note, op)),
     redrawFrame: (unitId, shotId) =>
       runAi({ shot: shotId }, (op) => redrawStoryboardFrame(projectId, unitId, shotId, op)),
     addAsset: (fields) => change(() => addStoryboardAsset(projectId, fields)),

@@ -43,6 +43,7 @@ func TestDeleteProjectData_RemovesOnlyThatProjectAndKeepsTheLibrary(t *testing.T
 			`INSERT INTO visual_sequence_versions (project_id, version, plan_version, concept_version, script_version, document) VALUES ($1, 1, 1, 1, 1, '{}')`,
 			`INSERT INTO project_visual (project_id) VALUES ($1)`,
 			`INSERT INTO project_reference_picks (project_id, ref_id) VALUES ($1, '` + ref + `')`,
+			`INSERT INTO ai_runs (project_id, channel, status, method, path) VALUES ($1, 'api', 'applied', 'POST', '/v1/projects/' || $1 || '/storyboard/review')`,
 		} {
 			if _, err := repo.pool.Exec(ctx, q, p); err != nil {
 				t.Fatal(err)

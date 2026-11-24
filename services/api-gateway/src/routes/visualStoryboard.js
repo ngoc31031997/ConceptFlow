@@ -35,6 +35,7 @@ function visualStoryboardRouter(visualClient, visualAiClient) {
   router.get(`${base}/assets/:asset/preview`, plain);
   router.post(`${base}/assets/:asset/draw`, ai);
   router.post(`${base}/assets/:asset/redraw`, ai);
+  router.post(`${base}/assets/:asset/fix`, ai);
   router.post(`${base}/assets/:asset/approve`, plain);
   router.post(`${base}/assets/:asset/unapprove`, plain);
 

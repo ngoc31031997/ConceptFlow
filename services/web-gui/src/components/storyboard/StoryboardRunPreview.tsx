@@ -1,7 +1,69 @@
+import type { AssetDrawError, AssetDrawErrorKind } from "../../api/client";
 import styles from "../airun/AiRun.module.css";
 
 /** The AI actions of step 11 whose result is previewed before it is stored. */
-export type StoryboardRunKind = "assets" | "asset_detail" | "unit" | "review";
+export type StoryboardRunKind = "assets" | "asset_detail" | "unit" | "review" | "asset_draw";
+
+/** How each kind of drawing error is named to the Creator. */
+export const DRAW_ERROR_LABEL: Record<AssetDrawErrorKind, string> = {
+  no_code: "Không tìm thấy code",
+  wrong_name: "Sai tên component",
+  syntax: "Lỗi cú pháp TSX",
+  render: "Lỗi khi dựng hình",
+  kit: "Sai kit/luật style",
+};
+
+/**
+ * Why the code an AI drew was refused: the kind of error, the message, the line when there is one
+ * and the numbered lines around it with the error line marked `>`.
+ */
+export function AssetDrawErrorView({ error, testId }: { error: AssetDrawError; testId: string }) {
+  return (
+    <div data-testid={testId}>
+      <p className={styles.previewHead} data-testid={`${testId}-kind`}>
+        {DRAW_ERROR_LABEL[error.kind] ?? error.kind}
+        {error.line !== null && ` · dòng ${error.line}`}
+      </p>
+      <p data-testid={`${testId}-message`}>{error.message}</p>
+      {error.snippet && (
+        <pre className={styles.snippet} data-testid={`${testId}-snippet`}>
+          {error.snippet}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+/** The preview of a ready asset drawing: the trial render and what the drawer warned about. */
+function AssetDrawPreview({ preview }: { preview: unknown }) {
+  const p = (preview ?? {}) as { png_base64?: string; warnings?: { message: string; line: number | null }[] };
+  const warnings = Array.isArray(p.warnings) ? p.warnings : [];
+  return (
+    <div className={styles.preview} data-testid="ai-run-preview">
+      <p className={styles.previewHead}>Hình dựng thử. Chưa lưu gì cho tới khi bạn bấm Áp dụng kết quả.</p>
+      {p.png_base64 ? (
+        <img
+          className={styles.drawImage}
+          src={`data:image/png;base64,${p.png_base64}`}
+          alt="Hình dựng thử của tài sản"
+          data-testid="ai-run-draw-image"
+        />
+      ) : (
+        <p className={styles.previewSub}>Không có hình dựng thử.</p>
+      )}
+      {warnings.length > 0 && (
+        <ul className={styles.previewList} data-testid="ai-run-draw-warnings">
+          {warnings.map((w, i) => (
+            <li key={`${w.line ?? ""}-${i}`}>
+              {w.message}
+              {w.line !== null && w.line !== undefined ? ` (dòng ${w.line})` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 type Row = Record<string, unknown>;
 
@@ -16,10 +78,11 @@ function text(v: unknown): string {
 
 /**
  * What applying a run would store, read from the run's preview: the shots of a unit, the asset
- * list, one asset's detail, or the review's findings. Only what the Creator needs to judge the
+ * list, one asset's detail, an asset's drawing, or the review's findings. Only what the Creator needs to judge the
  * reply is shown; the whole reply stays one tab away.
  */
 export function StoryboardRunPreview({ kind, preview }: { kind: StoryboardRunKind; preview: unknown }) {
+  if (kind === "asset_draw") return <AssetDrawPreview preview={preview} />;
   if (kind === "unit") {
     const shots = list(preview);
     return (

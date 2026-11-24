@@ -75,22 +75,69 @@ type deskReplayer struct{ f *sbFixture }
 
 func (d deskReplayer) Replay(ctx context.Context, req AIRunRequest) (int, []byte) {
 	var in struct {
-		Note string `json:"note"`
+		Note   string         `json:"note"`
+		Code   string         `json:"code"`
+		Error  AssetDrawError `json:"error"`
+		Redraw bool           `json:"redraw"`
 	}
 	_ = json.Unmarshal([]byte(req.Body), &in)
 	prefix := "/v1/projects/" + project + "/storyboard"
 	var st *StoryboardScreen
 	var err error
+	asset := func(action string) (string, bool) {
+		rest, ok := strings.CutPrefix(req.Path, prefix+"/assets/")
+		if !ok {
+			return "", false
+		}
+		return strings.CutSuffix(rest, "/"+action)
+	}
+	if id, ok := asset("draw"); ok {
+		st, err = d.f.desk.DrawAsset(ctx, project, id)
+	} else if id, ok := asset("redraw"); ok {
+		st, err = d.f.desk.RedrawAsset(ctx, project, id, in.Note)
+	} else if id, ok := asset("fix"); ok {
+		st, err = d.f.desk.FixAsset(ctx, project, id, AssetDrawFix{Code: in.Code, Error: in.Error}, in.Redraw)
+	} else {
+		st, err = d.serveOther(ctx, req.Path, prefix, in.Note)
+	}
+	return answer(st, err)
+}
+
+// serveOther serves the unit and asset list routes.
+func (d deskReplayer) serveOther(ctx context.Context, path, prefix, note string) (*StoryboardScreen, error) {
 	switch {
-	case req.Path == prefix+"/assets/generate":
-		st, err = d.f.desk.GenerateAssets(ctx, project, in.Note)
-	case strings.HasPrefix(req.Path, prefix+"/units/") && strings.HasSuffix(req.Path, "/generate"):
-		unit := strings.TrimSuffix(strings.TrimPrefix(req.Path, prefix+"/units/"), "/generate")
-		st, err = d.f.desk.GenerateUnit(ctx, project, unit, in.Note)
-	case req.Path == prefix+"/model":
-		st, err = d.f.desk.State(ctx, project)
-	default:
+	case path == prefix+"/assets/generate":
+		return d.f.desk.GenerateAssets(ctx, project, note)
+	case strings.HasPrefix(path, prefix+"/units/") && strings.HasSuffix(path, "/generate"):
+		unit := strings.TrimSuffix(strings.TrimPrefix(path, prefix+"/units/"), "/generate")
+		return d.f.desk.GenerateUnit(ctx, project, unit, note)
+	case path == prefix+"/model":
+		return d.f.desk.State(ctx, project)
+	}
+	return nil, errReplayNotFound
+}
+
+var errReplayNotFound = errors.New("not found")
+
+// answer is the status and body the HTTP layer answers st and err with.
+func answer(st *StoryboardScreen, err error) (int, []byte) {
+	var drawn *AssetDrawCheckError
+	var refused *RenderingError
+	switch {
+	case errors.Is(err, errReplayNotFound):
 		return http.StatusNotFound, []byte(`{"error":"not found"}`)
+	case errors.As(err, &drawn):
+		b, _ := json.Marshal(map[string]any{"error": drawn.Detail.Message, "detail": drawn.Detail})
+		return http.StatusUnprocessableEntity, b
+	case errors.As(err, &refused):
+		b, _ := json.Marshal(map[string]string{"error": refused.Message})
+		return refused.Status, b
+	case errors.Is(err, domain.ErrAssetNoDetail), errors.Is(err, domain.ErrAssetListNotApproved):
+		b, _ := json.Marshal(map[string]string{"error": err.Error()})
+		return http.StatusConflict, b
+	case errors.Is(err, domain.ErrInvalidEdit):
+		b, _ := json.Marshal(map[string]string{"error": err.Error()})
+		return http.StatusBadRequest, b
 	}
 	if err != nil {
 		status := http.StatusBadGateway

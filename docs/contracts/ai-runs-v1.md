@@ -31,7 +31,18 @@ Request được phát lại ở bốn chế độ `ExternalAIRun` (`application
 | POST | `/{rid}/apply` | | chỉ khi `ready`. Phát lại ở `paste`; trả `{run, state}`, `state` là thân trả về của request bước. Bước từ chối → status, thân của bước; lượt về `unreadable`. |
 | POST | `/{rid}/cancel` | | bỏ lượt chưa áp dụng |
 
-Một lượt: `{id, project_id, label, channel, status, method, path, body, prompt, reply, preview, error, created_at, updated_at}`. `status`: `waiting`, `running`, `ready`, `unreadable`, `failed`, `applied`, `cancelled`. Lượt `running` khi service khởi động lại chuyển `failed`. Bảng `ai_runs` ở DB của mỗi service, xoá theo dự án.
+Một lượt: `{id, project_id, label, channel, status, method, path, body, prompt, reply, preview, error, error_detail, created_at, updated_at}`. `error_detail` là `null` trừ khi bước trả lỗi có cấu trúc (xem "Vẽ tài sản bước 11"). `status`: `waiting`, `running`, `ready`, `unreadable`, `failed`, `applied`, `cancelled`. Lượt `running` khi service khởi động lại chuyển `failed`. Bảng `ai_runs` ở DB của mỗi service, xoá theo dự án.
+
+## Vẽ tài sản bước 11
+
+Vẽ, vẽ lại kèm ghi chú và gửi lại kèm lỗi của một tài sản (`POST .../storyboard/assets/{aid}/draw`, `/redraw`, `/fix`, xem [`storyboard-v1.md`](storyboard-v1.md)) là lượt AI một-prompt chạy qua lượt chạy ở visual-service, trên kênh mặc định `visual_storyboard`.
+
+- Kênh `api`: model được gọi **đúng một lần**, không thử lại. Kênh extension và dán tay: cùng luồng `prompt` → `reply` → `apply`.
+- `preview` của các lượt này là `{code, png_base64, warnings}` (`png_base64` là PNG dựng thử, `warnings` là `[{message, line}]`). Chưa lưu gì (không file, không đổi tài sản) cho tới khi `apply`; `apply` kiểm và dựng lại rồi mới lưu.
+- Code AI trả không qua kiểm (không có code, sai tên component, lỗi cú pháp, bộ dựng từ chối, vi phạm kit) → lượt `unreadable` ở **mọi** kênh, kể cả `api`; không có lần gọi lại tự động. Lượt mang lỗi có cấu trúc trong `error_detail`: `{kind: "no_code"|"wrong_name"|"syntax"|"render"|"kit", message, line, snippet}` (`line`, `snippet` có thể `null`), còn `error` là `message`. Creator chọn tiếp: gửi lại kèm lỗi (một lượt mới cùng kênh, prompt chứa code hỏng và lỗi có số dòng), vẽ lại kèm ghi chú, hoặc bỏ (`cancel`).
+- Lỗi của chính lần gọi API (hết số dư, bị giới hạn tốc độ, reply rỗng) giữ thông báo cũ và lượt `failed`; không có `error_detail`.
+- "Vẽ tất cả" mở mỗi tài sản một lượt; lượt kế chỉ mở khi lượt trước `applied` hoặc `cancelled`.
+- Luồng tài sản không còn vòng tự sửa 3 lượt; Thư viện hình vẫn giữ vòng đó và không đi qua lượt chạy.
 
 ## Kênh mặc định
 

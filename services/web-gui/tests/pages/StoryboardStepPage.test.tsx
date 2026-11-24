@@ -231,6 +231,7 @@ function aiRun(over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
     reply: "",
     preview: null,
     error: "",
+    error_detail: null,
     created_at: "2026-11-23T00:00:00Z",
     updated_at: "2026-11-23T00:00:00Z",
     ...over,
@@ -451,21 +452,265 @@ describe("StoryboardStepPage", () => {
       expect(await screen.findByTestId("sb-asset-AST-HERO-001-redraw")).toBeInTheDocument();
     });
 
-    it("draws an asset not drawn yet and redraws a drawn one with a note", async () => {
-      state.assets = { ...state.assets, approved: true };
-      const draw = vi.spyOn(apiClient, "drawStoryboardAsset").mockResolvedValue(state);
-      const redraw = vi.spyOn(apiClient, "redrawStoryboardAsset").mockResolvedValue(state);
-      renderPage();
-      fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw"));
-      await waitFor(() =>
-        expect(draw).toHaveBeenCalledWith("p1", "AST-DISK-001", expect.objectContaining({ id: expect.any(String) })),
-      );
-      fireEvent.click(await screen.findByTestId("sb-asset-AST-OBSERVER-001-redraw"));
-      fireEvent.change(await screen.findByTestId("sb-asset-AST-OBSERVER-001-redraw-note"), { target: { value: " tối hơn " } });
-      fireEvent.click(screen.getByTestId("sb-asset-AST-OBSERVER-001-redraw-confirm"));
-      await waitFor(() =>
-        expect(redraw).toHaveBeenCalledWith("p1", "AST-OBSERVER-001", "tối hơn", expect.objectContaining({ id: expect.any(String) })),
-      );
+    describe("drawing an asset on an AI channel", () => {
+      const base = "/v1/projects/p1/storyboard/assets";
+      const failure = {
+        kind: "syntax" as const,
+        message: "Thiếu dấu đóng thẻ <g>.",
+        line: 12,
+        snippet: "11:   <circle r={4} />\n12: > <g>\n13:   </svg>",
+      };
+
+      function describeRequest(fn: "drawStoryboardAsset" | "redrawStoryboardAsset" | "fixStoryboardAsset", path: string, body?: string) {
+        return vi
+          .spyOn(apiClient, fn)
+          .mockRejectedValue(new apiClient.ExternalRequestDescribed({ gateway: "g", method: "POST", path, body }));
+      }
+
+      function drawRun(assetId: string, kind: "draw" | "redraw" | "fix", over: Partial<apiClient.AiRun> = {}): apiClient.AiRun {
+        return aiRun({
+          id: `run-${assetId}-${kind}`,
+          label: `Vẽ ${assetId}`,
+          path: `${base}/${assetId}/${kind}`,
+          body: "{}",
+          ...over,
+        });
+      }
+
+      beforeEach(() => {
+        state.assets = { ...state.assets, approved: true };
+      });
+
+      it("draws on the step's channel, previews the picture and stores nothing until Áp dụng", async () => {
+        const describe = describeRequest("drawStoryboardAsset", `${base}/AST-DISK-001/draw`, "{}");
+        const ready = drawRun("AST-DISK-001", "draw", {
+          status: "ready",
+          preview: { code: "export const Disk = () => null", png_base64: "AAAA", warnings: [{ message: "Màu gần ngoài bảng", line: 3 }] },
+        });
+        const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(ready);
+        const apply = vi.spyOn(apiClient, "applyAiRun").mockResolvedValue({ run: { ...ready, status: "applied" }, state });
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw"));
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-run"));
+        await waitFor(() =>
+          expect(start).toHaveBeenCalledWith("visual", "p1", {
+            label: "Vẽ Disk",
+            request: expect.objectContaining({ method: "POST", path: `${base}/AST-DISK-001/draw`, body: "{}" }),
+            channel: "api",
+          }),
+        );
+        expect(describe).toHaveBeenCalledWith("p1", "AST-DISK-001", { external: { mode: "describe" } });
+        expect(await screen.findByTestId("ai-run-draw-image")).toHaveAttribute("src", "data:image/png;base64,AAAA");
+        expect(screen.getByTestId("ai-run-draw-warnings")).toHaveTextContent("Màu gần ngoài bảng (dòng 3)");
+        expect(apply).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-apply"));
+        await waitFor(() => expect(apply).toHaveBeenCalledWith("visual", "p1", "run-AST-DISK-001-draw"));
+      });
+
+      it("redraws a drawn asset with the note on the chosen channel", async () => {
+        const describe = describeRequest("redrawStoryboardAsset", `${base}/AST-OBSERVER-001/redraw`, '{"note":"tối hơn"}');
+        const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(drawRun("AST-OBSERVER-001", "redraw", { channel: "manual", status: "waiting" }));
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-OBSERVER-001-redraw"));
+        fireEvent.change(await screen.findByTestId("sb-asset-AST-OBSERVER-001-draw-dialog-note"), { target: { value: " tối hơn " } });
+        fireEvent.click(screen.getByTestId("sb-asset-AST-OBSERVER-001-draw-dialog-run-more"));
+        fireEvent.click(screen.getByTestId("sb-asset-AST-OBSERVER-001-draw-dialog-run-manual"));
+        await waitFor(() => expect(start).toHaveBeenCalledWith("visual", "p1", expect.objectContaining({ channel: "manual" })));
+        expect(describe).toHaveBeenCalledWith("p1", "AST-OBSERVER-001", "tối hơn", { external: { mode: "describe" } });
+      });
+
+      it("stops on refused code on the API too, shows the structured error and sends nothing again by itself", async () => {
+        describeRequest("drawStoryboardAsset", `${base}/AST-DISK-001/draw`, "{}");
+        const bad = drawRun("AST-DISK-001", "draw", {
+          status: "unreadable",
+          reply: "```tsx\nbroken\n```",
+          error: failure.message,
+          error_detail: failure,
+        });
+        const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(bad);
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw"));
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-run"));
+        const kind = await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-draw-error-kind");
+        expect(kind).toHaveTextContent("Lỗi cú pháp TSX · dòng 12");
+        expect(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-draw-error-message")).toHaveTextContent("Thiếu dấu đóng thẻ <g>.");
+        expect(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-draw-error-snippet")).toHaveTextContent("12: > <g>");
+        expect(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-error")).toHaveTextContent("không tự gửi lại");
+        // A planned asset has no drawing to redraw from.
+        expect(screen.queryByTestId("sb-asset-AST-DISK-001-draw-dialog-redraw-note")).toBeNull();
+        expect(start).toHaveBeenCalledTimes(1);
+      });
+
+      it("resends the broken code with its error on the same channel and cancels the failed run", async () => {
+        describeRequest("drawStoryboardAsset", `${base}/AST-DISK-001/draw`, "{}");
+        const fixDescribe = describeRequest("fixStoryboardAsset", `${base}/AST-DISK-001/fix`);
+        const bad = drawRun("AST-DISK-001", "draw", {
+          channel: "manual",
+          status: "unreadable",
+          reply: "RAW REPLY",
+          preview: { code: "BROKEN CODE" },
+          error: failure.message,
+          error_detail: failure,
+        });
+        const fixRun = drawRun("AST-DISK-001", "fix", { channel: "manual", status: "waiting", id: "fix-1" });
+        const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValueOnce(bad).mockResolvedValueOnce(fixRun);
+        const cancel = vi.spyOn(apiClient, "cancelAiRun").mockResolvedValue({ ...bad, status: "cancelled" });
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw"));
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-run-more"));
+        fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-run-manual"));
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-fix"));
+        await waitFor(() => expect(cancel).toHaveBeenCalledWith("visual", "p1", bad.id));
+        expect(fixDescribe).toHaveBeenCalledWith(
+          "p1",
+          "AST-DISK-001",
+          { code: "BROKEN CODE", error: failure, redraw: false },
+          { external: { mode: "describe" } },
+        );
+        expect(start).toHaveBeenLastCalledWith("visual", "p1", expect.objectContaining({ channel: "manual", label: "Gửi lại Disk kèm lỗi" }));
+        expect(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-status")).toHaveTextContent("Chờ bạn dán câu trả lời");
+        expect(start).toHaveBeenCalledTimes(2);
+      });
+
+      it("resends the reply text when the refused run kept no code, and marks a redraw", async () => {
+        const fixDescribe = describeRequest("fixStoryboardAsset", `${base}/AST-OBSERVER-001/fix`);
+        const bad = drawRun("AST-OBSERVER-001", "redraw", {
+          status: "unreadable",
+          reply: "no fence here",
+          error: "Không có code",
+          error_detail: { kind: "no_code", message: "Không có code", line: null, snippet: null },
+        });
+        vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([bad]);
+        vi.spyOn(apiClient, "startAiRun").mockResolvedValue(drawRun("AST-OBSERVER-001", "fix", { status: "running" }));
+        vi.spyOn(apiClient, "cancelAiRun").mockResolvedValue({ ...bad, status: "cancelled" });
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-OBSERVER-001-redraw-run"));
+        expect(await screen.findByTestId("sb-asset-AST-OBSERVER-001-draw-dialog-draw-error-kind")).toHaveTextContent("Không tìm thấy code");
+        fireEvent.click(screen.getByTestId("sb-asset-AST-OBSERVER-001-draw-dialog-fix"));
+        await waitFor(() =>
+          expect(fixDescribe).toHaveBeenCalledWith(
+            "p1",
+            "AST-OBSERVER-001",
+            { code: "no fence here", error: bad.error_detail, redraw: true },
+            { external: { mode: "describe" } },
+          ),
+        );
+      });
+
+      it("redraws with a note after a refusal and cancels the refused run", async () => {
+        const bad = drawRun("AST-OBSERVER-001", "redraw", {
+          status: "unreadable",
+          error: "x",
+          error_detail: { kind: "render", message: "Bộ dựng từ chối", line: 7, snippet: "7: > fetch(url);" },
+        });
+        vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([bad]);
+        const cancel = vi.spyOn(apiClient, "cancelAiRun").mockResolvedValue({ ...bad, status: "cancelled" });
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-OBSERVER-001-redraw-run"));
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-OBSERVER-001-draw-dialog-redraw-note"));
+        await waitFor(() => expect(cancel).toHaveBeenCalledWith("visual", "p1", bad.id));
+        expect(await screen.findByTestId("sb-asset-AST-OBSERVER-001-draw-dialog-note")).toBeInTheDocument();
+      });
+
+      it("drops a refused run: cancels it and closes the dialog", async () => {
+        const bad = drawRun("AST-DISK-001", "draw", {
+          status: "unreadable",
+          error: "x",
+          error_detail: { kind: "wrong_name", message: "Sai tên", line: null, snippet: null },
+        });
+        vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([bad]);
+        const cancel = vi.spyOn(apiClient, "cancelAiRun").mockResolvedValue({ ...bad, status: "cancelled" });
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-run"));
+        expect(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-draw-error-kind")).toHaveTextContent("Sai tên component");
+        fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-drop-error"));
+        await waitFor(() => expect(cancel).toHaveBeenCalledWith("visual", "p1", bad.id));
+        await waitFor(() => expect(screen.queryByTestId("sb-asset-AST-DISK-001-draw-dialog")).toBeNull());
+      });
+
+      it("shows an API failure as a plain error without the structured actions", async () => {
+        const failed = drawRun("AST-DISK-001", "draw", { status: "failed", error: "Hết số dư API", error_detail: null });
+        vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([failed]);
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-run"));
+        expect(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-error")).toHaveTextContent("Hết số dư API");
+        expect(screen.queryByTestId("sb-asset-AST-DISK-001-draw-dialog-fix")).toBeNull();
+        expect(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-switch-extension")).toBeInTheDocument();
+      });
+
+      it("shows a refusal at apply as the structured error", async () => {
+        const ready = drawRun("AST-DISK-001", "draw", { status: "ready", preview: { code: "c", png_base64: "AAAA", warnings: [] } });
+        vi.spyOn(apiClient, "listAiRuns").mockResolvedValueOnce([ready]);
+        vi.spyOn(apiClient, "applyAiRun").mockRejectedValue(new Error("Màu không thuộc kit"));
+        renderPage();
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-run"));
+        fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-apply"));
+        vi.spyOn(apiClient, "listAiRuns").mockResolvedValue([
+          { ...ready, status: "unreadable", error: "Màu không thuộc kit", error_detail: { kind: "kit", message: "Màu không thuộc kit", line: 9, snippet: "9: > fill" } },
+        ]);
+        expect(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-draw-error-kind")).toHaveTextContent("Sai kit/luật style · dòng 9");
+      });
+
+      describe("Vẽ tất cả", () => {
+        beforeEach(() => {
+          const second = asset("AST-MOON-001", { status: "planned", name: "Moon", preview_path: "", tier: "support" });
+          const items = [...state.assets.items, second];
+          state.assets = { ...state.assets, items, ...detailCounts(items) };
+        });
+
+        it("opens one run per asset and the next only after the current one is applied", async () => {
+          describeRequest("drawStoryboardAsset", `${base}/AST-DISK-001/draw`, "{}");
+          const first = drawRun("AST-DISK-001", "draw", { status: "ready", preview: { code: "c", png_base64: "AAAA", warnings: [] } });
+          const second = drawRun("AST-MOON-001", "draw", { status: "ready", preview: { code: "c", png_base64: "BBBB", warnings: [] } });
+          const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+          vi.spyOn(apiClient, "applyAiRun").mockResolvedValue({ run: { ...first, status: "applied" }, state });
+          renderPage();
+          fireEvent.click(await screen.findByTestId("sb-assets-draw-all"));
+          expect(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-apply")).toBeInTheDocument();
+          expect(start).toHaveBeenCalledTimes(1);
+          expect(start).toHaveBeenLastCalledWith("visual", "p1", expect.objectContaining({ label: "Vẽ Disk", channel: "api" }));
+          fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-apply"));
+          await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+          expect(start).toHaveBeenLastCalledWith("visual", "p1", expect.objectContaining({ label: "Vẽ Moon", channel: "api" }));
+          expect(await screen.findByTestId("sb-asset-AST-MOON-001-draw-dialog-apply")).toBeInTheDocument();
+        });
+
+        it("waits on a refused run and ends when the Creator closes the dialog", async () => {
+          describeRequest("drawStoryboardAsset", `${base}/AST-DISK-001/draw`, "{}");
+          const bad = drawRun("AST-DISK-001", "draw", {
+            status: "unreadable",
+            error: "x",
+            error_detail: { kind: "syntax", message: "Lỗi", line: 1, snippet: "1: > x" },
+          });
+          const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValue(bad);
+          renderPage();
+          fireEvent.click(await screen.findByTestId("sb-assets-draw-all"));
+          await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-fix");
+          expect(start).toHaveBeenCalledTimes(1);
+          fireEvent.click(screen.getByTestId("sb-asset-AST-DISK-001-draw-dialog-done"));
+          await waitFor(() => expect(screen.queryByTestId("sb-asset-AST-DISK-001-draw-dialog")).toBeNull());
+          expect(start).toHaveBeenCalledTimes(1);
+          expect(screen.queryByTestId("sb-asset-AST-MOON-001-draw-dialog")).toBeNull();
+        });
+
+        it("moves to the next asset when the Creator drops the current run", async () => {
+          describeRequest("drawStoryboardAsset", `${base}/AST-DISK-001/draw`, "{}");
+          const bad = drawRun("AST-DISK-001", "draw", {
+            status: "unreadable",
+            error: "x",
+            error_detail: { kind: "syntax", message: "Lỗi", line: 1, snippet: "1: > x" },
+          });
+          const next = drawRun("AST-MOON-001", "draw", { status: "running" });
+          const start = vi.spyOn(apiClient, "startAiRun").mockResolvedValueOnce(bad).mockResolvedValueOnce(next);
+          const cancel = vi.spyOn(apiClient, "cancelAiRun").mockResolvedValue({ ...bad, status: "cancelled" });
+          renderPage();
+          fireEvent.click(await screen.findByTestId("sb-assets-draw-all"));
+          fireEvent.click(await screen.findByTestId("sb-asset-AST-DISK-001-draw-dialog-drop-error"));
+          await waitFor(() => expect(cancel).toHaveBeenCalledWith("visual", "p1", bad.id));
+          await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+          expect(start).toHaveBeenLastCalledWith("visual", "p1", expect.objectContaining({ label: "Vẽ Moon" }));
+        });
+      });
     });
 
     it("puts an asset in the library by default, and lets the Creator untick it or pick a folder", async () => {

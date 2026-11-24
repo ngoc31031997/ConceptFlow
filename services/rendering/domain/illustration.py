@@ -189,6 +189,70 @@ class InvalidIllustrationError(IllustrationError):
         super().__init__(prefix + "code hình minh hoạ chưa qua kiểm tra: " + "; ".join(msgs))
 
 
+class DrawErrorKind(StrEnum):
+    """Loại lỗi khi kiểm câu trả lời vẽ của AI, để Creator biết nên sửa gì."""
+
+    NO_CODE = "no_code"
+    WRONG_NAME = "wrong_name"
+    SYNTAX = "syntax"
+    RENDER = "render"
+    KIT = "kit"
+
+
+#: Số dòng lấy mỗi bên dòng lỗi khi trích đoạn code.
+SNIPPET_RADIUS = 1
+_STYLE_RULE_RE = re.compile(r"^\[[A-Z]+\d*\]")
+_TS_SYNTAX_RE = re.compile(r"^TS1\d{3}:")
+
+
+class DrawCheckError(IllustrationError):
+    """Code AI vẽ không qua kiểm: một lỗi có cấu trúc (loại, thông báo, dòng, đoạn code quanh dòng).
+
+    `line` là số dòng trong code đã rút; `snippet` là `null` khi không có dòng hay không có code.
+    """
+
+    def __init__(self, kind: DrawErrorKind, message: str, line: int | None = None,
+                 snippet: str | None = None) -> None:
+        self.kind, self.message, self.line, self.snippet = kind, message, line, snippet
+        super().__init__(message)
+
+    def to_json(self) -> dict:
+        return {"kind": self.kind.value, "message": self.message, "line": self.line, "snippet": self.snippet}
+
+
+def code_snippet(code: str, line: int | None) -> str | None:
+    """Vài dòng quanh `line`, mỗi dòng có số, dòng lỗi đánh dấu `>`; `None` khi không gắn được dòng."""
+    lines = code.splitlines()
+    if line is None or not 1 <= line <= len(lines):
+        return None
+    first, last = max(1, line - SNIPPET_RADIUS), min(len(lines), line + SNIPPET_RADIUS)
+    return "\n".join(
+        f"{n}: {'> ' if n == line else '  '}{lines[n - 1]}" for n in range(first, last + 1))
+
+
+def draw_check_error(code: str, diagnostics: list[CodeFinding]) -> DrawCheckError:
+    """Lỗi có cấu trúc từ chẩn đoán của bộ dựng.
+
+    Bộ dựng dừng ở bước đầu tiên hỏng, nên mọi chẩn đoán của một lần dựng cùng một bước; loại lỗi lấy
+    theo dạng thông báo mà bước đó đặt: luật style của kit là `[S1] …`, lỗi tsc là `TS<mã>: …` (mã
+    1xxx là lỗi cú pháp, còn lại là lỗi kiểu bộ dựng từ chối), luật tĩnh và lỗi khi dựng thành ảnh là
+    lỗi dựng. Dòng của lỗi là dòng của chẩn đoán đầu tiên có số dòng.
+    """
+    first = diagnostics[0].message if diagnostics else ""
+    if _STYLE_RULE_RE.match(first):
+        kind, lead = DrawErrorKind.KIT, "Code vi phạm luật vẽ của kit"
+    elif _TS_SYNTAX_RE.match(first):
+        kind, lead = DrawErrorKind.SYNTAX, "Code lỗi cú pháp"
+    else:
+        kind, lead = DrawErrorKind.RENDER, "Bộ dựng từ chối code"
+    parts = [f"dòng {d.line}: {d.message}" if d.line is not None else d.message for d in diagnostics]
+    message = f"{lead} — {'; '.join(parts)}" if parts else lead
+    if not message.endswith((".", "!", "?")):
+        message += "."
+    line = next((d.line for d in diagnostics if d.line is not None), None)
+    return DrawCheckError(kind, message, line, code_snippet(code, line))
+
+
 @dataclass(frozen=True)
 class IllustrationFolder:
     id: str

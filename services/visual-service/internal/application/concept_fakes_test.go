@@ -111,13 +111,22 @@ func (s *fakeStore) InsertVersion(_ context.Context, v VersionRecord) error {
 // every request it was sent.
 type fakeLLM struct {
 	replies map[string][]string
-	calls   []ChatRequest
+	// always answers a role whose queue is empty; no entry means the call fails.
+	always map[string]string
+	// calls are every turn, asked of the model or answered by a paste; asked
+	// are only the turns that reached the model.
+	calls []ChatRequest
+	asked []ChatRequest
 }
 
 func (f *fakeLLM) Chat(_ context.Context, req ChatRequest) (ChatResult, error) {
 	f.calls = append(f.calls, req)
+	f.asked = append(f.asked, req)
 	q := f.replies[req.Role]
 	if len(q) == 0 {
+		if reply, ok := f.always[req.Role]; ok {
+			return ChatResult{Content: reply}, nil
+		}
 		return ChatResult{}, ErrLLMFailed
 	}
 	f.replies[req.Role] = q[1:]

@@ -1,6 +1,7 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -65,22 +66,25 @@ type AIRunRequest struct {
 
 // AIRun is one AI turn of a step run with a preview (ADR-0052): the step's own
 // request is replayed to build the prompt, to read a reply without storing it
-// (Preview), and, when the Creator applies it, to store it.
+// (Preview), and, when the Creator applies it, to store it. ErrorDetail is the
+// structured error an unreadable run's step answered with (an asset drawing's
+// {kind, message, line, snippet}), and null otherwise.
 type AIRun struct {
-	ID        string          `json:"id"`
-	ProjectID string          `json:"project_id"`
-	Label     string          `json:"label"`
-	Channel   AIRunChannel    `json:"channel"`
-	Status    AIRunStatus     `json:"status"`
-	Method    string          `json:"method"`
-	Path      string          `json:"path"`
-	Body      string          `json:"body"`
-	Prompt    string          `json:"prompt"`
-	Reply     string          `json:"reply"`
-	Preview   json.RawMessage `json:"preview"`
-	Error     string          `json:"error"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	ID          string          `json:"id"`
+	ProjectID   string          `json:"project_id"`
+	Label       string          `json:"label"`
+	Channel     AIRunChannel    `json:"channel"`
+	Status      AIRunStatus     `json:"status"`
+	Method      string          `json:"method"`
+	Path        string          `json:"path"`
+	Body        string          `json:"body"`
+	Prompt      string          `json:"prompt"`
+	Reply       string          `json:"reply"`
+	Preview     json.RawMessage `json:"preview"`
+	Error       string          `json:"error"`
+	ErrorDetail json.RawMessage `json:"error_detail"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 func (r AIRun) request() AIRunRequest {
@@ -115,11 +119,13 @@ type AIRunReplayer interface {
 }
 
 // AIRunHTTPError is a refusal of the replayed step request, kept with its
-// status so the caller answers with it.
+// status so the caller answers with it. Detail is the refusal's structured
+// "detail" object, nil when it has none.
 type AIRunHTTPError struct {
 	Status  int
 	Message string
 	Body    json.RawMessage
+	Detail  json.RawMessage
 }
 
 func (e *AIRunHTTPError) Error() string { return e.Message }
@@ -155,16 +161,34 @@ func (s *AIRuns) call(ctx context.Context, req AIRunRequest) error {
 	return refusal(status, body)
 }
 
-// refusal reads the step's error answer.
+// refusal reads the step's error answer: its "error" message and, when the
+// step sent one, its "detail" object. A body that is not that JSON keeps the
+// status text as the message.
 func refusal(status int, body []byte) *AIRunHTTPError {
 	var e struct {
-		Error string `json:"error"`
+		Error  string          `json:"error"`
+		Detail json.RawMessage `json:"detail"`
 	}
-	_ = json.Unmarshal(body, &e)
+	if json.Unmarshal(body, &e) != nil {
+		e.Error, e.Detail = "", nil
+	}
 	if strings.TrimSpace(e.Error) == "" {
 		e.Error = http.StatusText(status)
 	}
-	return &AIRunHTTPError{Status: status, Message: e.Error, Body: body}
+	refused := &AIRunHTTPError{Status: status, Message: e.Error, Body: body}
+	if d := bytes.TrimSpace(e.Detail); len(d) > 0 && d[0] == '{' {
+		refused.Detail = d
+	}
+	return refused
+}
+
+// errorDetail is the structured detail of a step's refusal err, nil when it has none.
+func errorDetail(err error) json.RawMessage {
+	var refused *AIRunHTTPError
+	if errors.As(err, &refused) {
+		return refused.Detail
+	}
+	return nil
 }
 
 func validRequest(projectID string, req AIRunRequest, channel AIRunChannel) error {
@@ -258,8 +282,10 @@ func (s *AIRuns) capture(ctx context.Context, run AIRun) {
 
 // settle sets the run's status from how reading its reply ended. A step that
 // stopped at its preview point is ready whatever status its handler answered.
+// A reply the step refused keeps the refusal's structured detail; a call that
+// got no reply has none.
 func settle(run *AIRun, er *ExternalAIRun, err error, answered bool) {
-	run.Preview, run.Error = nil, ""
+	run.Preview, run.Error, run.ErrorDetail = nil, "", nil
 	if p, ok := er.Preview(); ok {
 		run.Status, run.Preview = AIRunReady, p
 		return
@@ -268,7 +294,7 @@ func settle(run *AIRun, er *ExternalAIRun, err error, answered bool) {
 	case err == nil:
 		run.Status, run.Error = AIRunFailed, "bước này chưa dừng được để xem trước kết quả"
 	case answered:
-		run.Status, run.Error = AIRunUnreadable, err.Error()
+		run.Status, run.Error, run.ErrorDetail = AIRunUnreadable, err.Error(), errorDetail(err)
 	default:
 		run.Status, run.Error = AIRunFailed, err.Error()
 	}
@@ -317,13 +343,13 @@ func (s *AIRuns) Apply(ctx context.Context, projectID, id string) (AIRun, json.R
 	status, body := s.replay.Replay(WithExternalAI(ctx, NewExternalAIRun(ExternalAIPaste, run.Reply)), run.request())
 	if status < 200 || status >= 300 {
 		refused := refusal(status, body)
-		run.Status, run.Error, run.Preview = AIRunUnreadable, refused.Message, nil
+		run.Status, run.Error, run.ErrorDetail, run.Preview = AIRunUnreadable, refused.Message, refused.Detail, nil
 		if serr := s.store.SaveAIRun(ctx, run); serr != nil {
 			return AIRun{}, nil, serr
 		}
 		return run, nil, refused
 	}
-	run.Status, run.Error = AIRunApplied, ""
+	run.Status, run.Error, run.ErrorDetail = AIRunApplied, "", nil
 	if err := s.store.SaveAIRun(ctx, run); err != nil {
 		return AIRun{}, nil, err
 	}

@@ -136,14 +136,59 @@ func (c *Client) assetCall(ctx context.Context, projectID, assetID, action strin
 	return out, err
 }
 
-// DrawAsset has rendering draw an asset from its description.
-func (c *Client) DrawAsset(ctx context.Context, projectID, assetID string, req application.AssetDrawRequest) (application.ProjectAsset, error) {
-	return c.assetCall(ctx, projectID, assetID, "draw", req)
+// drawCheckError reads rendering's 422 refusal of drawn code, {"error",
+// "detail": {kind, message, line, snippet}}; ok is false for any other body.
+func drawCheckError(raw []byte) (*application.AssetDrawCheckError, bool) {
+	var body struct {
+		Detail *application.AssetDrawError `json:"detail"`
+	}
+	if json.Unmarshal(raw, &body) != nil || body.Detail == nil || !body.Detail.Valid() {
+		return nil, false
+	}
+	return &application.AssetDrawCheckError{Detail: *body.Detail}, true
 }
 
-// RedrawAsset has rendering draw an asset again from its code.
-func (c *Client) RedrawAsset(ctx context.Context, projectID, assetID string, req application.AssetDrawRequest) (application.ProjectAsset, error) {
-	return c.assetCall(ctx, projectID, assetID, "redraw", req)
+// drawCall makes one of the drawing calls of an asset. Drawn code rendering
+// refuses is an *application.AssetDrawCheckError; any other refusal is a
+// *application.RenderingError.
+func (c *Client) drawCall(ctx context.Context, projectID, assetID, action string, body, out any) error {
+	status, raw, err := c.send(ctx, http.MethodPost, assetsPath(projectID)+"/"+url.PathEscape(assetID)+"/"+action, body)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusUnprocessableEntity {
+		if de, ok := drawCheckError(raw); ok {
+			return de
+		}
+	}
+	if status < 200 || status > 299 {
+		return refusal(status, raw)
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		return fmt.Errorf("%w: câu trả lời không đọc được: %v", application.ErrRenderingFailed, err)
+	}
+	return nil
+}
+
+// AssetDrawPrompt has rendering build the prompt of one drawing of an asset.
+func (c *Client) AssetDrawPrompt(ctx context.Context, projectID, assetID string, req application.AssetDrawPromptRequest) (application.AssetDrawPrompt, error) {
+	var out application.AssetDrawPrompt
+	err := c.drawCall(ctx, projectID, assetID, "draw-prompt", req, &out)
+	return out, err
+}
+
+// AssetDrawCheck has rendering check and render an AI's reply without storing it.
+func (c *Client) AssetDrawCheck(ctx context.Context, projectID, assetID string, req application.AssetDrawCheckRequest) (application.AssetDrawPreview, error) {
+	var out application.AssetDrawPreview
+	err := c.drawCall(ctx, projectID, assetID, "draw-check", req, &out)
+	return out, err
+}
+
+// AssetDrawApply has rendering check, render and store code as the asset's next version.
+func (c *Client) AssetDrawApply(ctx context.Context, projectID, assetID string, req application.AssetDrawApplyRequest) (application.ProjectAsset, error) {
+	var out application.ProjectAsset
+	err := c.drawCall(ctx, projectID, assetID, "draw-apply", req, &out)
+	return out, err
 }
 
 // ApproveAsset approves a drawn asset.

@@ -4403,14 +4403,41 @@ export function deleteStoryboardAsset(projectId: string, assetId: string): Promi
   return sendStoryboard(projectId, "DELETE", `/assets/${assetId}`);
 }
 
-/** Draws an asset from its description. */
-export function drawStoryboardAsset(projectId: string, assetId: string, call?: OperationCall): Promise<StoryboardState> {
+/** The kinds of structured error the asset drawer reports for code the AI drew. */
+export type AssetDrawErrorKind = "no_code" | "wrong_name" | "syntax" | "render" | "kit";
+
+/** Why the code an AI drew was refused: what went wrong, where, and the lines around it. */
+export interface AssetDrawError {
+  kind: AssetDrawErrorKind;
+  message: string;
+  /** Line in the AI's code; null when the error has no line. */
+  line: number | null;
+  /** A few numbered lines around `line` with the error line marked `>`; null without a line. */
+  snippet: string | null;
+}
+
+/** The code an AI drew, sent back to it with the error it got. */
+export interface AssetDrawFix {
+  /** The broken code; empty when the reply had none. */
+  code: string;
+  error: AssetDrawError;
+  /** The failed turn was a redraw, so the asset's current code stays part of the context. */
+  redraw: boolean;
+}
+
+/** Has the AI draw an asset from its description; always made in an external-AI mode, which the AI run replays. */
+export function drawStoryboardAsset(projectId: string, assetId: string, call: ExternalAiCall): Promise<StoryboardState> {
   return sendStoryboard(projectId, "POST", `/assets/${assetId}/draw`, undefined, call);
 }
 
-/** Draws an asset again from its code, with a note. */
-export function redrawStoryboardAsset(projectId: string, assetId: string, note: string, call?: OperationCall): Promise<StoryboardState> {
+/** Has the AI draw an asset again from its code, with a note; always made in an external-AI mode. */
+export function redrawStoryboardAsset(projectId: string, assetId: string, note: string, call: ExternalAiCall): Promise<StoryboardState> {
   return sendStoryboard(projectId, "POST", `/assets/${assetId}/redraw`, { note }, call);
+}
+
+/** Sends the code the AI drew back to it with the error it got, as a new turn; always made in an external-AI mode. */
+export function fixStoryboardAsset(projectId: string, assetId: string, fix: AssetDrawFix, call: ExternalAiCall): Promise<StoryboardState> {
+  return sendStoryboard(projectId, "POST", `/assets/${assetId}/fix`, fix, call);
 }
 
 /** Approves a drawn asset; `projectName` goes into the description of the library illustration. */
@@ -4529,6 +4556,8 @@ export interface AiRun {
   /** What applying stores, once the reply was read; its shape is the step's. */
   preview: unknown;
   error: string;
+  /** The structured reason a reply was refused (asset drawing); null or absent for any other error. */
+  error_detail?: AssetDrawError | null;
   created_at: string;
   updated_at: string;
 }

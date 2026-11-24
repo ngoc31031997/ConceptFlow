@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -23,6 +24,7 @@ type storyboardDesk interface {
 	DeleteAsset(ctx context.Context, projectID, assetID string) (*application.StoryboardScreen, error)
 	DrawAsset(ctx context.Context, projectID, assetID string) (*application.StoryboardScreen, error)
 	RedrawAsset(ctx context.Context, projectID, assetID, note string) (*application.StoryboardScreen, error)
+	FixAsset(ctx context.Context, projectID, assetID string, fix application.AssetDrawFix, redraw bool) (*application.StoryboardScreen, error)
 	ApproveAsset(ctx context.Context, projectID, assetID, projectName string) (*application.StoryboardScreen, error)
 	UnapproveAsset(ctx context.Context, projectID, assetID string) (*application.StoryboardScreen, error)
 	ApproveAssets(ctx context.Context, projectID string) (*application.StoryboardScreen, error)
@@ -66,8 +68,9 @@ func (rt *Router) mountStoryboard(r chi.Router) {
 		r.Post("/assets/unapprove", sbProject(sb.UnapproveAssets))
 		r.Put("/assets/{aid}", sbFields(sb.EditAsset, "aid"))
 		r.Delete("/assets/{aid}", sbParam(sb.DeleteAsset, "aid"))
-		r.Post("/assets/{aid}/draw", sbParam(sb.DrawAsset, "aid"))
-		r.Post("/assets/{aid}/redraw", sbGenerate(sb.RedrawAsset, "aid"))
+		r.With(externalAI).Post("/assets/{aid}/draw", rt.sbDrawAsset)
+		r.With(externalAI).Post("/assets/{aid}/redraw", rt.sbRedrawAsset)
+		r.With(externalAI).Post("/assets/{aid}/fix", rt.sbFixAsset)
 		r.Post("/assets/{aid}/approve", rt.sbApproveAsset)
 		r.Get("/assets/{aid}/preview", rt.sbAssetPreview)
 		r.Post("/assets/{aid}/unapprove", sbParam(sb.UnapproveAsset, "aid"))
@@ -179,6 +182,53 @@ func (rt *Router) sbApproveAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	st, err := rt.storyboard.ApproveAsset(r.Context(), pid(r), chi.URLParam(r, "aid"), in.ProjectName)
 	writeConcept(w, st, err)
+}
+
+// writeAssetDraw answers a drawing of an asset with the screen. Drawn code
+// rendering refused answers 422 {"error", "detail": {kind, message, line,
+// snippet}}, the structured error of rendering passed on unchanged; any other
+// error is mapped like the other step routes.
+func writeAssetDraw(w http.ResponseWriter, st *application.StoryboardScreen, err error) {
+	var refused *application.AssetDrawCheckError
+	if errors.As(err, &refused) {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": refused.Detail.Message, "detail": refused.Detail})
+		return
+	}
+	writeConcept(w, st, err)
+}
+
+// sbDrawAsset draws an asset for the first time; the body is not read.
+func (rt *Router) sbDrawAsset(w http.ResponseWriter, r *http.Request) {
+	st, err := rt.storyboard.DrawAsset(r.Context(), pid(r), chi.URLParam(r, "aid"))
+	writeAssetDraw(w, st, err)
+}
+
+// sbRedrawAsset draws an asset again from its code with {note}.
+func (rt *Router) sbRedrawAsset(w http.ResponseWriter, r *http.Request) {
+	var in noteBody
+	if err := decodeBody(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	st, err := rt.storyboard.RedrawAsset(r.Context(), pid(r), chi.URLParam(r, "aid"), in.Note)
+	writeAssetDraw(w, st, err)
+}
+
+// sbFixAsset sends the code the AI drew for an asset back with rendering's
+// error: {code, error: {kind, message, line, snippet}, redraw?}. redraw keeps
+// the asset's current code as the context, like a redraw.
+func (rt *Router) sbFixAsset(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Code   string                      `json:"code"`
+		Error  *application.AssetDrawError `json:"error"`
+		Redraw bool                        `json:"redraw"`
+	}
+	if err := decodeBody(r, &in); err != nil || in.Error == nil {
+		writeError(w, http.StatusBadRequest, "thân cần {code, error: {kind, message, line, snippet}, redraw?}")
+		return
+	}
+	st, err := rt.storyboard.FixAsset(r.Context(), pid(r), chi.URLParam(r, "aid"), application.AssetDrawFix{Code: in.Code, Error: *in.Error}, in.Redraw)
+	writeAssetDraw(w, st, err)
 }
 
 // sbAssetPreview serves the PNG of an asset's drawing, read through rendering.
